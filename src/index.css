@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #B85C72;
+  --color-accent-light: #F7EDF0;
+  --color-accent-medium: #D4849A;
+  --color-accent-dark: #8F3F55;
+  --color-success: #1A7A48;
+  --color-success-light: #E8F8EF;
+  --color-page-bg: #F4F2EF;
+  --color-card: #FFFFFF;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #7A7A7A;
+  --color-border: #EBEBEB;
+
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #F4F2EF;
+  color: #1A1A1A;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.fade-in-1 { animation: fadeInUp 0.4s ease 0.05s forwards; opacity: 0; }
+.fade-in-2 { animation: fadeInUp 0.4s ease 0.10s forwards; opacity: 0; }
+.fade-in-3 { animation: fadeInUp 0.4s ease 0.15s forwards; opacity: 0; }
+.fade-in-4 { animation: fadeInUp 0.4s ease 0.20s forwards; opacity: 0; }
+.fade-in-5 { animation: fadeInUp 0.4s ease 0.25s forwards; opacity: 0; }
+.fade-in-6 { animation: fadeInUp 0.4s ease 0.30s forwards; opacity: 0; }
