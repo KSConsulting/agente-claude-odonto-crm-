@@ -120,7 +120,7 @@ function LeadCard({ lead, isDragging = false, overlay = false }: LeadCardProps) 
         opacity: isSortableDragging ? 0.35 : 1,
       }
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (_e: React.MouseEvent) => {
     // Only navigate if not dragging
     if (!isDragging) {
       navigate(`/leads/${lead.id}`)
