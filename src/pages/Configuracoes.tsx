@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   User, Clock, Stethoscope, Upload, Save, Plus, Pencil,
   Trash2, ChevronDown, ChevronUp, X, Check, KeyRound, Eye, EyeOff,
@@ -375,37 +375,39 @@ function TabHorarios() {
         <div style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 4 }}>Esses horários são usados no Dashboard para calcular contatos dentro e fora do horário comercial.</div>
       </div>
       {rows.map((row, idx) => (
-        <div key={row.dia_semana} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: idx < 6 ? '1px solid #F5F5F5' : 'none', flexWrap: 'wrap', background: row.ativo ? '#fff' : '#FAFAFA', transition: 'background 0.15s' }}>
-          {/* Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
-            <button onClick={() => update(row.dia_semana, 'ativo', !row.ativo)}
-              style={{ width: 40, height: 22, borderRadius: 11, background: row.ativo ? '#B85C72' : '#EBEBEB', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: row.ativo ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-            </button>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: row.ativo ? '#1A1A1A' : '#7A7A7A' }}>{DAY_NAMES[row.dia_semana]}</span>
-          </div>
+        <React.Fragment key={row.dia_semana}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: (idx < 6 && !row.error) ? '1px solid #F5F5F5' : 'none', flexWrap: 'wrap', background: row.ativo ? '#fff' : '#FAFAFA', transition: 'background 0.15s' }}>
+            {/* Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
+              <button onClick={() => update(row.dia_semana, 'ativo', !row.ativo)}
+                style={{ width: 40, height: 22, borderRadius: 11, background: row.ativo ? '#B85C72' : '#EBEBEB', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: row.ativo ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+              </button>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: row.ativo ? '#1A1A1A' : '#7A7A7A' }}>{DAY_NAMES[row.dia_semana]}</span>
+            </div>
 
-          {/* Time inputs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-            <input type="time" value={row.hora_inicio} disabled={!row.ativo}
-              onChange={(e) => update(row.dia_semana, 'hora_inicio', e.target.value)}
-              style={{ ...timeInput, opacity: row.ativo ? 1 : 0.4, cursor: row.ativo ? 'pointer' : 'not-allowed' }}
-              onFocus={(e) => row.ativo && (e.target.style.borderColor = '#B85C72')}
-              onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
-            <span style={{ color: '#7A7A7A', fontSize: 13 }}>até</span>
-            <input type="time" value={row.hora_fim} disabled={!row.ativo}
-              onChange={(e) => update(row.dia_semana, 'hora_fim', e.target.value)}
-              style={{ ...timeInput, opacity: row.ativo ? 1 : 0.4, cursor: row.ativo ? 'pointer' : 'not-allowed' }}
-              onFocus={(e) => row.ativo && (e.target.style.borderColor = '#B85C72')}
-              onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
-          </div>
+            {/* Time inputs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+              <input type="time" value={row.hora_inicio} disabled={!row.ativo}
+                onChange={(e) => update(row.dia_semana, 'hora_inicio', e.target.value)}
+                style={{ ...timeInput, opacity: row.ativo ? 1 : 0.4, cursor: row.ativo ? 'pointer' : 'not-allowed' }}
+                onFocus={(e) => row.ativo && (e.target.style.borderColor = '#B85C72')}
+                onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+              <span style={{ color: '#7A7A7A', fontSize: 13 }}>até</span>
+              <input type="time" value={row.hora_fim} disabled={!row.ativo}
+                onChange={(e) => update(row.dia_semana, 'hora_fim', e.target.value)}
+                style={{ ...timeInput, opacity: row.ativo ? 1 : 0.4, cursor: row.ativo ? 'pointer' : 'not-allowed' }}
+                onFocus={(e) => row.ativo && (e.target.style.borderColor = '#B85C72')}
+                onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+            </div>
 
-          {/* Save button */}
-          <SaveButton onClick={() => handleSave(row)} saving={row.saving} saved={row.saved} />
-        </div>
-        {row.error && (
-          <div style={{ padding: '0 24px 12px', fontSize: 12.5, color: '#DC2626' }}>{row.error}</div>
-        )}
+            {/* Save button */}
+            <SaveButton onClick={() => handleSave(row)} saving={row.saving} saved={row.saved} />
+          </div>
+          {row.error && (
+            <div style={{ padding: '4px 24px 12px', fontSize: 12.5, color: '#DC2626', borderBottom: idx < 6 ? '1px solid #F5F5F5' : 'none' }}>{row.error}</div>
+          )}
+        </React.Fragment>
       ))}
     </div>
   )
