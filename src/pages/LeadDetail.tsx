@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, Clock, FileText, Save, Plus, X, CalendarDays, Stethoscope, BadgeDollarSign, ClipboardList } from 'lucide-react'
+import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus } from '../types'
 
@@ -190,6 +190,12 @@ export default function LeadDetail() {
   const [notesSaved, setNotesSaved] = useState(false)
   const [notesError, setNotesError] = useState('')
 
+  const [dataNascimento, setDataNascimento] = useState('')
+  const [valorPago, setValorPago] = useState('')
+  const [savingFicha, setSavingFicha] = useState(false)
+  const [fichaSaved, setFichaSaved] = useState(false)
+  const [fichaError, setFichaError] = useState('')
+
   const [showModal, setShowModal] = useState(false)
 
   /* Load data */
@@ -203,6 +209,8 @@ export default function LeadDetail() {
         setLead(leadData)
         setSelectedStatus(leadData.status)
         setAnotacoes(leadData.anotacoes ?? '')
+        setDataNascimento(leadData.data_nascimento ? leadData.data_nascimento.slice(0, 10) : '')
+        setValorPago(leadData.valor_pago_acumulado !== null && leadData.valor_pago_acumulado !== undefined ? String(leadData.valor_pago_acumulado) : '')
       }
       setConsultas(consultasData ?? [])
       setLoading(false)
@@ -232,6 +240,22 @@ export default function LeadDetail() {
     setLead((prev) => prev ? { ...prev, status: selectedStatus } : prev)
     setStatusSaved(true)
     setTimeout(() => setStatusSaved(false), 2000)
+  }
+
+  /* Save ficha */
+  const handleSaveFicha = async () => {
+    if (!lead) return
+    setSavingFicha(true); setFichaError('')
+    const valorNum = valorPago ? parseFloat(valorPago.replace(',', '.')) : null
+    const { error } = await supabase.from('leads_clinica').update({
+      data_nascimento: dataNascimento || null,
+      valor_pago_acumulado: valorNum,
+    }).eq('id', lead.id)
+    setSavingFicha(false)
+    if (error) { setFichaError('Erro ao salvar. Tente novamente.'); return }
+    setLead((prev) => prev ? { ...prev, data_nascimento: dataNascimento || null, valor_pago_acumulado: valorNum } : prev)
+    setFichaSaved(true)
+    setTimeout(() => setFichaSaved(false), 2000)
   }
 
   /* Save notes */
@@ -295,32 +319,18 @@ export default function LeadDetail() {
                   <Clock size={13} /> Última interação: {fmtDate(lead.ultima_mensagem)}
                 </span>
               )}
+              {lead.inicio_atendimento && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#7A7A7A' }}>
+                  <CalendarDays size={13} /> Início do atendimento: {fmtDate(lead.inicio_atendimento)}
+                </span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* AI Info */}
+      {/* Histórico de Consultas */}
       <div className="fade-in-2">
-        <SectionCard title="Informações da IA" icon={Stethoscope}>
-          <InfoRow label="Procedimento de Interesse" value={lead.procedimento_interesse} />
-          <div style={{ display: 'flex', gap: 12 }}>
-            <span style={{ fontSize: 12.5, color: '#7A7A7A', minWidth: 180, flexShrink: 0, paddingTop: 2 }}>Resumo da Conversa</span>
-            <span style={{ fontSize: 13.5, color: '#1A1A1A', lineHeight: 1.6 }}>{lead.resumo_conversa || '—'}</span>
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* Ficha Adicional */}
-      <div className="fade-in-3">
-        <SectionCard title="Ficha Adicional" icon={BadgeDollarSign}>
-          <InfoRow label="Data de Nascimento" value={fmtDateOnly(lead.data_nascimento)} />
-          <InfoRow label="Valor Pago Acumulado" value={fmtCurrency(lead.valor_pago_acumulado)} />
-        </SectionCard>
-      </div>
-
-      {/* Consultas */}
-      <div className="fade-in-4">
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', padding: '22px 26px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid #F5F5F5' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -374,9 +384,60 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      {/* Status */}
-      <div className="fade-in-5">
-        <SectionCard title="Status do Lead" icon={FileText}>
+      {/* Visão Completa do Contato */}
+      <div className="fade-in-3">
+        <SectionCard title="Visão Completa do Contato" icon={ClipboardList}>
+
+          {/* Informações da IA */}
+          <InfoRow label="Procedimento de Interesse" value={lead.procedimento_interesse} />
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <span style={{ fontSize: 12.5, color: '#7A7A7A', minWidth: 180, flexShrink: 0, paddingTop: 2 }}>Resumo da Conversa</span>
+            <span style={{ fontSize: 13.5, color: '#1A1A1A', lineHeight: 1.6 }}>{lead.resumo_conversa || '—'}</span>
+          </div>
+
+          <div style={{ borderTop: '1px solid #F5F5F5', margin: '18px 0' }} />
+
+          {/* Ficha Adicional */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12.5, color: '#7A7A7A', minWidth: 180, flexShrink: 0 }}>Data de Nascimento</span>
+              <input
+                type="date"
+                value={dataNascimento}
+                onChange={(e) => { setDataNascimento(e.target.value); setFichaError('') }}
+                style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #EBEBEB', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', outline: 'none', background: '#fff' }}
+                onFocus={(e) => (e.target.style.borderColor = '#B85C72')}
+                onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12.5, color: '#7A7A7A', minWidth: 180, flexShrink: 0 }}>Valor Pago Acumulado (R$)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={valorPago}
+                onChange={(e) => { setValorPago(e.target.value); setFichaError('') }}
+                placeholder="0,00"
+                style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #EBEBEB', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', outline: 'none', background: '#fff', width: 160 }}
+                onFocus={(e) => (e.target.style.borderColor = '#B85C72')}
+                onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')}
+              />
+            </div>
+            {fichaError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#DC2626' }}>{fichaError}</div>
+            )}
+            <div>
+              <button onClick={handleSaveFicha} disabled={savingFicha}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, border: 'none', background: fichaSaved ? '#1A7A48' : (savingFicha ? '#D4849A' : '#B85C72'), color: '#fff', cursor: savingFicha ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
+                <Save size={13} /> {fichaSaved ? 'Salvo!' : savingFicha ? 'Salvando...' : 'Salvar Ficha'}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid #F5F5F5', margin: '18px 0' }} />
+
+          {/* Status do Lead */}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <select
               value={selectedStatus}
@@ -390,18 +451,16 @@ export default function LeadDetail() {
             </select>
             <button onClick={handleSaveStatus} disabled={savingStatus || selectedStatus === lead.status}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: 'none', background: statusSaved ? '#1A7A48' : (selectedStatus === lead.status ? '#EBEBEB' : '#B85C72'), color: selectedStatus === lead.status ? '#7A7A7A' : '#fff', cursor: selectedStatus === lead.status ? 'default' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
-              <Save size={14} /> {statusSaved ? 'Salvo!' : savingStatus ? 'Salvando...' : 'Salvar'}
+              <Save size={14} /> {statusSaved ? 'Salvo!' : savingStatus ? 'Salvando...' : 'Salvar Status'}
             </button>
           </div>
           {statusError && (
             <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#DC2626', marginTop: 10 }}>{statusError}</div>
           )}
-        </SectionCard>
-      </div>
 
-      {/* Anotações */}
-      <div className="fade-in-6">
-        <SectionCard title="Anotações" icon={ClipboardList}>
+          <div style={{ borderTop: '1px solid #F5F5F5', margin: '18px 0' }} />
+
+          {/* Anotações */}
           <textarea
             value={anotacoes}
             onChange={(e) => setAnotacoes(e.target.value)}
@@ -420,6 +479,7 @@ export default function LeadDetail() {
               <Save size={14} /> {notesSaved ? 'Salvo!' : savingNotes ? 'Salvando...' : 'Salvar Anotações'}
             </button>
           </div>
+
         </SectionCard>
       </div>
 
