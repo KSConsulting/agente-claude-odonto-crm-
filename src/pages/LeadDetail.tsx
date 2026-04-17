@@ -44,10 +44,7 @@ function fmtDate(str: string | null) {
   if (!str) return '—'
   return new Date(str).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
-function fmtDateOnly(str: string | null) {
-  if (!str) return '—'
-  return new Date(str).toLocaleDateString('pt-BR')
-}
+
 function fmtCurrency(v: number | null) {
   if (v === null || v === undefined) return '—'
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
