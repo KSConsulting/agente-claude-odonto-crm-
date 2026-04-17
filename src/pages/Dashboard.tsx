@@ -521,6 +521,13 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {foraHorario > 0 && (
+            <div style={{ marginTop: 16, background: '#F7EDF0', borderRadius: 10, padding: '12px 16px', borderLeft: '3px solid #B85C72' }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: '#B85C72' }}>{foraHorario} {foraHorario === 1 ? 'lead atendido' : 'leads atendidos'} fora do expediente.</span>
+              <span style={{ fontSize: 13, color: '#5A3A44', fontWeight: 400 }}> Cada um deles poderia ter ido para a concorrência — o Agente de IA garantiu que não fossem.</span>
+            </div>
+          )}
         </div>
       </div>
 
