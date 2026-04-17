@@ -247,7 +247,7 @@ export default function Dashboard() {
   const range = getPeriodRange(period, customRange)
 
   /* KPIs */
-  const novosContatos = leads.filter((l) => inRange(l.created_at, range)).length
+  const novosContatos = leads.filter((l) => inRange(l.inicio_atendimento, range)).length
   const consultasAgendadas = leads.filter((l) => inRange(l.data_marcacao_agendamento, range)).length
   const taxaConversao = novosContatos > 0 ? Math.round((consultasAgendadas / novosContatos) * 100) : 0
 
