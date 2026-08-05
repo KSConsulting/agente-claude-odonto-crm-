@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  User, Clock, Stethoscope, Upload, Save, Plus, Pencil,
+  User, Clock, Stethoscope, Upload, Save, Plus, Pencil, MapPin,
   Trash2, ChevronDown, ChevronUp, X, Check, KeyRound, Eye, EyeOff,
 } from 'lucide-react'
 import zxcvbn from 'zxcvbn'
@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import type { Usuario, ConfiguracoesClinica, HorarioComercial, ServicoClinica } from '../types'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import TabTokenApi from '../components/TabTokenApi'
+import TabClinica from '../components/TabClinica'
 
 /* ──────────────────────────────────────────────
    Upload validation constants
@@ -32,10 +33,11 @@ const STRENGTH_COLORS = ['#DC2626', '#F97316', '#D97706', '#1A7A48', '#1A7A48']
 ────────────────────────────────────────────── */
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
 
-type TabKey = 'perfil' | 'horarios' | 'procedimentos' | 'tokens'
+type TabKey = 'perfil' | 'clinica' | 'horarios' | 'procedimentos' | 'tokens'
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'perfil',         label: 'Perfil',                  icon: User },
+  { key: 'clinica',        label: 'Clínica',                  icon: MapPin },
   { key: 'horarios',       label: 'Horários de Funcionamento', icon: Clock },
   { key: 'procedimentos',  label: 'Procedimentos',            icon: Stethoscope },
   { key: 'tokens',         label: 'Token e API',              icon: KeyRound },
@@ -145,7 +147,12 @@ function TabPerfil({ userId }: { userId: string }) {
     const { error: dbError } = await dbOp
     if (dbError) { setLogoError('Logo enviada, mas erro ao salvar configuração.') }
     else {
-      setClinica((prev) => prev ? { ...prev, logo_url: url } : { id: '', nome_clinica: null, logo_url: url, fuso_horario: 'America/Sao_Paulo', created_at: '', updated_at: '' })
+      setClinica((prev) => prev ? { ...prev, logo_url: url } : {
+        id: '', nome_clinica: null, logo_url: url, fuso_horario: 'America/Sao_Paulo',
+        endereco: null, bairro: null, cidade: null, estado: null, cep: null,
+        google_maps_url: null, instagram_url: null, site_url: null,
+        created_at: '', updated_at: '',
+      })
       window.dispatchEvent(new Event('clinica-logo-updated'))
     }
     setUploadingLogo(false); e.target.value = ''
@@ -670,6 +677,7 @@ export default function Configuracoes() {
       {/* Tab content */}
       <div className="fade-in-3">
         {activeTab === 'perfil' && userId && <TabPerfil userId={userId} />}
+        {activeTab === 'clinica' && <TabClinica />}
         {activeTab === 'horarios' && <TabHorarios />}
         {activeTab === 'procedimentos' && <TabProcedimentos />}
         {activeTab === 'tokens' && <TabTokenApi />}

@@ -66,11 +66,12 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **cinco arquivos, nesta ordem**:
+A migração é aplicada em **seis arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
-`0004_api_agente.sql` (tokens e funções da API) e
-`0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica).
+`0004_api_agente.sql` (tokens e funções da API),
+`0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica) e
+`0006_informacoes_clinica.sql` (endereço da clínica e a view do agente).
 
 Os pontos que mais causam erro:
 
@@ -130,6 +131,7 @@ src/
 │   ├── AgendaMes.tsx           grade mensal (semanas inteiras)
 │   ├── NovoAgendamentoModal.tsx  criar consulta; cria o paciente se não existir
 │   ├── CampoTelefone.tsx       seletor de país + contagem de dígitos
+│   ├── TabClinica.tsx          aba "Clínica" de Configurações
 │   ├── TabTokenApi.tsx         aba "Token e API" de Configurações
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
@@ -141,7 +143,7 @@ src/
     ├── Leads.tsx               invólucro: <PessoasPage mode="leads" />
     ├── Clientes.tsx            invólucro: <PessoasPage mode="clientes" />
     ├── LeadDetail.tsx          ficha do lead + consultas + anotações
-    └── Configuracoes.tsx       perfil, horários, procedimentos, Token e API
+    └── Configuracoes.tsx       perfil, clínica, horários, procedimentos, tokens
 ```
 
 ### A agenda não é uma entidade
@@ -471,3 +473,27 @@ sintoma é um 401 sem explicação.
 O valor em claro nunca é gravado: o banco guarda só o hash, e a tela mantém o
 valor em memória apenas enquanto a página está aberta, para os cURLs saírem
 preenchidos logo depois da criação.
+
+### Os dados da clínica o agente lê direto do banco, sem API
+
+`informacoes_clinica_agente` é uma view de **coluna única**, com uma informação
+por linha, já escrita como frase — endereço, bairro, cidade/UF, CEP, Maps,
+Instagram e site. O n8n lê com a mesma `service_role key` que já usa para gravar
+os leads em `crm_clinica`; não há endpoint para isso, de propósito.
+
+Três coisas que a definem (detalhes na seção 4.12 do
+[`DATABASE.md`](DATABASE.md)):
+
+1. **É view, não tabela.** Calculada na leitura a partir de
+   `configuracoes_clinica` — o estado "desatualizada" não existe. Mesmo motivo
+   de `crm_clinica`.
+2. **Uma coluna só, com rótulo dentro da frase.** Valor sem rótulo obriga o
+   agente a adivinhar qual linha é o CEP e qual é o bairro.
+3. **Campo vazio não vira linha.** `Site: ` pelado faria o agente dizer que o
+   site da clínica é nada.
+
+Quem preenche é a aba **Clínica** ([`TabClinica.tsx`](src/components/TabClinica.tsx)),
+que mostra no rodapé a prévia do que o agente lê — e essa prévia é **uma consulta
+real à view**, não uma reimplementação. Se ela fosse montada no TypeScript,
+haveria duas versões da mesma regra e um dia a tela mostraria uma coisa e o
+paciente ouviria outra.

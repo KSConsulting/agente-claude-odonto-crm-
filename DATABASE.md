@@ -44,6 +44,9 @@ ordem**:
    profissional).
 5. `supabase/migrations/0005_catalogo_procedimentos.sql` — os 20 procedimentos
    da clínica, no lugar dos 3 de exemplo do seed inicial. Só dados.
+6. `supabase/migrations/0006_informacoes_clinica.sql` — endereço e links da
+   clínica: 8 colunas novas em `configuracoes_clinica`, 2 restrições e a view
+   `informacoes_clinica_agente`, de coluna única, que o Agente de IA lê.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -139,6 +142,9 @@ erDiagram
         uuid id PK
         text nome_clinica
         text fuso_horario
+        text endereco
+        text cidade
+        text estado
     }
     horario_comercial {
         uuid id PK
@@ -160,7 +166,8 @@ erDiagram
 | `profissional_horarios` | tabela | Jornada, 1 linha por dia da semana |
 | `profissional_bloqueios` | tabela | Férias, feriado, almoço |
 | `usuarios` | tabela | Perfil da equipe, espelha `auth.users` |
-| `configuracoes_clinica` | tabela | Nome, logo e fuso da clínica (linha única) |
+| `configuracoes_clinica` | tabela | Identidade, endereço e fuso da clínica (linha única) |
+| `informacoes_clinica_agente` | **view** | Os dados da clínica em frases prontas, uma por linha, para o Agente de IA (ver 4.12) |
 | `horario_comercial` | tabela | Grade de atendimento, 1 linha por dia |
 | `servicos_clinica` | tabela | Catálogo de procedimentos |
 
@@ -445,9 +452,10 @@ $$;
 
 ### 4.4. `configuracoes_clinica`
 
-Nome e logo da clínica. **Tem no máximo uma linha.**
+Identidade e endereço da clínica. **Tem no máximo uma linha.**
 
-**Usada em:** `Configuracoes.tsx`, `Sidebar.tsx`
+**Usada em:** `Configuracoes.tsx` (abas Perfil e Clínica), `Sidebar.tsx`, e a view
+`informacoes_clinica_agente` (seção 4.12), que o Agente de IA lê.
 
 | Coluna | Tipo | Nulo | Default |
 |---|---|:---:|---|
@@ -455,8 +463,30 @@ Nome e logo da clínica. **Tem no máximo uma linha.**
 | `nome_clinica` | `text` | sim | — |
 | `logo_url` | `text` | sim | — |
 | `fuso_horario` | `text` | não | `'America/Sao_Paulo'` |
+| `endereco` | `text` | sim | — |
+| `bairro` | `text` | sim | — |
+| `cidade` | `text` | sim | — |
+| `estado` | `text` | sim | — |
+| `cep` | `text` | sim | — |
+| `google_maps_url` | `text` | sim | — |
+| `instagram_url` | `text` | sim | — |
+| `site_url` | `text` | sim | — |
 | `created_at` | `timestamptz` | não | `now()` |
 | `updated_at` | `timestamptz` | não | `now()` |
+
+**Restrições:** `configuracoes_clinica_estado_valido` aceita só as 27 UFs (ou
+nulo); `configuracoes_clinica_cep_valido` exige `^\d{8}$`.
+
+> **`endereco` é um campo só** — guarda "Rua Samuel Scott, 212 A - bloco 3"
+> inteiro. Separar rua, número e complemento obrigaria a remontar a frase na
+> leitura, e daria três jeitos diferentes de o mesmo endereço ficar estranho.
+
+> **`cidade` é livre, `estado` é lista.** Cidade escrita à mão é inevitável — são
+> milhares. UF é um conjunto fechado de 27, e digitada à mão vira "SP", "sp" e
+> "São Paulo" na mesma coluna.
+
+> **`cep` guarda só dígitos** (`88040600`), como `whatsapp_lead`. A pontuação
+> existe na tela; o `CHECK` recusa qualquer coisa formatada.
 
 > **`fuso_horario` não é enfeite.** `profissional_horarios` guarda `time` sem
 > fuso e `consultas.data_consulta` é `timestamptz`; cruzar os dois exige saber em
@@ -704,6 +734,59 @@ que vira frase para o paciente na Edge Function.
 As de escrita são `security definer` **com `set search_path = public`**. Sem esse
 `set`, `security definer` é vetor clássico de escalada de privilégio: quem chama
 poderia plantar um schema com objetos de mesmo nome.
+
+---
+
+### 4.12. `informacoes_clinica_agente` (view)
+
+Os dados da clínica em frases prontas, **uma coluna, uma informação por linha**.
+É o que o Agente de IA consulta pelo n8n quando precisa falar do endereço, do
+Instagram ou do site com um paciente.
+
+| Coluna | Tipo |
+|---|---|
+| `informacao` | `text` |
+
+```
+Nome: Odonto Clinica
+Rua: Rua Samuel Scott, 212 A - bloco 3
+Bairro: Carvoeira
+Cidade: Florianópolis/SC
+CEP: 88040-600
+Link do Google Maps: https://maps.app.goo.gl/...
+Instagram: https://instagram.com/clinica
+Site: https://clinica.com.br
+```
+
+> **Por que view e não tabela.** Uma segunda tabela precisaria ser mantida em
+> sincronia com `configuracoes_clinica`, e um dia não estaria — alguém edita o
+> endereço na tela e esquece de propagar, ou o trigger falha em silêncio. A view
+> é calculada na leitura: **o estado "desatualizada" não existe**. É o mesmo
+> motivo pelo qual `crm_clinica` é view sobre `crm_clinica_dados`.
+
+> **Por que uma coluna só.** Quem lê vai falar com um paciente. Valor sem rótulo
+> obriga o agente a adivinhar qual linha é o CEP e qual é o bairro — e uma hora
+> ele erra. Frase pronta elimina a adivinhação, na mesma lógica do campo
+> `mensagem` da API.
+
+> **Campo vazio não vira linha.** O `||` com `NULL` devolve `NULL` e o `WHERE`
+> derruba a linha, então a clínica sem site simplesmente não tem a linha `Site:`
+> — em vez de ter uma linha `Site: ` pelada, que o agente leria como "o site da
+> clínica é nada". O `nullif(trim(...), '')` cobre o campo salvo com espaço em
+> branco, que não é `NULL` mas produziria o mesmo efeito.
+
+**A ordem é fixa** dentro da própria view, via uma coluna `ordem` que não é
+selecionada. A saída sai sempre na mesma sequência.
+
+**Acesso:** `security_invoker = true`, então vale o RLS de
+`configuracoes_clinica`. Na prática: a `service_role` do n8n lê, a equipe logada
+lê, e quem não tem sessão não lê nada. **O agente lê a view direto, sem passar
+pela API** — ele já entra no banco com a `service_role` para gravar os leads em
+`crm_clinica`, e uma leitura a mais pela mesma conexão não acrescenta superfície.
+
+```sql
+select informacao from public.informacoes_clinica_agente;
+```
 
 ---
 

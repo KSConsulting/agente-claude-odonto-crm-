@@ -27,8 +27,28 @@ export interface ConfiguracoesClinica {
   logo_url: string | null
   /** IANA (ex.: 'America/Sao_Paulo'). Base do cálculo de disponibilidade. */
   fuso_horario: string
+  /** Rua, número e complemento num campo só: 'Rua Samuel Scott, 212 A - bloco 3'. */
+  endereco: string | null
+  bairro: string | null
+  cidade: string | null
+  /** UF de duas letras. O banco recusa qualquer coisa fora das 27. */
+  estado: string | null
+  /** Só dígitos: '88040600'. A pontuação existe apenas na tela. */
+  cep: string | null
+  google_maps_url: string | null
+  instagram_url: string | null
+  site_url: string | null
   created_at: string
   updated_at: string
+}
+
+/**
+ * Uma linha da view `informacoes_clinica_agente` — frase pronta, coluna única.
+ * É o que o Agente de IA lê pelo n8n quando precisa falar da clínica.
+ * **Somente leitura:** a view é calculada a partir de `configuracoes_clinica`.
+ */
+export interface InformacaoClinica {
+  informacao: string
 }
 
 export interface HorarioComercial {
