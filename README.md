@@ -565,6 +565,7 @@ where pubname = 'supabase_realtime';
 | Arquivo | Conteúdo |
 |---|---|
 | [`DATABASE.md`](DATABASE.md) | Referência completa do banco: todas as colunas, RLS, Storage, Realtime, armadilhas e consultas de verificação |
+| [`API_AGENTE.md`](API_AGENTE.md) | Contrato da API que o Agente de IA consome pelo n8n: os sete endpoints, com cURL pronto, e o desenho dos tokens de acesso |
 | [`CLAUDE.md`](CLAUDE.md) | Convenções de código, design system, rotas e débito técnico conhecido |
 | [`supabase/migrations/`](supabase/migrations/) | O SQL que recria o banco do zero |
 

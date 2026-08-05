@@ -421,11 +421,19 @@ lead. **Isso não vale mais:** a consulta precisa virar linha em `consultas`, co
 `data_agendamento` continua existindo, mas virou reflexo — quem o mantém é o
 trigger `consultas_sincroniza_lead`.
 
-### A API da agenda ainda não existe
+### A API da agenda: contrato aprovado, código não escrito
 
-A fase seguinte é expor cinco operações ao agente (consultar disponibilidade,
-criar, consultar, cancelar, reagendar), chamadas pelo **n8n via nó HTTP**. O
-schema já foi desenhado para isso — restrição anti-conflito, idempotência,
+**O contrato está em [`API_AGENTE.md`](API_AGENTE.md)** — sete endpoints
+(profissionais, procedimentos, disponibilidade, marcar, consultas, cancelar,
+remarcar), chamados pelo **n8n via nó HTTP**, autenticados por token próprio e
+não pela `service_role key`.
+
+Leia antes de implementar. As duas decisões que mais afetam o código: **recusa
+de negócio volta com HTTP 200** (`ok: false` + `motivo` + `mensagem`), porque
+"horário ocupado" é resposta e não erro; e **toda saída traz uma frase pronta
+para o paciente ouvir**, já que quem consome é um agente que vai falar, não uma
+tela que vai renderizar.
+
+O schema já foi desenhado para isso — restrição anti-conflito, idempotência,
 bloqueios e fuso da clínica estão no banco justamente porque a API não passa
-pela interface. Os detalhes e as recomendações estão na **seção 8 do
-`DATABASE.md`**.
+pela interface. Ver também a **seção 8 do `DATABASE.md`**.
