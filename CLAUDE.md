@@ -62,12 +62,14 @@ Não existe suíte de testes. Ao mexer em algo, valide com `npm run build`
 de tocar em qualquer coisa relacionada a dados — schema, RLS, Storage,
 integração com o agente e armadilhas conhecidas estão todos lá.
 
-A migração executável fica em
-[`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql).
+As migrações executáveis ficam em [`supabase/migrations/`](supabase/migrations/),
+e a API do Agente de IA em
+[`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **três arquivos, nesta ordem**: `0001_schema_inicial.sql`,
-`0002_agenda_profissionais.sql` (agenda e profissionais) e
-`0003_whatsapp_unico.sql` (WhatsApp normalizado e único).
+A migração é aplicada em **quatro arquivos, nesta ordem**:
+`0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
+profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único) e
+`0004_api_agente.sql` (tokens e funções da API).
 
 Os pontos que mais causam erro:
 
@@ -421,19 +423,29 @@ lead. **Isso não vale mais:** a consulta precisa virar linha em `consultas`, co
 `data_agendamento` continua existindo, mas virou reflexo — quem o mantém é o
 trigger `consultas_sincroniza_lead`.
 
-### A API da agenda: contrato aprovado, código não escrito
+### A API da agenda — implantada
 
-**O contrato está em [`API_AGENTE.md`](API_AGENTE.md)** — sete endpoints
+**Contrato e cURLs em [`API_AGENTE.md`](API_AGENTE.md)** — sete endpoints
 (profissionais, procedimentos, disponibilidade, marcar, consultas, cancelar,
 remarcar), chamados pelo **n8n via nó HTTP**, autenticados por token próprio e
 não pela `service_role key`.
 
-Leia antes de implementar. As duas decisões que mais afetam o código: **recusa
-de negócio volta com HTTP 200** (`ok: false` + `motivo` + `mensagem`), porque
-"horário ocupado" é resposta e não erro; e **toda saída traz uma frase pronta
-para o paciente ouvir**, já que quem consome é um agente que vai falar, não uma
-tela que vai renderizar.
+Três coisas para não descobrir do jeito difícil:
 
-O schema já foi desenhado para isso — restrição anti-conflito, idempotência,
-bloqueios e fuso da clínica estão no banco justamente porque a API não passa
-pela interface. Ver também a **seção 8 do `DATABASE.md`**.
+1. **A Edge Function não pode ter `import` de nada.** O runtime sobe com
+   `--no-remote` e um import externo derruba a função inteira com `BOOT_ERROR`,
+   antes de rodar uma linha. A conversa com o banco é `fetch` no PostgREST.
+2. **Recusa de negócio volta com HTTP 200** (`ok: false` + `motivo` +
+   `mensagem`). "Horário ocupado" é resposta, não erro — com 4xx o nó do n8n
+   quebraria o fluxo justamente na hora de dar a notícia.
+3. **Toda resposta traz frase pronta**, inclusive 401 e 500, onde ela é neutra.
+   Quem consome vai falar com um paciente; sem frase, o agente improvisa.
+
+A lógica pesada mora em funções SQL (`0004`), não no TypeScript: remarcar precisa
+ser atômico e o cruzamento entre jornada e consulta só é confiável com o
+`AT TIME ZONE` do Postgres. A Edge Function confere o token, chama a função e
+monta a frase.
+
+**A regra de disponibilidade em SQL espelha [`src/lib/agenda.ts`](src/lib/agenda.ts).**
+Mudou uma, mude a outra — se divergirem, o agente oferece horário que a recepção
+vê como ocupado.

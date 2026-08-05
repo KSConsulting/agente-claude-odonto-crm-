@@ -37,9 +37,10 @@ ordem**:
    da clínica.
 3. `supabase/migrations/0003_whatsapp_unico.sql` — WhatsApp normalizado e único:
    1 função, 1 trigger e o índice que impede duas pessoas com o mesmo número.
+4. `supabase/migrations/0004_api_agente.sql` — API do Agente de IA: a tabela
+   `api_tokens` e as 7 funções que a Edge Function chama.
 
-A ordem importa: o `0002` usa a função `set_updated_at` e a tabela `consultas`
-do `0001`, e o `0003` age sobre `crm_clinica_dados`. Rodar fora de ordem falha.
+A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
 Confira o resultado com as consultas da [seção 10](#10-consultas-úteis-para-verificação).
 
@@ -610,6 +611,60 @@ disponibilidade da API.
 
 ---
 
+### 4.10. `api_tokens`
+
+Chaves de acesso da API do Agente de IA. Contrato completo em
+[`API_AGENTE.md`](API_AGENTE.md).
+
+| Coluna | Tipo | Nulo | Default | Observação |
+|---|---|:---:|---|---|
+| `id` | `uuid` | não | `gen_random_uuid()` | PK |
+| `nome` | `text` | não | — | Como a equipe identifica ("n8n produção") |
+| `prefixo` | `text` | não | — | Início visível (`odk_7f3a…`), para distinguir na lista |
+| `hash` | `text` | não | — | **SHA-256 do token. UNIQUE** |
+| `ativo` | `boolean` | não | `true` | Revogar é `false` |
+| `criado_por` | `uuid` | sim | — | FK → `usuarios(id)` ON DELETE SET NULL |
+| `ultimo_acesso` | `timestamptz` | sim | — | Atualizado pela API, no máximo a cada 5 min |
+| `revogado_em` | `timestamptz` | sim | — | |
+| `created_at` | `timestamptz` | não | `now()` | |
+
+> **O valor do token não existe em lugar nenhum.** Guarda-se só o hash: dá para
+> conferir quem chega, não para reconstruir. Por isso ele é exibido uma única
+> vez, na criação — e é nesse momento que a tela mostra os cURLs já preenchidos.
+> Guardar o valor legível faria de um vazamento do banco a entrega de todos os
+> tokens de uma vez.
+
+> **Revogar não apaga.** `ativo = false` preserva o histórico de quem teve
+> acesso e quando.
+
+---
+
+### 4.11. Funções da API
+
+Sete funções servem a Edge Function `agenda`. Elas existem **no banco**, e não no
+TypeScript, por três motivos: remarcar precisa ser atômico; o cruzamento entre a
+jornada (`time` sem fuso) e a consulta (`timestamptz`) só é confiável com o
+`AT TIME ZONE` do Postgres; e assim dá para testar tudo com SQL, sem subir nada.
+
+| Função | Papel |
+|---|---|
+| `api_token_valido(hash)` | Confere o token e carimba `ultimo_acesso` |
+| `agenda_profissionais_livres(inicio, duracao)` | Quem está livre num horário |
+| `agenda_horarios_disponiveis(data, profissional, duracao, passo)` | Slots livres num dia |
+| `agenda_proxima_vaga(a_partir_de, profissional, duracao)` | Próximo dia com vaga (até 60 dias) |
+| `agenda_marcar(...)` | Acha ou cria o paciente, escolhe profissional, insere |
+| `agenda_cancelar(...)` | Cancela, com conferência opcional pelo WhatsApp |
+| `agenda_remarcar(...)` | Move a consulta num `UPDATE` só |
+
+As três últimas devolvem `ok`, `motivo` e os campos da resposta — o `motivo` é o
+que vira frase para o paciente na Edge Function.
+
+As de escrita são `security definer` **com `set search_path = public`**. Sem esse
+`set`, `security definer` é vetor clássico de escalada de privilégio: quem chama
+poderia plantar um schema com objetos de mesmo nome.
+
+---
+
 ## 5. Status do funil
 
 `crm_clinica_dados.status` aceita exatamente estes 9 valores, garantidos por
@@ -686,7 +741,7 @@ passa pelo React. Escreveu consulta, o funil acompanha — venha de onde vier.
 **Premissa: sistema interno.** Todo usuário autenticado é da equipe e enxerga
 tudo. Quem não estiver logado não enxerga nada.
 
-RLS está **ativo nas 9 tabelas**. São 10 políticas:
+RLS está **ativo nas 10 tabelas**. São 11 políticas:
 
 | Tabela | Política | Operação | Regra |
 |---|---|---|---|
@@ -699,9 +754,14 @@ RLS está **ativo nas 9 tabelas**. São 10 políticas:
 | `horario_comercial` | `horario_all` | ALL | `authenticated` — acesso total |
 | `servicos_clinica` | `servicos_all` | ALL | `authenticated` — acesso total |
 | `usuarios` | `usuarios_select` | SELECT | `authenticated` — vê todos os perfis |
+| `api_tokens` | `api_tokens_all` | ALL | `authenticated` — acesso total |
 | `usuarios` | `usuarios_update_own` | UPDATE | **só o próprio** (`auth.uid() = id`) |
 
 Mais 6 políticas em `storage.objects` (seção 7).
+
+> A Edge Function usa a `service_role key`, que ignora o RLS — ela é servidor, não
+> sessão de usuário. O que limita o agente não é o RLS, é a superfície da API:
+> sete operações e nada mais.
 
 A função `sincronizar_agendamento_lead` (seção 5) **não** usa `security definer`:
 roda com as permissões de quem chamou, que já tem acesso total pelas políticas.
@@ -790,11 +850,12 @@ calendário — duas telas contando histórias diferentes sobre o mesmo fato. A
 fonte da verdade do agendamento é a linha em `consultas`; `data_agendamento`
 virou reflexo, mantido pelo trigger.
 
-### A API da agenda (fase 2 — ainda não implementada)
+### A API da agenda — implantada
 
-O schema já nasceu preparado para as cinco operações que o agente precisa:
-consultar disponibilidade, criar, consultar os agendamentos de um paciente,
-cancelar e reagendar. O que está no banco por causa disso:
+Sete endpoints na Edge Function `agenda`, autenticados por token próprio.
+Contrato e cURLs em [`API_AGENTE.md`](API_AGENTE.md); funções SQL na seção 4.11.
+
+O que está no banco por causa dela:
 
 | Peça | Por quê |
 |---|---|
@@ -804,16 +865,15 @@ cancelar e reagendar. O que está no banco por causa disso:
 | `configuracoes_clinica.fuso_horario` (4.4) | Servidor em UTC; sem fixar o fuso, a disponibilidade erra em 3 horas |
 | `origem` (4.2) | Sem isso é impossível medir ou auditar o que o agente marcou sozinho |
 
-Recomendações de implementação:
+Duas coisas que a implementação confirmou, e que quem for mexer precisa saber:
 
-- **Edge Function do Supabase**, com a lógica de disponibilidade numa função SQL.
-  Dar a `service_role key` para a camada de ferramentas do agente significa que
-  uma injeção de prompt numa mensagem de WhatsApp vira acesso total ao banco. Uma
-  Edge Function com segredo próprio expõe cinco operações e nada mais.
-- **Reagendar precisa ser operação atômica**, não "cancela e cria": se o segundo
-  passo falhar, o paciente fica sem consulta nenhuma e ninguém percebe.
-- **A regra de disponibilidade em SQL precisa espelhar `src/lib/agenda.ts`.** Se
-  divergirem, o agente oferece horário que a recepção vê como ocupado.
+- **A Edge Function não pode ter dependência externa.** O runtime sobe com
+  `--no-remote`; um `import` de `supabase-js` derruba a função inteira com
+  `BOOT_ERROR` antes de rodar uma linha. Toda conversa com o banco é `fetch` no
+  PostgREST.
+- **A regra de disponibilidade em SQL espelha `src/lib/agenda.ts`.** Se
+  divergirem, o agente oferece horário que a recepção vê como ocupado. Mudou uma,
+  mude a outra.
 
 ---
 
@@ -922,6 +982,10 @@ Lista do que quebra este banco de formas não óbvias:
 18. **Criar o índice `crm_clinica_whatsapp_unico` com duplicatas no banco** →
     o Postgres recusa. Rode a consulta de duplicados da seção 4.1 e resolva
     antes.
+19. **Acrescentar `import` na Edge Function** → `BOOT_ERROR` no boot, com todos
+    os endpoints fora do ar de uma vez. O runtime roda com `--no-remote`.
+20. **Esquecer `set search_path = public` numa função `security definer`** →
+    brecha de escalada de privilégio.
 
 ---
 

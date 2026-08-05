@@ -3,12 +3,22 @@
 Especificação dos endpoints que o Agente de IA consome pelo **n8n, via nó HTTP**,
 para consultar disponibilidade, marcar, consultar, cancelar e remarcar consultas.
 
-> **Status: aprovada, não implementada.** Este documento é o contrato. O código
-> vem depois dele, não antes.
+> **Status: implantada e testada ponta a ponta.** Os catorze cenários deste
+> documento foram exercitados por HTTP contra o projeto real — conflito,
+> expediente, idempotência, conferência de dono, fuso e token revogado.
 
 - **Quem chama:** n8n (nó HTTP Request), dentro do fluxo que atende o WhatsApp
 - **Onde roda:** Supabase Edge Function `agenda`
+  ([`supabase/functions/agenda/index.ts`](supabase/functions/agenda/index.ts))
+- **Regras de negócio:** funções SQL da migração
+  [`0004_api_agente.sql`](supabase/migrations/0004_api_agente.sql)
 - **Banco:** as garantias já existem — ver [`DATABASE.md`](DATABASE.md)
+
+> **A Edge Function não tem dependência nenhuma, e isso é obrigatório.** O
+> runtime sobe com `--no-remote` e recusa buscar qualquer módulo externo no
+> boot — com um `import` de `supabase-js`, a função inteira morre com
+> `BOOT_ERROR` antes de executar uma linha. Toda conversa com o banco é `fetch`
+> direto no PostgREST. Se for acrescentar biblioteca, saiba que não vai subir.
 
 ---
 
@@ -336,7 +346,8 @@ banco cuida disso sozinho, por trigger. Se o paciente tiver outras sessões
 marcadas, o funil dele **não** muda: cancelar uma sessão não é desistir do
 tratamento.
 
-**Recusas:** `nao_encontrada`, `nao_pertence`, `ja_cancelada`.
+**Recusas:** `nao_encontrada`, `nao_pertence`, `ja_cancelada`, `nao_cancelavel`
+(consulta já realizada).
 
 ```bash
 curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/cancelar' \

@@ -151,23 +151,24 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **três arquivos, nesta ordem** — cada um depende do anterior:
+São **quatro arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
 3. [`supabase/migrations/0003_whatsapp_unico.sql`](supabase/migrations/0003_whatsapp_unico.sql)
+4. [`supabase/migrations/0004_api_agente.sql`](supabase/migrations/0004_api_agente.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
 Ao final você terá:
 
 ```
-9 tabelas + 1 view       estrutura de dados
-16 índices               desempenho e integridade (um deles impede
+10 tabelas + 1 view      estrutura de dados
+17 índices               desempenho e integridade (um deles impede
                          duas pessoas com o mesmo WhatsApp)
-16 políticas de RLS      controle de acesso (10 no banco + 6 no Storage)
+17 políticas de RLS      controle de acesso (11 no banco + 6 no Storage)
 2 buckets de Storage     fotos de perfil e logotipo
-5 funções + 7 triggers   automações internas
+12 funções + 7 triggers  automações internas e as regras da API
 1 restrição de exclusão  impede duas consultas no mesmo horário
 2 tabelas no Realtime    atualização automática da tela
 ```
@@ -385,16 +386,22 @@ apareceria no CRM e sumiria da Agenda. A linha em `consultas` deve trazer
 consultas idênticas. O resto (data na ficha, status no funil) um trigger do banco
 mantém sozinho.
 
-### A API da agenda ainda não existe
+### A API da agenda
 
-O próximo passo é expor ao agente as cinco operações de que ele precisa —
-consultar disponibilidade, marcar, consultar, cancelar e reagendar — chamadas
-pelo n8n via nó HTTP.
+Sete endpoints para o agente consultar disponibilidade, marcar, consultar,
+cancelar e remarcar, além de listar profissionais e procedimentos. Rodam numa
+Edge Function do Supabase e são chamados pelo n8n via nó HTTP.
 
-O banco já foi desenhado para isso: a restrição anti-conflito, a idempotência,
-os bloqueios de agenda e o fuso horário da clínica estão no PostgreSQL
-justamente porque essas chamadas não passam pela interface. Detalhes na seção 8
-do [`DATABASE.md`](DATABASE.md).
+Cada resposta traz uma **frase pronta para o paciente ouvir** — quem consome vai
+falar no WhatsApp, não renderizar uma tela. Recusa de negócio ("esse horário está
+ocupado") volta com HTTP 200 e a frase correspondente, então o fluxo do n8n só
+quebra em bug ou configuração errada.
+
+O acesso é por **token próprio**, guardado hasheado, e não pela `service_role
+key`: a camada que fala com o agente é a que mais recebe texto de estranho.
+
+O contrato completo, com cURL de cada endpoint pronto para o **Import cURL** do
+n8n, está em [`API_AGENTE.md`](API_AGENTE.md).
 
 ### ⚠️ A automação precisa da chave `service_role`
 
@@ -421,7 +428,8 @@ odonto-clinica/
 │   ├── types/            tipos espelhando o schema do banco
 │   └── index.css         fonte, Tailwind e animações
 ├── supabase/
-│   └── migrations/       o SQL que cria o banco inteiro (rode em ordem)
+│   ├── migrations/       o SQL que cria o banco inteiro (rode em ordem)
+│   └── functions/agenda/ a API que o Agente de IA consome
 ├── public/               favicon
 ├── DATABASE.md           documentação completa do banco
 ├── CLAUDE.md             convenções e orientações de desenvolvimento
