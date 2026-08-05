@@ -1,14 +1,31 @@
+import React from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 
+/**
+ * Confirmação destrutiva. Os textos são opcionais e caem no padrão de exclusão
+ * — que é o uso da maioria das telas. Revogar um token entra aqui trocando só
+ * as palavras: o gesto é o mesmo, e revogar também não se desfaz.
+ */
 interface ConfirmDeleteModalProps {
   itemName: string
   onConfirm: () => void
   onClose: () => void
   loading?: boolean
   error?: string
+  title?: string
+  /** Substitui a frase inteira. Recebe o nome já destacado por conta própria. */
+  message?: React.ReactNode
+  confirmLabel?: string
+  loadingLabel?: string
 }
 
-export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loading = false, error = '' }: ConfirmDeleteModalProps) {
+export default function ConfirmDeleteModal({
+  itemName, onConfirm, onClose, loading = false, error = '',
+  title = 'Confirmar exclusão',
+  message,
+  confirmLabel = 'Excluir',
+  loadingLabel = 'Excluindo...',
+}: ConfirmDeleteModalProps) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
@@ -22,7 +39,7 @@ export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loadi
             <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <AlertTriangle size={20} color="#DC2626" />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#16232B' }}>Confirmar exclusão</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#16232B' }}>{title}</span>
           </div>
           <button
             onClick={onClose}
@@ -34,9 +51,13 @@ export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loadi
 
         {/* Message */}
         <p style={{ fontSize: 13.5, color: '#6B818C', lineHeight: 1.6, margin: '0 0 22px' }}>
-          Tem certeza que deseja excluir{' '}
-          <strong style={{ color: '#16232B' }}>"{itemName}"</strong>?{' '}
-          Essa ação não pode ser desfeita.
+          {message ?? (
+            <>
+              Tem certeza que deseja excluir{' '}
+              <strong style={{ color: '#16232B' }}>"{itemName}"</strong>?{' '}
+              Essa ação não pode ser desfeita.
+            </>
+          )}
         </p>
 
         {/* Error */}
@@ -61,7 +82,7 @@ export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loadi
             {loading && (
               <div style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
             )}
-            {loading ? 'Excluindo...' : 'Excluir'}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>

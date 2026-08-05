@@ -655,6 +655,9 @@ disponibilidade da API.
 Chaves de acesso da API do Agente de IA. Contrato completo em
 [`API_AGENTE.md`](API_AGENTE.md).
 
+**Usada em:** `TabTokenApi.tsx` (Configurações → Token e API), que cria e revoga;
+e pela Edge Function, via `api_token_valido()`, a cada chamada.
+
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
 | `id` | `uuid` | não | `gen_random_uuid()` | PK |

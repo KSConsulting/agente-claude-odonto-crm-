@@ -135,6 +135,30 @@ export interface ProfissionalBloqueio {
 }
 
 /**
+ * Chave de acesso da API do Agente de IA.
+ *
+ * O valor em claro **não existe aqui, nem em lugar nenhum** — o banco guarda só
+ * o `hash` (SHA-256). Por isso o token só pode ser exibido no instante da
+ * criação: depois disso, nem o sistema consegue reconstruí-lo.
+ *
+ * Revogar é `ativo = false`, não `DELETE`: o histórico de quem teve acesso e
+ * quando não pode sumir junto.
+ */
+export interface ApiToken {
+  id: string
+  nome: string
+  /** Primeiros caracteres, visíveis na lista, para saber qual token é qual. */
+  prefixo: string
+  hash: string
+  ativo: boolean
+  criado_por: string | null
+  /** Carimbado pela API no máximo a cada 5 minutos por token. */
+  ultimo_acesso: string | null
+  revogado_em: string | null
+  created_at: string
+}
+
+/**
  * Consulta com os dados que a agenda precisa mostrar no bloco: de quem é a
  * consulta e qual o nome do paciente. Vem do join da Agenda.tsx.
  */

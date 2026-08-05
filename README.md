@@ -101,6 +101,8 @@ CSV**.
 - **Horários** — grade de atendimento por dia da semana, usada pelo Dashboard
 - **Procedimentos** — catálogo de serviços oferecidos
 - **Senha** — troca com medidor de força
+- **Token e API** — chaves de acesso do Agente de IA e a documentação dos sete
+  endpoints, com os cURLs prontos para o nó HTTP do n8n
 
 ---
 
@@ -174,10 +176,11 @@ Ao final você terá:
 2 tabelas no Realtime    atualização automática da tela
 ```
 
-E já deixa cadastrados o horário comercial padrão e alguns procedimentos de
-exemplo — todos editáveis depois pela tela de Configurações. Profissionais não
+E já deixa cadastrados o horário comercial padrão e os **20 procedimentos** da
+clínica — todos editáveis depois pela tela de Configurações. Profissionais não
 vêm de exemplo: cadastre os seus na tela **Profissionais**, e a agenda de cada
-um nasce junto.
+um nasce junto. Tokens também começam vazios: crie o primeiro em
+**Configurações → Token e API**, senão a API responde 401 para o n8n.
 
 ### 4. Configurar as variáveis de ambiente
 
@@ -422,10 +425,12 @@ O fluxo esperado está descrito na seção 8 do [`DATABASE.md`](DATABASE.md).
 ```
 odonto-clinica/
 ├── src/
-│   ├── components/       Sidebar, Layout, rota protegida, pessoas, calendário
+│   ├── components/       Sidebar, Layout, rota protegida, pessoas, calendário,
+│   │                     aba Token e API
 │   ├── pages/            Login, Dashboard, CRM, Agenda, Profissionais, Leads,
 │   │                     Clientes, Ficha, Configurações
-│   ├── lib/              Supabase, regra Lead × Paciente, cores, agenda e telefones
+│   ├── lib/              Supabase, regra Lead × Paciente, cores, agenda,
+│   │                     telefones e tokens da API
 │   ├── types/            tipos espelhando o schema do banco
 │   └── index.css         fonte, Tailwind e animações
 ├── supabase/

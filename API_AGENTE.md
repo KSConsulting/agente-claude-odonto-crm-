@@ -101,7 +101,7 @@ Saem **sempre em UTC**, no ISO completo que o PostgREST usa para `timestamptz`:
 
 ## 2. Autenticação
 
-Cabeçalho próprio, com token gerado na tela de Configurações → Tokens:
+Cabeçalho próprio, com token gerado em **Configurações → Token e API**:
 
 ```
 X-Api-Key: odk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -504,22 +504,33 @@ teve acesso e quando não desaparecer.
 token, não a cada chamada — senão cada consulta de disponibilidade viraria
 também uma escrita.
 
-### Tela: Configurações → Tokens
+### Tela: Configurações → Token e API
 
-> ⏳ **Esta tela ainda não existe** — é a próxima etapa. A tabela `api_tokens` e
-> a validação na API já estão no ar, mas **não há nenhum token cadastrado**, e
-> por isso hoje toda chamada responde 401. O que está descrito abaixo é o
-> combinado do que a tela vai fazer.
+Implementada em [`TabTokenApi.tsx`](src/components/TabTokenApi.tsx), com a
+geração e o catálogo de endpoints em
+[`src/lib/apiTokens.ts`](src/lib/apiTokens.ts).
 
-- Lista com nome, prefixo, status, último acesso e quem criou
-- Criar: pede só o nome
-- **No momento da criação**, e só nele, a tela mostra o token completo **e os
-  sete cURLs desta página já preenchidos** com ele e com a URL do projeto —
-  pronto para o Import cURL do n8n
-- Revogar, com confirmação
-- Depois da criação, escolher um token na documentação preenche o cabeçalho e
-  deixa `SEU_TOKEN_AQUI` no lugar do valor, com o aviso de que o caminho para
-  quem perdeu é revogar e criar outro
+- Lista com nome, prefixo, status, último acesso, data e quem criou
+- Criar: pede só o nome. O valor é sorteado no navegador — `odk_` + 40
+  caracteres de um alfabeto de 62, cerca de 238 bits — e o que vai para o banco
+  é o SHA-256
+- **No momento da criação**, e só nele, a tela mostra o token completo com botão
+  de copiar e o aviso de que ele não volta a aparecer
+- Revogar, com confirmação que avisa o efeito: a próxima chamada já responde 401
+- A documentação dos sete endpoints fica na mesma aba, com o cURL de cada um e
+  um seletor de token. Escolhido um token **criado nesta sessão**, os cURLs saem
+  com o valor real; para qualquer outro, saem com `SEU_TOKEN_AQUI` e o aviso de
+  que o caminho para quem perdeu o valor é revogar e criar outro
+
+> **O valor em claro só existe enquanto a página está aberta.** Ele fica na
+> memória do componente para os cURLs poderem sair preenchidos logo depois da
+> criação, e some ao sair da tela. Não é gravado em lugar nenhum — nem no banco,
+> nem no navegador.
+
+> **O `hashToken()` da tela e o `sha256()` da Edge Function precisam ser o mesmo
+> cálculo** — SHA-256 em hexadecimal minúsculo. É o único ponto de encontro
+> entre quem cria o token e quem o confere. Se divergirem, todo token nasce
+> inválido e o sintoma é um 401 sem explicação nenhuma.
 
 ---
 

@@ -117,7 +117,8 @@ src/
 │   ├── cores.ts                paleta das agendas (cor do profissional)
 │   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
-│   └── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
+│   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
+│   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
 ├── components/
@@ -129,6 +130,7 @@ src/
 │   ├── AgendaMes.tsx           grade mensal (semanas inteiras)
 │   ├── NovoAgendamentoModal.tsx  criar consulta; cria o paciente se não existir
 │   ├── CampoTelefone.tsx       seletor de país + contagem de dígitos
+│   ├── TabTokenApi.tsx         aba "Token e API" de Configurações
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -139,7 +141,7 @@ src/
     ├── Leads.tsx               invólucro: <PessoasPage mode="leads" />
     ├── Clientes.tsx            invólucro: <PessoasPage mode="clientes" />
     ├── LeadDetail.tsx          ficha do lead + consultas + anotações
-    └── Configuracoes.tsx       perfil, clínica, horários, procedimentos
+    └── Configuracoes.tsx       perfil, horários, procedimentos, Token e API
 ```
 
 ### A agenda não é uma entidade
@@ -431,15 +433,18 @@ trigger `consultas_sincroniza_lead`.
 remarcar), chamados pelo **n8n via nó HTTP**, autenticados por token próprio e
 não pela `service_role key`.
 
-Três coisas para não descobrir do jeito difícil:
+Quatro coisas para não descobrir do jeito difícil:
 
 1. **A Edge Function não pode ter `import` de nada.** O runtime sobe com
    `--no-remote` e um import externo derruba a função inteira com `BOOT_ERROR`,
    antes de rodar uma linha. A conversa com o banco é `fetch` no PostgREST.
-2. **Recusa de negócio volta com HTTP 200** (`ok: false` + `motivo` +
+2. **Ela está publicada com `verify_jwt = false`**, de propósito: a autenticação
+   é o nosso token, não a `anon key`. Reimplantar no padrão derruba os sete
+   endpoints de uma vez, com um 401 que nem chega no nosso código.
+3. **Recusa de negócio volta com HTTP 200** (`ok: false` + `motivo` +
    `mensagem`). "Horário ocupado" é resposta, não erro — com 4xx o nó do n8n
    quebraria o fluxo justamente na hora de dar a notícia.
-3. **Toda resposta traz frase pronta**, inclusive 401 e 500, onde ela é neutra.
+4. **Toda resposta traz frase pronta**, inclusive 401 e 500, onde ela é neutra.
    Quem consome vai falar com um paciente; sem frase, o agente improvisa.
 
 A lógica pesada mora em funções SQL (`0004`), não no TypeScript: remarcar precisa
@@ -450,3 +455,19 @@ monta a frase.
 **A regra de disponibilidade em SQL espelha [`src/lib/agenda.ts`](src/lib/agenda.ts).**
 Mudou uma, mude a outra — se divergirem, o agente oferece horário que a recepção
 vê como ocupado.
+
+### Os tokens saem de Configurações → Token e API
+
+A aba é [`TabTokenApi.tsx`](src/components/TabTokenApi.tsx), com a geração e o
+catálogo de endpoints em [`src/lib/apiTokens.ts`](src/lib/apiTokens.ts). Ela
+cria, revoga, mostra status e último acesso, e traz a documentação dos sete
+endpoints com os cURLs prontos para o Import cURL do n8n.
+
+**O `hashToken()` da tela e o `sha256()` da Edge Function precisam ser o mesmo
+cálculo** — SHA-256 em hexadecimal minúsculo. É o único ponto de encontro entre
+quem cria o token e quem o confere; se divergirem, todo token nasce inválido e o
+sintoma é um 401 sem explicação.
+
+O valor em claro nunca é gravado: o banco guarda só o hash, e a tela mantém o
+valor em memória apenas enquanto a página está aberta, para os cURLs saírem
+preenchidos logo depois da criação.

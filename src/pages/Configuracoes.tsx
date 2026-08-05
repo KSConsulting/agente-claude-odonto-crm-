@@ -7,6 +7,7 @@ import zxcvbn from 'zxcvbn'
 import { supabase } from '../lib/supabase'
 import type { Usuario, ConfiguracoesClinica, HorarioComercial, ServicoClinica } from '../types'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import TabTokenApi from '../components/TabTokenApi'
 
 /* ──────────────────────────────────────────────
    Upload validation constants
@@ -31,12 +32,13 @@ const STRENGTH_COLORS = ['#DC2626', '#F97316', '#D97706', '#1A7A48', '#1A7A48']
 ────────────────────────────────────────────── */
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
 
-type TabKey = 'perfil' | 'horarios' | 'procedimentos'
+type TabKey = 'perfil' | 'horarios' | 'procedimentos' | 'tokens'
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'perfil',         label: 'Perfil',                  icon: User },
   { key: 'horarios',       label: 'Horários de Funcionamento', icon: Clock },
   { key: 'procedimentos',  label: 'Procedimentos',            icon: Stethoscope },
+  { key: 'tokens',         label: 'Token e API',              icon: KeyRound },
 ]
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -652,7 +654,7 @@ export default function Configuracoes() {
       {/* Page header */}
       <div className="fade-in-1" style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>Configurações</h1>
-        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>Gerencie o perfil, horários e procedimentos da clínica.</p>
+        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>Gerencie o perfil, horários e procedimentos da clínica, e o acesso do Agente de IA.</p>
       </div>
 
       {/* Tabs */}
@@ -670,6 +672,7 @@ export default function Configuracoes() {
         {activeTab === 'perfil' && userId && <TabPerfil userId={userId} />}
         {activeTab === 'horarios' && <TabHorarios />}
         {activeTab === 'procedimentos' && <TabProcedimentos />}
+        {activeTab === 'tokens' && <TabTokenApi />}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
