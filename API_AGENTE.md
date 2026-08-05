@@ -159,9 +159,34 @@ existe.
 ```json
 {
   "ok": true,
-  "procedimentos": ["Lentes de Contato", "Prótese Dentária", "Alinhadores Transparentes"]
+  "procedimentos": [
+    "Alinhadores Transparentes",
+    "Avaliação e Planejamento Digital do Sorriso",
+    "Carga Imediata",
+    "Clareamento Dental",
+    "Enxerto Gengival",
+    "Enxerto Ósseo",
+    "Extração de Siso",
+    "Facetas em Resina",
+    "Gengivoplastia",
+    "Implante Unitário",
+    "Lentes de Contato",
+    "Levantamento de Seio Maxilar",
+    "Limpeza e Profilaxia",
+    "Placa de Bruxismo",
+    "Prótese Dentária",
+    "Prótese Fixa sobre Implantes",
+    "Raspagem",
+    "Tratamento de Canal",
+    "Tratamento de DTM",
+    "Tratamento Periodontal"
+  ]
 }
 ```
+
+São os 20 do catálogo atual, **em ordem alfabética** — a consulta ordena por
+nome, não por cadastro. Procedimento desativado em Configurações some da lista
+sem precisar mexer no agente.
 
 Sem ID de propósito: o campo `procedimento` do endpoint de marcar é texto livre,
 então um ID aqui não teria uso nenhum.

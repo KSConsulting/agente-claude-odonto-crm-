@@ -66,10 +66,11 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **quatro arquivos, nesta ordem**:
+A migração é aplicada em **cinco arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
-profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único) e
-`0004_api_agente.sql` (tokens e funções da API).
+profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
+`0004_api_agente.sql` (tokens e funções da API) e
+`0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica).
 
 Os pontos que mais causam erro:
 

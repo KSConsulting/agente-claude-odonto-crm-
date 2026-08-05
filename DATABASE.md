@@ -39,6 +39,8 @@ ordem**:
    1 função, 1 trigger e o índice que impede duas pessoas com o mesmo número.
 4. `supabase/migrations/0004_api_agente.sql` — API do Agente de IA: a tabela
    `api_tokens` e as 7 funções que a Edge Function chama.
+5. `supabase/migrations/0005_catalogo_procedimentos.sql` — os 20 procedimentos
+   da clínica, no lugar dos 3 de exemplo do seed inicial. Só dados.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -500,7 +502,8 @@ linhas duplicadas fariam todas menos a primeira serem ignoradas em silêncio.
 
 Catálogo de procedimentos oferecidos.
 
-**Usada em:** `Configuracoes.tsx`
+**Usada em:** `Configuracoes.tsx` e o endpoint `GET /procedimentos` da API do
+Agente de IA — que devolve **só o nome**, sem `id` nem descrição.
 
 | Coluna | Tipo | Nulo | Default |
 |---|---|:---:|---|
@@ -515,6 +518,39 @@ Catálogo de procedimentos oferecidos.
 > **Não cadastre marcas registradas** (ClearCorrect, Invisalign e similares).
 > Use a descrição genérica do procedimento: "Alinhadores Transparentes".
 > Isso vale também para os prompts do Agente de IA, que fala com o público.
+
+#### O catálogo da clínica — 20 procedimentos
+
+Definidos em
+[`0005_catalogo_procedimentos.sql`](supabase/migrations/0005_catalogo_procedimentos.sql),
+que apagou os 3 de exemplo do seed inicial. As descrições completas estão lá;
+abaixo, só os nomes, na ordem em que a tela de Configurações os lista.
+
+| # | Procedimento | # | Procedimento |
+|---|---|---|---|
+| 1 | Avaliação e Planejamento Digital do Sorriso | 11 | Levantamento de Seio Maxilar |
+| 2 | Lentes de Contato | 12 | Prótese Dentária |
+| 3 | Facetas em Resina | 13 | Tratamento de Canal |
+| 4 | Clareamento Dental | 14 | Placa de Bruxismo |
+| 5 | Gengivoplastia | 15 | Tratamento de DTM |
+| 6 | Alinhadores Transparentes | 16 | Limpeza e Profilaxia |
+| 7 | Implante Unitário | 17 | Raspagem |
+| 8 | Carga Imediata | 18 | Tratamento Periodontal |
+| 9 | Prótese Fixa sobre Implantes | 19 | Enxerto Gengival |
+| 10 | Enxerto Ósseo | 20 | Extração de Siso |
+
+> **A `descricao` é a explicação do procedimento em uma linha**, escrita em
+> linguagem de paciente, não em jargão clínico. Ela existe para quem lê na tela
+> — a API do agente devolve só o nome, e é o nome que o paciente ouve no
+> WhatsApp. Por isso os nomes também são os do paciente ("Limpeza e Profilaxia",
+> não "profilaxia dentária supragengival").
+
+> **A tabela não guarda duração.** Ao marcar, o agente usa 60 minutos por
+> padrão para qualquer procedimento, a menos que o n8n mande `duracao_minutos`
+> na chamada. Uma carga imediata, que na prática ocupa o dobro disso, precisa
+> vir com a duração explícita — senão a agenda reserva menos tempo do que o
+> atendimento consome. Uma coluna `duracao_padrao_minutos` resolveria isso de
+> vez; ficou de fora por decisão, não por esquecimento.
 
 ---
 

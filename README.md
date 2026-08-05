@@ -151,12 +151,13 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **quatro arquivos, nesta ordem** — cada um depende do anterior:
+São **cinco arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
 3. [`supabase/migrations/0003_whatsapp_unico.sql`](supabase/migrations/0003_whatsapp_unico.sql)
 4. [`supabase/migrations/0004_api_agente.sql`](supabase/migrations/0004_api_agente.sql)
+5. [`supabase/migrations/0005_catalogo_procedimentos.sql`](supabase/migrations/0005_catalogo_procedimentos.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
