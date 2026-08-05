@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   KanbanSquare,
   Users,
+  UserCheck,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -16,7 +17,8 @@ import type { Usuario, ConfiguracoesClinica } from '../types'
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'CRM', icon: KanbanSquare },
-  { to: '/leads', label: 'Leads / Clientes', icon: Users },
+  { to: '/leads', label: 'Leads', icon: Users, end: true },
+  { to: '/clientes', label: 'Clientes', icon: UserCheck },
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
@@ -66,7 +68,7 @@ export default function Sidebar() {
         transition: 'width 0.25s ease',
         minHeight: '100vh',
         background: '#fff',
-        borderRight: '1px solid #EBEBEB',
+        borderRight: '1px solid #DCE6EA',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
@@ -81,7 +83,7 @@ export default function Sidebar() {
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
           padding: collapsed ? '20px 0' : '20px 16px',
-          borderBottom: '1px solid #EBEBEB',
+          borderBottom: '1px solid #DCE6EA',
           minHeight: 64,
         }}
       >
@@ -99,21 +101,21 @@ export default function Sidebar() {
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  background: '#F7EDF0',
+                  background: '#EAF3F6',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <Stethoscope size={18} color="#B85C72" />
+                <Stethoscope size={18} color="#1E6E8C" />
               </div>
             )}
             <span
               style={{
                 fontSize: 13,
                 fontWeight: 700,
-                color: '#1A1A1A',
+                color: '#16232B',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -137,13 +139,13 @@ export default function Sidebar() {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: '#F7EDF0',
+                background: '#EAF3F6',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Stethoscope size={18} color="#B85C72" />
+              <Stethoscope size={18} color="#1E6E8C" />
             </div>
           )
         )}
@@ -158,7 +160,7 @@ export default function Sidebar() {
             height: 24,
             borderRadius: '50%',
             background: '#fff',
-            border: '1px solid #EBEBEB',
+            border: '1px solid #DCE6EA',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -167,7 +169,7 @@ export default function Sidebar() {
             boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
           }}
         >
-          {collapsed ? <ChevronRight size={13} color="#7A7A7A" /> : <ChevronLeft size={13} color="#7A7A7A" />}
+          {collapsed ? <ChevronRight size={13} color="#6B818C" /> : <ChevronLeft size={13} color="#6B818C" />}
         </button>
       </div>
 
@@ -186,8 +188,8 @@ export default function Sidebar() {
               justifyContent: collapsed ? 'center' : 'flex-start',
               borderRadius: 10,
               textDecoration: 'none',
-              background: isActive ? '#F7EDF0' : 'transparent',
-              color: isActive ? '#B85C72' : '#7A7A7A',
+              background: isActive ? '#EAF3F6' : 'transparent',
+              color: isActive ? '#1E6E8C' : '#6B818C',
               fontWeight: isActive ? 600 : 500,
               fontSize: 13.5,
               transition: 'background 0.15s ease, color 0.15s ease',
@@ -196,7 +198,7 @@ export default function Sidebar() {
           >
             {({ isActive }) => (
               <>
-                <Icon size={18} color={isActive ? '#B85C72' : '#7A7A7A'} strokeWidth={isActive ? 2.2 : 1.8} />
+                <Icon size={18} color={isActive ? '#1E6E8C' : '#6B818C'} strokeWidth={isActive ? 2.2 : 1.8} />
                 {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>{label}</span>}
               </>
             )}
@@ -207,7 +209,7 @@ export default function Sidebar() {
       {/* Footer: user info + logout */}
       <div
         style={{
-          borderTop: '1px solid #EBEBEB',
+          borderTop: '1px solid #DCE6EA',
           padding: collapsed ? '12px 0' : '12px 16px',
           display: 'flex',
           alignItems: 'center',
@@ -221,13 +223,13 @@ export default function Sidebar() {
               width: 34,
               height: 34,
               borderRadius: '50%',
-              background: '#F7EDF0',
+              background: '#EAF3F6',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 13,
               fontWeight: 700,
-              color: '#B85C72',
+              color: '#1E6E8C',
               flexShrink: 0,
             }}
           >
@@ -239,7 +241,7 @@ export default function Sidebar() {
                 style={{
                   fontSize: 12.5,
                   fontWeight: 600,
-                  color: '#1A1A1A',
+                  color: '#16232B',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -247,7 +249,7 @@ export default function Sidebar() {
               >
                 {usuario?.nome ?? 'Usuário'}
               </div>
-              <div style={{ fontSize: 11, color: '#7A7A7A' }}>Secretária</div>
+              <div style={{ fontSize: 11, color: '#6B818C' }}>Secretária</div>
             </div>
           )}
         </div>
@@ -267,7 +269,7 @@ export default function Sidebar() {
               flexShrink: 0,
             }}
           >
-            <LogOut size={16} color="#7A7A7A" />
+            <LogOut size={16} color="#6B818C" />
           </button>
         )}
       </div>

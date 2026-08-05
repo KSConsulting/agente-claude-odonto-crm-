@@ -14,7 +14,7 @@ export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loadi
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #EBEBEB', width: '100%', maxWidth: 420, padding: '28px 28px 24px', boxShadow: '0 8px 48px rgba(0,0,0,0.12)' }}>
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #DCE6EA', width: '100%', maxWidth: 420, padding: '28px 28px 24px', boxShadow: '0 8px 48px rgba(0,0,0,0.12)' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -22,20 +22,20 @@ export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loadi
             <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <AlertTriangle size={20} color="#DC2626" />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A' }}>Confirmar exclusão</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#16232B' }}>Confirmar exclusão</span>
           </div>
           <button
             onClick={onClose}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0 }}
           >
-            <X size={18} color="#7A7A7A" />
+            <X size={18} color="#6B818C" />
           </button>
         </div>
 
         {/* Message */}
-        <p style={{ fontSize: 13.5, color: '#7A7A7A', lineHeight: 1.6, margin: '0 0 22px' }}>
+        <p style={{ fontSize: 13.5, color: '#6B818C', lineHeight: 1.6, margin: '0 0 22px' }}>
           Tem certeza que deseja excluir{' '}
-          <strong style={{ color: '#1A1A1A' }}>"{itemName}"</strong>?{' '}
+          <strong style={{ color: '#16232B' }}>"{itemName}"</strong>?{' '}
           Essa ação não pode ser desfeita.
         </p>
 
@@ -49,7 +49,7 @@ export default function ConfirmDeleteModal({ itemName, onConfirm, onClose, loadi
           <button
             onClick={onClose}
             disabled={loading}
-            style={{ flex: 1, padding: '10px', borderRadius: 9, border: '1px solid #EBEBEB', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#7A7A7A', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            style={{ flex: 1, padding: '10px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
             Cancelar
           </button>

@@ -105,8 +105,8 @@ const STATUS_LABELS: Record<LeadStatus, string> = {
 }
 
 const STATUS_COLORS: Record<LeadStatus, { bg: string; text: string; dot?: string }> = {
-  iniciou_conversa: { bg: '#F7EDF0', text: '#B85C72', dot: '#B85C72' },
-  conversando: { bg: '#EFF6FF', text: '#2563EB' },
+  iniciou_conversa: { bg: '#EAF3F6', text: '#1E6E8C', dot: '#1E6E8C' },
+  conversando: { bg: '#EEF2FF', text: '#4F46E5' },
   consulta_agendada: { bg: '#E8F8EF', text: '#1A7A48' },
   consulta_cancelada: { bg: '#FEF2F2', text: '#DC2626' },
   follow_up_1_feito: { bg: '#FFFBEB', text: '#D97706' },
@@ -143,13 +143,13 @@ function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: strin
 function LineTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: '#fff', border: '1px solid #EBEBEB', borderRadius: 10, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', fontSize: 13 }}>
-      <div style={{ fontWeight: 600, color: '#1A1A1A', marginBottom: 6 }}>{label}</div>
+    <div style={{ background: '#fff', border: '1px solid #DCE6EA', borderRadius: 10, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', fontSize: 13 }}>
+      <div style={{ fontWeight: 600, color: '#16232B', marginBottom: 6 }}>{label}</div>
       {payload.map((p: any) => (
         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, color: p.color, marginBottom: 2 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color }} />
-          <span style={{ color: '#7A7A7A' }}>{p.name}:</span>
-          <span style={{ fontWeight: 600, color: '#1A1A1A' }}>{p.value}</span>
+          <span style={{ color: '#6B818C' }}>{p.name}:</span>
+          <span style={{ fontWeight: 600, color: '#16232B' }}>{p.value}</span>
         </div>
       ))}
     </div>
@@ -171,7 +171,7 @@ function KpiCard({
       style={{
         background: '#fff',
         borderRadius: 14,
-        border: '1px solid #EBEBEB',
+        border: '1px solid #DCE6EA',
         padding: '22px 24px',
         flex: 1,
         minWidth: 0,
@@ -183,14 +183,14 @@ function KpiCard({
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 12.5, color: '#7A7A7A', fontWeight: 500, marginBottom: 8 }}>{label}</div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: '#1A1A1A', lineHeight: 1 }}>
+          <div style={{ fontSize: 12.5, color: '#6B818C', fontWeight: 500, marginBottom: 8 }}>{label}</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: '#16232B', lineHeight: 1 }}>
             <AnimatedCounter value={value} suffix={suffix} />
           </div>
-          <div style={{ fontSize: 12, color: '#7A7A7A', marginTop: 6 }}>{description}</div>
+          <div style={{ fontSize: 12, color: '#6B818C', marginTop: 6 }}>{description}</div>
         </div>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#F7EDF0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon size={20} color="#B85C72" strokeWidth={1.8} />
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAF3F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={20} color="#1E6E8C" strokeWidth={1.8} />
         </div>
       </div>
     </div>
@@ -216,7 +216,6 @@ const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
    Main Component
 ────────────────────────────────────────────── */
 export default function Dashboard() {
-  const [userName, setUserName] = useState('')
   const [leads, setLeads] = useState<LeadClinica[]>([])
   const [horarios, setHorarios] = useState<HorarioComercial[]>([])
   const [period, setPeriod] = useState<PeriodKey>('this_month')
@@ -226,14 +225,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase.from('usuarios').select('nome').eq('id', user.id).single()
-        if (data) setUserName(data.nome?.split(' ')[0] ?? '')
-      }
-
       const [{ data: leadsData }, { data: horariosData }] = await Promise.all([
-        supabase.from('leads_clinica').select('*'),
+        supabase.from('crm_clinica').select('*'),
         supabase.from('horario_comercial').select('*').eq('ativo', true),
       ])
 
@@ -315,15 +308,15 @@ export default function Dashboard() {
 
   const greeting = () => {
     const h = new Date().getHours()
-    if (h < 12) return 'Bom dia'
-    if (h < 18) return 'Boa tarde'
-    return 'Boa noite'
+    if (h < 12) return 'bom dia'
+    if (h < 18) return 'boa tarde'
+    return 'boa noite'
   }
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #F7EDF0', borderTopColor: '#B85C72', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <div style={{ width: 32, height: 32, border: '3px solid #EAF3F6', borderTopColor: '#1E6E8C', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
@@ -334,10 +327,10 @@ export default function Dashboard() {
 
       {/* Header */}
       <div className="fade-in-1" style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1A1A1A', margin: 0 }}>
-          {greeting()}{userName ? `, ${userName}` : ''}! 👋
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#16232B', margin: 0 }}>
+          Olá, {greeting()}! ;)
         </h1>
-        <p style={{ fontSize: 13.5, color: '#7A7A7A', marginTop: 4 }}>
+        <p style={{ fontSize: 16.5, fontWeight: 500, color: '#3A5560', marginTop: 8 }}>
           Aqui está o resumo da sua clínica.
         </p>
       </div>
@@ -347,7 +340,7 @@ export default function Dashboard() {
         <div style={{
           display: 'inline-flex',
           background: '#fff',
-          border: '1px solid #EBEBEB',
+          border: '1px solid #DCE6EA',
           borderRadius: 10,
           padding: 4,
           gap: 2,
@@ -365,8 +358,8 @@ export default function Dashboard() {
                 fontSize: 12.5,
                 fontWeight: period === key ? 600 : 500,
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                background: period === key ? '#B85C72' : 'transparent',
-                color: period === key ? '#fff' : '#7A7A7A',
+                background: period === key ? '#1E6E8C' : 'transparent',
+                color: period === key ? '#fff' : '#6B818C',
                 transition: 'all 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
@@ -387,26 +380,26 @@ export default function Dashboard() {
             gap: 10,
             marginLeft: 12,
             background: '#fff',
-            border: '1px solid #EBEBEB',
+            border: '1px solid #DCE6EA',
             borderRadius: 10,
             padding: '6px 14px',
             fontSize: 13,
           }}>
-            <span style={{ color: '#7A7A7A' }}>De</span>
+            <span style={{ color: '#6B818C' }}>De</span>
             <input
               type="date"
               max={new Date().toISOString().split('T')[0]}
               value={customRange.start.toISOString().split('T')[0]}
               onChange={(e) => setCustomRange((r) => ({ ...r, start: new Date(e.target.value) }))}
-              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', cursor: 'pointer' }}
+              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', cursor: 'pointer' }}
             />
-            <span style={{ color: '#7A7A7A' }}>até</span>
+            <span style={{ color: '#6B818C' }}>até</span>
             <input
               type="date"
               max={new Date().toISOString().split('T')[0]}
               value={customRange.end.toISOString().split('T')[0]}
               onChange={(e) => setCustomRange((r) => ({ ...r, end: endOfDay(new Date(e.target.value)) }))}
-              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', cursor: 'pointer' }}
+              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', cursor: 'pointer' }}
             />
           </div>
         )}
@@ -420,26 +413,26 @@ export default function Dashboard() {
       </div>
 
       {/* Chart 1: Line Chart */}
-      <div className="fade-in-4" style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', padding: '24px', marginBottom: 24 }}
+      <div className="fade-in-4" style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', marginBottom: 24 }}
         onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
       >
         <div style={{ marginBottom: 4 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>Atendimentos vs Agendamentos</h3>
-          <p style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 4 }}>Compare quantas pessoas entraram em contato e quantas marcaram consulta por dia no período selecionado</p>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Atendimentos vs Agendamentos</h3>
+          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>Compare quantas pessoas entraram em contato e quantas marcaram consulta por dia no período selecionado</p>
         </div>
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={lineData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#7A7A7A' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#7A7A7A' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" vertical={false} />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip content={<LineTooltip />} />
             <Legend
               wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
               iconType="circle"
               iconSize={8}
             />
-            <Line type="monotone" dataKey="Atendimentos" stroke="#B85C72" strokeWidth={2.5} dot={{ r: 3, fill: '#B85C72' }} activeDot={{ r: 5 }} />
+            <Line type="monotone" dataKey="Atendimentos" stroke="#1E6E8C" strokeWidth={2.5} dot={{ r: 3, fill: '#1E6E8C' }} activeDot={{ r: 5 }} />
             <Line type="monotone" dataKey="Agendamentos" stroke="#1A7A48" strokeWidth={2.5} dot={{ r: 3, fill: '#1A7A48' }} activeDot={{ r: 5 }} />
           </LineChart>
         </ResponsiveContainer>
@@ -450,24 +443,24 @@ export default function Dashboard() {
 
         {/* Bar Chart */}
         <div className="fade-in-5"
-          style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', padding: '24px', transition: 'box-shadow 0.2s' }}
+          style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', transition: 'box-shadow 0.2s' }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
           onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
         >
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>Dias com Mais Movimento</h3>
-          <p style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 4, marginBottom: 16 }}>Veja em quais dias a clínica recebe mais contatos</p>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Dias com Mais Movimento</h3>
+          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4, marginBottom: 16 }}>Veja em quais dias a clínica recebe mais contatos</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={barData} barSize={28} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#7A7A7A' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#7A7A7A' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B818C' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
-                contentStyle={{ borderRadius: 10, border: '1px solid #EBEBEB', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                cursor={{ fill: '#F4F2EF' }}
+                contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                cursor={{ fill: '#F2F6F7' }}
               />
               <Bar dataKey="Contatos" radius={[6, 6, 0, 0]}>
                 {barData.map((entry, i) => (
-                  <Cell key={i} fill={entry.isMax ? '#B85C72' : '#F7EDF0'} />
+                  <Cell key={i} fill={entry.isMax ? '#1E6E8C' : '#EAF3F6'} />
                 ))}
               </Bar>
             </BarChart>
@@ -476,12 +469,12 @@ export default function Dashboard() {
 
         {/* Donut Chart */}
         <div className="fade-in-6"
-          style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', padding: '24px', transition: 'box-shadow 0.2s' }}
+          style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', transition: 'box-shadow 0.2s' }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
           onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
         >
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>Horário dos Contatos</h3>
-          <p style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 4, marginBottom: 8 }}>Contatos dentro e fora do horário de funcionamento da clínica</p>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Horário dos Contatos</h3>
+          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4, marginBottom: 8 }}>Contatos dentro e fora do horário de funcionamento da clínica</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <ResponsiveContainer width={160} height={160}>
               <PieChart>
@@ -501,7 +494,7 @@ export default function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ borderRadius: 10, border: '1px solid #EBEBEB', fontSize: 13 }}
+                  contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13 }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -511,21 +504,21 @@ export default function Dashboard() {
                 <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: entry.color, flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A1A' }}>{entry.name}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B' }}>{entry.name}</div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: entry.color, lineHeight: 1.2 }}>{entry.value}</div>
                   </div>
                 </div>
               ))}
-              <div style={{ fontSize: 11, color: '#7A7A7A', marginTop: 8, lineHeight: 1.4 }}>
-                * Horários geridos em <span style={{ color: '#B85C72', fontWeight: 600 }}>Configurações</span>
+              <div style={{ fontSize: 11, color: '#6B818C', marginTop: 8, lineHeight: 1.4 }}>
+                * Horários geridos em <span style={{ color: '#1E6E8C', fontWeight: 600 }}>Configurações</span>
               </div>
             </div>
           </div>
 
           {foraHorario > 0 && (
-            <div style={{ marginTop: 16, background: '#F7EDF0', borderRadius: 10, padding: '12px 16px', borderLeft: '3px solid #B85C72' }}>
-              <span style={{ fontSize: 13.5, fontWeight: 800, color: '#B85C72' }}>{foraHorario} {foraHorario === 1 ? 'lead atendido' : 'leads atendidos'} fora do expediente.</span>
-              <span style={{ fontSize: 13, color: '#5A3A44', fontWeight: 400 }}> Cada um deles poderia ter ido para a concorrência — o Agente de IA garantiu que não fossem.</span>
+            <div style={{ marginTop: 16, background: '#EAF3F6', borderRadius: 10, padding: '12px 16px', borderLeft: '3px solid #1E6E8C' }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: '#1E6E8C' }}>{foraHorario} {foraHorario === 1 ? 'lead atendido' : 'leads atendidos'} fora do expediente.</span>
+              <span style={{ fontSize: 13, color: '#3A5560', fontWeight: 400 }}> Cada um deles poderia ter ido para a concorrência — o Agente de IA garantiu que não fossem.</span>
             </div>
           )}
         </div>
@@ -533,26 +526,26 @@ export default function Dashboard() {
 
       {/* Próximas Consultas */}
       <div className="fade-in-6"
-        style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', padding: '24px', marginBottom: 32, transition: 'box-shadow 0.2s' }}
+        style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', marginBottom: 32, transition: 'box-shadow 0.2s' }}
         onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
       >
         <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>Próximas Consultas</h3>
-          <p style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 4 }}>Consultas já agendadas que ainda estão por acontecer</p>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Próximas Consultas</h3>
+          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>Consultas já agendadas que ainda estão por acontecer</p>
         </div>
 
         {proximasConsultas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#7A7A7A', fontSize: 13.5 }}>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#6B818C', fontSize: 13.5 }}>
             Nenhuma consulta futura agendada.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #EBEBEB' }}>
+                <tr style={{ borderBottom: '1px solid #DCE6EA' }}>
                   {['Paciente', 'Procedimento', 'Status', 'Data da Consulta'].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#7A7A7A', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#6B818C', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -563,15 +556,15 @@ export default function Dashboard() {
                   return (
                     <tr
                       key={lead.id}
-                      style={{ borderBottom: '1px solid #F5F5F5', transition: 'background 0.15s' }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = '#FAFAFA')}
+                      style={{ borderBottom: '1px solid #EDF2F4', transition: 'background 0.15s' }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = '#F7FAFB')}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = 'transparent')}
                     >
                       <td style={{ padding: '12px 12px' }}>
-                        <div style={{ fontWeight: 600, color: '#1A1A1A' }}>{lead.nome_lead ?? '—'}</div>
-                        <div style={{ fontSize: 12, color: '#7A7A7A' }}>{lead.whatsapp_lead ?? ''}</div>
+                        <div style={{ fontWeight: 600, color: '#16232B' }}>{lead.nome_lead ?? '—'}</div>
+                        <div style={{ fontSize: 12, color: '#6B818C' }}>{lead.whatsapp_lead ?? ''}</div>
                       </td>
-                      <td style={{ padding: '12px 12px', color: '#7A7A7A' }}>{lead.procedimento_interesse ?? '—'}</td>
+                      <td style={{ padding: '12px 12px', color: '#6B818C' }}>{lead.procedimento_interesse ?? '—'}</td>
                       <td style={{ padding: '12px 12px' }}>
                         <span style={{
                           display: 'inline-flex',
@@ -596,7 +589,7 @@ export default function Dashboard() {
                           {STATUS_LABELS[lead.status]}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 12px', color: '#1A1A1A', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 12px', color: '#16232B', fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {lead.data_agendamento
                           ? new Date(lead.data_agendamento).toLocaleString('pt-BR', {
                             day: '2-digit', month: '2-digit', year: 'numeric',

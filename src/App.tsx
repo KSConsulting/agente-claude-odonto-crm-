@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import CRM from './pages/CRM'
 import Leads from './pages/Leads'
+import Clientes from './pages/Clientes'
 import LeadDetail from './pages/LeadDetail'
 import Configuracoes from './pages/Configuracoes'
 
@@ -19,6 +20,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/crm" element={<CRM />} />
             <Route path="/leads" element={<Leads />} />
+            <Route path="/clientes" element={<Clientes />} />
             <Route path="/leads/:id" element={<LeadDetail />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
           </Route>

@@ -34,8 +34,8 @@ interface ColumnConfig {
 }
 
 const COLUMNS: ColumnConfig[] = [
-  { status: 'iniciou_conversa',   label: 'Iniciou Conversa',   color: '#B85C72', bg: '#F7EDF0', dot: '#B85C72', pulse: true },
-  { status: 'conversando',        label: 'Conversando',        color: '#2563EB', bg: '#EFF6FF' },
+  { status: 'iniciou_conversa',   label: 'Iniciou Conversa',   color: '#1E6E8C', bg: '#EAF3F6', dot: '#1E6E8C', pulse: true },
+  { status: 'conversando',        label: 'Conversando',        color: '#4F46E5', bg: '#EEF2FF' },
   { status: 'consulta_agendada',  label: 'Consulta Agendada',  color: '#1A7A48', bg: '#E8F8EF' },
   { status: 'consulta_cancelada', label: 'Consulta Cancelada', color: '#DC2626', bg: '#FEF2F2' },
   { status: 'follow_up_1_feito',  label: 'Follow-up 1',        color: '#D97706', bg: '#FFFBEB' },
@@ -75,7 +75,7 @@ function CopyBadge({ value }: { value: string }) {
     })
   }
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F4F2EF', border: '1px solid #EBEBEB', borderRadius: 5, padding: '2px 6px', fontSize: 10.5, color: '#7A7A7A', fontFamily: 'monospace', maxWidth: '100%', overflow: 'hidden' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F2F6F7', border: '1px solid #DCE6EA', borderRadius: 5, padding: '2px 6px', fontSize: 10.5, color: '#6B818C', fontFamily: 'monospace', maxWidth: '100%', overflow: 'hidden' }}>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
       <button
         onClick={copy}
@@ -84,7 +84,7 @@ function CopyBadge({ value }: { value: string }) {
       >
         {copied
           ? <Check size={10} color="#1A7A48" />
-          : <Copy size={10} color="#7A7A7A" />}
+          : <Copy size={10} color="#6B818C" />}
       </button>
     </span>
   )
@@ -133,7 +133,7 @@ function LeadCard({ lead, isDragging = false, overlay = false }: LeadCardProps) 
       style={{
         background: '#fff',
         borderRadius: 12,
-        border: '1px solid #EBEBEB',
+        border: '1px solid #DCE6EA',
         padding: '12px 14px',
         cursor: overlay ? 'grabbing' : 'pointer',
         userSelect: 'none',
@@ -151,16 +151,16 @@ function LeadCard({ lead, isDragging = false, overlay = false }: LeadCardProps) 
         <span
           {...(overlay ? {} : { ...attributes, ...listeners })}
           onClick={(e) => e.stopPropagation()}
-          style={{ cursor: overlay ? 'grabbing' : 'grab', marginTop: 2, flexShrink: 0, color: '#CCCCCC' }}
+          style={{ cursor: overlay ? 'grabbing' : 'grab', marginTop: 2, flexShrink: 0, color: '#B9C8CE' }}
         >
           <GripVertical size={14} />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#16232B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {lead.nome_lead ?? 'Sem nome'}
           </div>
           {lead.procedimento_interesse && (
-            <div style={{ fontSize: 12, color: '#7A7A7A', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 12, color: '#6B818C', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {lead.procedimento_interesse}
             </div>
           )}
@@ -180,7 +180,7 @@ function LeadCard({ lead, isDragging = false, overlay = false }: LeadCardProps) 
       {/* Bottom row: copy badge + time */}
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
         <CopyBadge value={lead.status} />
-        <span style={{ fontSize: 11, color: '#7A7A7A', whiteSpace: 'nowrap', flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: '#6B818C', whiteSpace: 'nowrap', flexShrink: 0 }}>
           {formatLastContact(lead.minutos_ultima_mensagem)}
         </span>
       </div>
@@ -218,15 +218,15 @@ function KanbanColumn({ cfg, leads, isDraggingOver }: KanbanColumnProps) {
         padding: '10px 14px',
         background: '#fff',
         borderRadius: '12px 12px 0 0',
-        border: '1px solid #EBEBEB',
+        border: '1px solid #DCE6EA',
         borderBottom: 'none',
         gap: 8,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span style={{ width: 9, height: 9, borderRadius: '50%', background: cfg.status === 'consulta_realizada' ? cfg.bg : cfg.color, flexShrink: 0, display: 'block', border: cfg.status === 'consulta_realizada' ? '2px solid #1A7A48' : 'none' }} />
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cfg.label}</span>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#16232B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cfg.label}</span>
         </div>
-        <span style={{ background: '#F4F2EF', color: '#7A7A7A', borderRadius: 20, fontSize: 11.5, fontWeight: 700, padding: '2px 8px', flexShrink: 0 }}>
+        <span style={{ background: '#F2F6F7', color: '#6B818C', borderRadius: 20, fontSize: 11.5, fontWeight: 700, padding: '2px 8px', flexShrink: 0 }}>
           {leads.length}
         </span>
       </div>
@@ -237,8 +237,8 @@ function KanbanColumn({ cfg, leads, isDraggingOver }: KanbanColumnProps) {
         style={{
           flex: 1,
           overflowY: 'auto',
-          background: isDraggingOver ? '#F7EDF0' : '#F9F8F6',
-          border: `1px solid ${isDraggingOver ? '#D4849A' : '#EBEBEB'}`,
+          background: isDraggingOver ? '#EAF3F6' : '#F4F8F9',
+          border: `1px solid ${isDraggingOver ? '#4C90A8' : '#DCE6EA'}`,
           borderTop: 'none',
           borderRadius: '0 0 12px 12px',
           padding: '8px 8px',
@@ -264,7 +264,7 @@ function KanbanColumn({ cfg, leads, isDraggingOver }: KanbanColumnProps) {
             justifyContent: 'center',
             gap: 6,
             padding: '24px 0',
-            color: '#CCCCCC',
+            color: '#B9C8CE',
           }}>
             <Inbox size={22} strokeWidth={1.5} />
             <span style={{ fontSize: 11.5 }}>Nenhum lead</span>
@@ -291,7 +291,7 @@ export default function CRM() {
 
   /* Load leads */
   useEffect(() => {
-    supabase.from('leads_clinica').select('*').then(({ data }) => {
+    supabase.from('crm_clinica').select('*').then(({ data }) => {
       setLeads(data ?? [])
       setLoading(false)
     })
@@ -303,7 +303,8 @@ export default function CRM() {
       .channel('crm-leads-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'leads_clinica' },
+        // Realtime escuta a TABELA, não a view: o Postgres só replica tabelas.
+        { event: '*', schema: 'public', table: 'crm_clinica_dados' },
         (payload) => {
           if (payload.eventType === 'UPDATE') {
             setLeads((prev) =>
@@ -386,7 +387,7 @@ export default function CRM() {
 
     // Persist to Supabase
     const { error } = await supabase
-      .from('leads_clinica')
+      .from('crm_clinica')
       .update({ status: targetStatus })
       .eq('id', leadId)
 
@@ -401,7 +402,7 @@ export default function CRM() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #F7EDF0', borderTopColor: '#B85C72', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <div style={{ width: 32, height: 32, border: '3px solid #EAF3F6', borderTopColor: '#1E6E8C', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
@@ -413,8 +414,8 @@ export default function CRM() {
       <div style={{ padding: '28px 32px 20px', flexShrink: 0 }}>
         <div className="fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A1A1A', margin: 0 }}>CRM</h1>
-            <p style={{ fontSize: 13, color: '#7A7A7A', marginTop: 4 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>CRM</h1>
+            <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>
               {leads.length} lead{leads.length !== 1 ? 's' : ''} no funil • Arraste para mover entre colunas
             </p>
           </div>

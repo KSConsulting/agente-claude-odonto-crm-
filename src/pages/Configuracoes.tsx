@@ -41,8 +41,8 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', padding: '22px 26px', marginBottom: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid #F5F5F5' }}>
+    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '22px 26px', marginBottom: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: '#16232B', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid #EDF2F4' }}>
         {title}
       </div>
       {children}
@@ -53,7 +53,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 function SaveButton({ onClick, saving, saved, disabled = false }: { onClick: () => void; saving: boolean; saved: boolean; disabled?: boolean }) {
   return (
     <button onClick={onClick} disabled={saving || disabled}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, border: 'none', background: saved ? '#1A7A48' : (disabled ? '#EBEBEB' : '#B85C72'), color: disabled ? '#7A7A7A' : '#fff', cursor: disabled ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
+      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, border: 'none', background: saved ? '#1A7A48' : (disabled ? '#DCE6EA' : '#1E6E8C'), color: disabled ? '#6B818C' : '#fff', cursor: disabled ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
       {saved ? <Check size={14} /> : <Save size={14} />}
       {saved ? 'Salvo!' : saving ? 'Salvando...' : 'Salvar'}
     </button>
@@ -168,13 +168,13 @@ function TabPerfil({ userId }: { userId: string }) {
     : '?'
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #EBEBEB',
-    fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A',
+    width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #DCE6EA',
+    fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B',
     outline: 'none', background: '#fff', boxSizing: 'border-box',
   }
 
   const passwordScore = newPassword ? zxcvbn(newPassword).score : -1
-  const strengthColor = passwordScore >= 0 ? STRENGTH_COLORS[passwordScore] : '#EBEBEB'
+  const strengthColor = passwordScore >= 0 ? STRENGTH_COLORS[passwordScore] : '#DCE6EA'
   const strengthLabel = passwordScore >= 0 ? STRENGTH_LABELS[passwordScore] : ''
 
   const ErrorMsg = ({ msg }: { msg: string }) => msg ? (
@@ -187,8 +187,8 @@ function TabPerfil({ userId }: { userId: string }) {
       <SectionCard title="Nome do Usuário">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" style={{ ...inputStyle, flex: 1, minWidth: 200 }}
-            onFocus={(e) => (e.target.style.borderColor = '#B85C72')}
-            onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+            onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
+            onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
           <SaveButton onClick={handleSaveNome} saving={savingNome} saved={savedNome} disabled={!nome.trim()} />
         </div>
         <ErrorMsg msg={nomeError} />
@@ -199,22 +199,22 @@ function TabPerfil({ userId }: { userId: string }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
             {usuario?.avatar_url ? (
-              <img src={usuario.avatar_url} alt="Avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #EBEBEB' }} />
+              <img src={usuario.avatar_url} alt="Avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #DCE6EA' }} />
             ) : (
-              <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#F7EDF0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: '#B85C72', border: '2px solid #EBEBEB' }}>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#EAF3F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: '#1E6E8C', border: '2px solid #DCE6EA' }}>
                 {initials}
               </div>
             )}
             {uploadingAvatar && (
               <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 20, height: 20, border: '2px solid #F7EDF0', borderTopColor: '#B85C72', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                <div style={{ width: 20, height: 20, border: '2px solid #EAF3F6', borderTopColor: '#1E6E8C', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
               </div>
             )}
           </div>
           <div>
-            <p style={{ fontSize: 13, color: '#7A7A7A', margin: '0 0 10px' }}>JPG, PNG ou WebP. Tamanho máximo: 2MB.</p>
+            <p style={{ fontSize: 13, color: '#6B818C', margin: '0 0 10px' }}>JPG, PNG ou WebP. Tamanho máximo: 2MB.</p>
             <button onClick={() => { setAvatarError(''); avatarRef.current?.click() }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #EBEBEB', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1A1A1A', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               <Upload size={14} /> {uploadingAvatar ? 'Enviando...' : 'Alterar foto'}
             </button>
             <input ref={avatarRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={handleAvatarUpload} />
@@ -228,22 +228,22 @@ function TabPerfil({ userId }: { userId: string }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
             {clinica?.logo_url ? (
-              <img src={clinica.logo_url} alt="Logo" style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '2px solid #EBEBEB' }} />
+              <img src={clinica.logo_url} alt="Logo" style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '2px solid #DCE6EA' }} />
             ) : (
-              <div style={{ width: 80, height: 80, borderRadius: 12, background: '#F7EDF0', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #EBEBEB' }}>
-                <Stethoscope size={30} color="#D4849A" strokeWidth={1.5} />
+              <div style={{ width: 80, height: 80, borderRadius: 12, background: '#EAF3F6', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #DCE6EA' }}>
+                <Stethoscope size={30} color="#4C90A8" strokeWidth={1.5} />
               </div>
             )}
             {uploadingLogo && (
               <div style={{ position: 'absolute', inset: 0, borderRadius: 12, background: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 20, height: 20, border: '2px solid #F7EDF0', borderTopColor: '#B85C72', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                <div style={{ width: 20, height: 20, border: '2px solid #EAF3F6', borderTopColor: '#1E6E8C', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
               </div>
             )}
           </div>
           <div>
-            <p style={{ fontSize: 13, color: '#7A7A7A', margin: '0 0 10px' }}>A logo aparece na sidebar do sistema. JPG, PNG ou SVG.</p>
+            <p style={{ fontSize: 13, color: '#6B818C', margin: '0 0 10px' }}>A logo aparece na sidebar do sistema. JPG, PNG ou SVG.</p>
             <button onClick={() => { setLogoError(''); logoRef.current?.click() }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #EBEBEB', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1A1A1A', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               <Upload size={14} /> {uploadingLogo ? 'Enviando...' : 'Alterar logo'}
             </button>
             <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={handleLogoUpload} />
@@ -257,13 +257,13 @@ function TabPerfil({ userId }: { userId: string }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 420 }}>
           {/* Nova senha */}
           <div>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 6 }}>Nova senha</label>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Nova senha</label>
             <div style={{ position: 'relative' }}>
               <input type={showNewPass ? 'text' : 'password'} value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setPasswordError('') }}
                 placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }}
-                onFocus={(e) => (e.target.style.borderColor = '#B85C72')} onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+                onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
               <button type="button" onClick={() => setShowNewPass((s) => !s)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                {showNewPass ? <EyeOff size={15} color="#7A7A7A" /> : <Eye size={15} color="#7A7A7A" />}
+                {showNewPass ? <EyeOff size={15} color="#6B818C" /> : <Eye size={15} color="#6B818C" />}
               </button>
             </div>
             {/* Strength bar */}
@@ -271,7 +271,7 @@ function TabPerfil({ userId }: { userId: string }) {
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
                   {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= passwordScore ? strengthColor : '#EBEBEB', transition: 'background 0.2s' }} />
+                    <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= passwordScore ? strengthColor : '#DCE6EA', transition: 'background 0.2s' }} />
                   ))}
                 </div>
                 <span style={{ fontSize: 11.5, color: strengthColor, fontWeight: 600 }}>{strengthLabel}</span>
@@ -281,13 +281,13 @@ function TabPerfil({ userId }: { userId: string }) {
 
           {/* Confirmar senha */}
           <div>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 6 }}>Confirmar nova senha</label>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Confirmar nova senha</label>
             <div style={{ position: 'relative' }}>
               <input type={showConfirmPass ? 'text' : 'password'} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError('') }}
                 placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }}
-                onFocus={(e) => (e.target.style.borderColor = '#B85C72')} onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+                onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
               <button type="button" onClick={() => setShowConfirmPass((s) => !s)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                {showConfirmPass ? <EyeOff size={15} color="#7A7A7A" /> : <Eye size={15} color="#7A7A7A" />}
+                {showConfirmPass ? <EyeOff size={15} color="#6B818C" /> : <Eye size={15} color="#6B818C" />}
               </button>
             </div>
           </div>
@@ -301,7 +301,7 @@ function TabPerfil({ userId }: { userId: string }) {
           )}
 
           <button onClick={handleSavePassword} disabled={savingPassword || !newPassword || !confirmPassword}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', alignSelf: 'flex-start', background: (!newPassword || !confirmPassword) ? '#EBEBEB' : savingPassword ? '#D4849A' : '#B85C72', color: (!newPassword || !confirmPassword) ? '#7A7A7A' : '#fff', cursor: (!newPassword || !confirmPassword) ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', alignSelf: 'flex-start', background: (!newPassword || !confirmPassword) ? '#DCE6EA' : savingPassword ? '#4C90A8' : '#1E6E8C', color: (!newPassword || !confirmPassword) ? '#6B818C' : '#fff', cursor: (!newPassword || !confirmPassword) ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
             <KeyRound size={14} /> {savingPassword ? 'Salvando...' : 'Alterar senha'}
           </button>
         </div>
@@ -364,26 +364,26 @@ function TabHorarios() {
   }
 
   const timeInput: React.CSSProperties = {
-    padding: '7px 10px', borderRadius: 8, border: '1px solid #EBEBEB', fontSize: 13.5,
-    fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', outline: 'none', background: '#fff',
+    padding: '7px 10px', borderRadius: 8, border: '1px solid #DCE6EA', fontSize: 13.5,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', background: '#fff',
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #EBEBEB', overflow: 'hidden' }}>
-      <div style={{ padding: '18px 24px', borderBottom: '1px solid #F5F5F5' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>Horários de Funcionamento</div>
-        <div style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 4 }}>Esses horários são usados no Dashboard para calcular contatos dentro e fora do horário comercial.</div>
+    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', overflow: 'hidden' }}>
+      <div style={{ padding: '18px 24px', borderBottom: '1px solid #EDF2F4' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#16232B' }}>Horários de Funcionamento</div>
+        <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>Esses horários são usados no Dashboard para calcular contatos dentro e fora do horário comercial.</div>
       </div>
       {rows.map((row, idx) => (
         <React.Fragment key={row.dia_semana}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: (idx < 6 && !row.error) ? '1px solid #F5F5F5' : 'none', flexWrap: 'wrap', background: row.ativo ? '#fff' : '#FAFAFA', transition: 'background 0.15s' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: (idx < 6 && !row.error) ? '1px solid #EDF2F4' : 'none', flexWrap: 'wrap', background: row.ativo ? '#fff' : '#F7FAFB', transition: 'background 0.15s' }}>
             {/* Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
               <button onClick={() => update(row.dia_semana, 'ativo', !row.ativo)}
-                style={{ width: 40, height: 22, borderRadius: 11, background: row.ativo ? '#B85C72' : '#EBEBEB', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                style={{ width: 40, height: 22, borderRadius: 11, background: row.ativo ? '#1E6E8C' : '#DCE6EA', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: row.ativo ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
               </button>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: row.ativo ? '#1A1A1A' : '#7A7A7A' }}>{DAY_NAMES[row.dia_semana]}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: row.ativo ? '#16232B' : '#6B818C' }}>{DAY_NAMES[row.dia_semana]}</span>
             </div>
 
             {/* Time inputs */}
@@ -391,21 +391,21 @@ function TabHorarios() {
               <input type="time" value={row.hora_inicio} disabled={!row.ativo}
                 onChange={(e) => update(row.dia_semana, 'hora_inicio', e.target.value)}
                 style={{ ...timeInput, opacity: row.ativo ? 1 : 0.4, cursor: row.ativo ? 'pointer' : 'not-allowed' }}
-                onFocus={(e) => row.ativo && (e.target.style.borderColor = '#B85C72')}
-                onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
-              <span style={{ color: '#7A7A7A', fontSize: 13 }}>até</span>
+                onFocus={(e) => row.ativo && (e.target.style.borderColor = '#1E6E8C')}
+                onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
+              <span style={{ color: '#6B818C', fontSize: 13 }}>até</span>
               <input type="time" value={row.hora_fim} disabled={!row.ativo}
                 onChange={(e) => update(row.dia_semana, 'hora_fim', e.target.value)}
                 style={{ ...timeInput, opacity: row.ativo ? 1 : 0.4, cursor: row.ativo ? 'pointer' : 'not-allowed' }}
-                onFocus={(e) => row.ativo && (e.target.style.borderColor = '#B85C72')}
-                onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+                onFocus={(e) => row.ativo && (e.target.style.borderColor = '#1E6E8C')}
+                onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
             </div>
 
             {/* Save button */}
             <SaveButton onClick={() => handleSave(row)} saving={row.saving} saved={row.saved} />
           </div>
           {row.error && (
-            <div style={{ padding: '4px 24px 12px', fontSize: 12.5, color: '#DC2626', borderBottom: idx < 6 ? '1px solid #F5F5F5' : 'none' }}>{row.error}</div>
+            <div style={{ padding: '4px 24px 12px', fontSize: 12.5, color: '#DC2626', borderBottom: idx < 6 ? '1px solid #EDF2F4' : 'none' }}>{row.error}</div>
           )}
         </React.Fragment>
       ))}
@@ -499,46 +499,46 @@ function TabProcedimentos() {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #EBEBEB',
-    fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A',
+    width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #DCE6EA',
+    fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B',
     outline: 'none', background: '#fff', boxSizing: 'border-box',
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7A7A7A' }}>Carregando...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6B818C' }}>Carregando...</div>
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, color: '#7A7A7A' }}>{items.length} procedimento{items.length !== 1 ? 's' : ''} cadastrado{items.length !== 1 ? 's' : ''}</span>
+        <span style={{ fontSize: 13, color: '#6B818C' }}>{items.length} procedimento{items.length !== 1 ? 's' : ''} cadastrado{items.length !== 1 ? 's' : ''}</span>
         <button onClick={() => setShowNew((s) => !s)}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: 'none', background: '#B85C72', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1E6E8C', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           {showNew ? <X size={14} /> : <Plus size={14} />} {showNew ? 'Cancelar' : 'Novo Procedimento'}
         </button>
       </div>
 
       {/* New form */}
       {showNew && (
-        <div style={{ background: '#fff', borderRadius: 14, border: '2px solid #B85C72', padding: '20px 22px', marginBottom: 12 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#B85C72', marginBottom: 14 }}>Novo Procedimento</div>
+        <div style={{ background: '#fff', borderRadius: 14, border: '2px solid #1E6E8C', padding: '20px 22px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1E6E8C', marginBottom: 14 }}>Novo Procedimento</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 6 }}>Nome *</label>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Nome *</label>
               <input value={newNome} onChange={(e) => setNewNome(e.target.value)} placeholder="Nome do procedimento" style={inputStyle}
-                onFocus={(e) => (e.target.style.borderColor = '#B85C72')} onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+                onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
             </div>
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 6 }}>Descrição *</label>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Descrição *</label>
               <textarea value={newDescricao} onChange={(e) => setNewDescricao(e.target.value)} rows={3} placeholder="Descrição detalhada do procedimento..." style={{ ...inputStyle, resize: 'vertical' }}
-                onFocus={(e) => (e.target.style.borderColor = '#B85C72')} onBlur={(e) => (e.target.style.borderColor = '#EBEBEB')} />
+                onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
             </div>
           </div>
           {newError && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#DC2626', marginTop: 10 }}>{newError}</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
             <button onClick={() => { setShowNew(false); setNewNome(''); setNewDescricao(''); setNewError('') }}
-              style={{ padding: '8px 16px', borderRadius: 9, border: '1px solid #EBEBEB', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#7A7A7A', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancelar</button>
+              style={{ padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancelar</button>
             <button onClick={handleAddNew} disabled={savingNew}
-              style={{ padding: '8px 20px', borderRadius: 9, border: 'none', background: savingNew ? '#D4849A' : '#B85C72', cursor: savingNew ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              style={{ padding: '8px 20px', borderRadius: 9, border: 'none', background: savingNew ? '#4C90A8' : '#1E6E8C', cursor: savingNew ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {savingNew ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
@@ -552,13 +552,13 @@ function TabProcedimentos() {
       {/* List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {items.map((item) => (
-          <div key={item.data.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #EBEBEB', overflow: 'hidden', opacity: item.data.ativo ? 1 : 0.65, transition: 'opacity 0.2s' }}>
+          <div key={item.data.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #DCE6EA', overflow: 'hidden', opacity: item.data.ativo ? 1 : 0.65, transition: 'opacity 0.2s' }}>
 
             {/* Row header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', flexWrap: 'wrap' }}>
               {/* Toggle */}
               <button onClick={() => handleToggleAtivo(item)}
-                style={{ width: 36, height: 20, borderRadius: 10, background: item.data.ativo ? '#B85C72' : '#EBEBEB', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                style={{ width: 36, height: 20, borderRadius: 10, background: item.data.ativo ? '#1E6E8C' : '#DCE6EA', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: item.data.ativo ? 19 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
               </button>
 
@@ -566,22 +566,22 @@ function TabProcedimentos() {
                 {item.editing ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input value={item.editNome} onChange={(e) => updateItem(item.data.id, { editNome: e.target.value })}
-                      style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #B85C72', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                      style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #1E6E8C', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
                     <textarea value={item.editDescricao} onChange={(e) => updateItem(item.data.id, { editDescricao: e.target.value })} rows={2}
-                      style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #B85C72', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#1A1A1A', outline: 'none', resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
+                      style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #1E6E8C', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
                     {editError[item.data.id] && (
                       <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '6px 10px', fontSize: 12.5, color: '#DC2626' }}>{editError[item.data.id]}</div>
                     )}
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>{item.data.nome}</div>
-                    <div style={{ fontSize: 12.5, color: '#7A7A7A', marginTop: 3, overflow: 'hidden', display: item.expanded ? 'block' : '-webkit-box', WebkitLineClamp: item.expanded ? undefined : 2, WebkitBoxOrient: 'vertical' as any }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#16232B' }}>{item.data.nome}</div>
+                    <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 3, overflow: 'hidden', display: item.expanded ? 'block' : '-webkit-box', WebkitLineClamp: item.expanded ? undefined : 2, WebkitBoxOrient: 'vertical' as any }}>
                       {item.data.descricao}
                     </div>
                     {item.data.descricao.length > 100 && (
                       <button onClick={() => updateItem(item.data.id, { expanded: !item.expanded })}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#B85C72', fontWeight: 600, padding: '2px 0', display: 'flex', alignItems: 'center', gap: 3, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#1E6E8C', fontWeight: 600, padding: '2px 0', display: 'flex', alignItems: 'center', gap: 3, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                         {item.expanded ? <><ChevronUp size={12} /> Ver menos</> : <><ChevronDown size={12} /> Ver mais</>}
                       </button>
                     )}
@@ -594,18 +594,18 @@ function TabProcedimentos() {
                 {item.editing ? (
                   <>
                     <button onClick={() => updateItem(item.data.id, { editing: false, editNome: item.data.nome, editDescricao: item.data.descricao })}
-                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #EBEBEB', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#7A7A7A', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       Cancelar
                     </button>
                     <button onClick={() => handleSaveEdit(item)} disabled={item.saving}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: 'none', background: item.saved ? '#1A7A48' : '#B85C72', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: 'none', background: item.saved ? '#1A7A48' : '#1E6E8C', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {item.saved ? <Check size={13} /> : <Save size={13} />} {item.saving ? 'Salvando...' : item.saved ? 'Salvo!' : 'Salvar'}
                     </button>
                   </>
                 ) : (
                   <>
                     <button onClick={() => updateItem(item.data.id, { editing: true })}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #EBEBEB', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#1A1A1A', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       <Pencil size={13} /> Editar
                     </button>
                     <button onClick={() => setDeleteTarget(item)}
@@ -651,15 +651,15 @@ export default function Configuracoes() {
 
       {/* Page header */}
       <div className="fade-in-1" style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A1A1A', margin: 0 }}>Configurações</h1>
-        <p style={{ fontSize: 13, color: '#7A7A7A', marginTop: 4 }}>Gerencie o perfil, horários e procedimentos da clínica.</p>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>Configurações</h1>
+        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>Gerencie o perfil, horários e procedimentos da clínica.</p>
       </div>
 
       {/* Tabs */}
-      <div className="fade-in-2" style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #EBEBEB' }}>
+      <div className="fade-in-2" style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #DCE6EA' }}>
         {TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: activeTab === key ? 700 : 500, color: activeTab === key ? '#B85C72' : '#7A7A7A', borderBottom: activeTab === key ? '2px solid #B85C72' : '2px solid transparent', fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'color 0.15s', marginBottom: -1 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: activeTab === key ? 700 : 500, color: activeTab === key ? '#1E6E8C' : '#6B818C', borderBottom: activeTab === key ? '2px solid #1E6E8C' : '2px solid transparent', fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'color 0.15s', marginBottom: -1 }}>
             <Icon size={15} /> {label}
           </button>
         ))}
