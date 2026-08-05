@@ -38,7 +38,10 @@ ordem**:
 3. `supabase/migrations/0003_whatsapp_unico.sql` — WhatsApp normalizado e único:
    1 função, 1 trigger e o índice que impede duas pessoas com o mesmo número.
 4. `supabase/migrations/0004_api_agente.sql` — API do Agente de IA: a tabela
-   `api_tokens` e as 7 funções que a Edge Function chama.
+   `api_tokens` e as 7 funções que sustentam os endpoints (a Edge Function
+   chama 6 delas direto; `agenda_profissionais_livres` é usada por dentro de
+   `agenda_marcar` e `agenda_remarcar`, quando o paciente não escolhe
+   profissional).
 5. `supabase/migrations/0005_catalogo_procedimentos.sql` — os 20 procedimentos
    da clínica, no lugar dos 3 de exemplo do seed inicial. Só dados.
 

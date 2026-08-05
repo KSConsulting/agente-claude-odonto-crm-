@@ -47,13 +47,21 @@ HTTP 200**, com `ok: false`, um `motivo` em código e a `mensagem` falável.
 |---|---|---|
 | Deu certo | 200 | `ok: true` + campos + `mensagem` |
 | Recusa de negócio (ocupado, não encontrado, fora do expediente) | 200 | `ok: false` + `motivo` + `mensagem` |
-| JSON malformado ou campo obrigatório faltando | 400 | `ok: false` + `motivo` + `mensagem` |
+| Campo obrigatório faltando ou data que não dá para entender | 200 | `ok: false` + `motivo` + `mensagem` |
+| Corpo não é JSON válido, ou método HTTP errado na rota | 400 | `ok: false` + `motivo` + `mensagem` |
 | Token inválido, revogado ou ausente | 401 | `ok: false` + `motivo` + `mensagem` |
+| Rota inexistente | 404 | `ok: false` + `motivo` + `mensagem` |
 | Falha inesperada | 500 | `ok: false` + `motivo` + `mensagem` |
 
 Isso mantém o fluxo do n8n simples: **só quebra o que é problema de configuração
 ou bug.** Tudo que o paciente precisa ouvir chega como 200 e segue o caminho
 normal do fluxo.
+
+> **Campo faltando volta 200, não 400** — e é de propósito. Quando o agente não
+> extraiu a data da conversa, o certo é ele dizer *"faltou alguma informação
+> para eu concluir"* e perguntar de novo, não o fluxo do n8n morrer. O 400 fica
+> reservado para o que é erro de quem programou o nó: corpo que não é JSON e
+> verbo HTTP trocado.
 
 ### `motivo` é para a máquina, `mensagem` é para o paciente
 
@@ -80,8 +88,14 @@ Entram em ISO 8601 com fuso (`2026-05-15T09:00:00-03:00`) ou sem
 (`2026-05-15T09:00`, interpretado no fuso da clínica, gravado em
 `configuracoes_clinica.fuso_horario`).
 
-Saem **nos dois formatos**: ISO nos campos, brasileiro por extenso dentro da
-`mensagem`.
+Saem **sempre em UTC**, no ISO completo que o PostgREST usa para `timestamptz`:
+`2026-05-15T12:00:00+00:00` é 09:00 em São Paulo. Vale para `data_hora`,
+`horarios[]` e `proxima_data` — todos são `timestamptz` no banco.
+
+> **Se o n8n for formatar a hora sozinho, precisa converter.** Ler `data_hora`
+> e mostrar "12:00" para quem marcou às 09:00 é o erro fácil de cometer aqui. A
+> `mensagem` já vem convertida para o fuso da clínica e por extenso — é
+> exatamente para isso que ela existe.
 
 ---
 
@@ -116,6 +130,14 @@ Base: `https://SEU_REF.supabase.co/functions/v1/agenda`
 Os sete cURLs abaixo são para colar no **Import cURL** do nó HTTP do n8n, que
 monta o nó inteiro sozinho. Na tela de Tokens eles aparecem com a URL e o token
 reais já preenchidos.
+
+> **Só o `X-Api-Key` vai no cabeçalho — não existe `Authorization` aqui.** A
+> função está publicada com `verify_jwt = false`, justamente para que a
+> autenticação seja o nosso token e não a `anon key` do Supabase. Se algum dia
+> ela for reimplantada com o padrão (`verify_jwt = true`), **os sete cURLs param
+> de funcionar de uma vez**, com 401 vindo da borda do Supabase, antes de chegar
+> no nosso código — e a resposta nem vai ter `mensagem`. É a primeira coisa a
+> conferir se tudo quebrar junto depois de um deploy.
 
 ---
 
@@ -206,16 +228,25 @@ curl -X GET 'https://SEU_REF.supabase.co/functions/v1/agenda/procedimentos' \
 A `hora` é opcional porque o paciente pergunta de dois jeitos, e os dois são
 comuns: *"pode ser quinta às 9?"* e *"que horários você tem quinta?"*.
 
-**Com `hora`** — responde à pergunta feita e já oferece alternativa:
+**Com `hora`** — responde à pergunta feita. O campo `horarios` traz o dia
+inteiro, livre; `disponivel` responde especificamente pelo horário perguntado.
 
 ```json
 {
   "ok": true,
   "disponivel": false,
-  "horarios": ["2026-05-15T10:30", "2026-05-15T14:00"],
-  "mensagem": "Quinta, 15/05, às 09:00 já está ocupado, mas tenho 10:30 e 14:00."
+  "horarios": ["2026-05-15T13:30:00+00:00", "2026-05-15T17:00:00+00:00"],
+  "mensagem": "quinta, 15/05/2026 às 09:00 já está ocupado, mas tenho 10:30 e 14:00."
 }
 ```
+
+São três frases possíveis aqui, conforme o caso:
+
+| Caso | `mensagem` |
+|---|---|
+| Livre | `quinta, 15/05/2026 às 09:00 está livre, posso marcar.` |
+| Ocupado, com alternativa no dia | `quinta, 15/05/2026 às 09:00 já está ocupado, mas tenho 10:30 e 14:00.` |
+| Ocupado, e o dia acabou | `quinta, 15/05/2026 às 09:00 já está ocupado e não tenho outro horário nesse dia.` |
 
 **Sem `hora`** — lista o dia. O campo `disponivel` não aparece, porque não houve
 pergunta específica a responder:
@@ -223,8 +254,12 @@ pergunta específica a responder:
 ```json
 {
   "ok": true,
-  "horarios": ["2026-05-15T09:00", "2026-05-15T10:30", "2026-05-15T14:00"],
-  "mensagem": "Quinta, 15/05, tenho 09:00, 10:30 e 14:00."
+  "horarios": [
+    "2026-05-15T12:00:00+00:00",
+    "2026-05-15T13:30:00+00:00",
+    "2026-05-15T17:00:00+00:00"
+  ],
+  "mensagem": "quinta, 15/05/2026, tenho 09:00, 10:30 e 14:00."
 }
 ```
 
@@ -235,13 +270,22 @@ num pinga-pinga de perguntar dia a dia:
 {
   "ok": true,
   "horarios": [],
-  "proxima_data": "2026-05-16T08:00",
-  "mensagem": "Não tenho horário na quinta. O mais próximo é sexta, 16/05, às 08:00."
+  "proxima_data": "2026-05-16T11:00:00+00:00",
+  "mensagem": "Não tenho horário em quinta, 15/05/2026. O mais próximo é sexta, 16/05/2026, às 08:00."
 }
 ```
 
+Se não houver vaga nenhuma na busca (ela varre 60 dias), `proxima_data` vem
+`null` e a frase é *"Não encontrei horário disponível nos próximos dias."*
+
 Os horários respeitam a jornada do profissional, os bloqueios (férias, feriado)
 e as consultas já marcadas. Sem `profissional_id`, considera todos os ativos.
+
+**A grade anda de 30 em 30 minutos.** É o passo padrão da função SQL, e é o que
+faz a lista sair "09:00, 09:30, 10:00" em vez de minuto a minuto. A `duracao_minutos`
+é outra coisa: ela diz quanto tempo precisa caber a partir de cada horário
+oferecido — com 90 minutos, um vão de uma hora entre duas consultas deixa de
+aparecer na lista.
 
 **Recusas:** `data_invalida`, `profissional_inexistente`.
 
@@ -282,9 +326,9 @@ agendamento que já existe em vez de criar outro.
 {
   "ok": true,
   "id": "7b4e…",
-  "data_hora": "2026-05-15T09:00",
+  "data_hora": "2026-05-15T12:00:00+00:00",
   "profissional": "Henrique Salles",
-  "mensagem": "Maria Pereira, seu agendamento foi marcado com sucesso com o profissional Henrique Salles para o dia 15/05/2026 às 09:00."
+  "mensagem": "Maria Pereira, seu agendamento foi marcado com sucesso com o profissional Henrique Salles para quinta, 15/05/2026 às 09:00."
 }
 ```
 
@@ -292,7 +336,8 @@ O `id` volta para o agente poder cancelar ou remarcar depois sem ter que
 procurar.
 
 **Recusas:** `horario_ocupado`, `sem_profissional_livre`, `fora_expediente`,
-`whatsapp_invalido`, `dados_invalidos` — cada uma com a frase correspondente.
+`whatsapp_invalido`, `dados_invalidos`, `data_invalida` — cada uma com a frase
+correspondente.
 
 ```bash
 curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/marcar' \
@@ -322,19 +367,25 @@ curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/marcar' \
   "consultas": [
     {
       "id": "7b4e…",
-      "data_hora": "2026-05-15T09:00",
+      "data_hora": "2026-05-15T12:00:00+00:00",
       "profissional": "Henrique Salles",
-      "procedimento": "Limpeza"
+      "procedimento": "Limpeza e Profilaxia"
     }
   ],
-  "mensagem": "Você tem consulta na quinta, 15/05, às 09:00, com o Henrique Salles."
+  "mensagem": "Você tem consulta em quinta, 15/05/2026, às 09:00, com Henrique Salles."
 }
 ```
 
 É daqui que o agente tira o `id` para cancelar ou remarcar.
 
-**Nenhuma consulta:** `consultas` vazio e a frase dizendo que não há nada
-marcado. Continua sendo `ok: true` — a pergunta foi respondida.
+**Mais de uma:** a lista vem inteira, em ordem de data, mas a frase fala só da
+próxima — *"Você tem 3 consultas marcadas. A próxima é em quinta, 15/05/2026,
+às 09:00, com Henrique Salles."* Ninguém recita agenda no WhatsApp; se o
+paciente quiser o resto, o agente tem a lista para ler.
+
+**Nenhuma consulta:** `consultas` vazio e a frase *"Você não tem nenhuma
+consulta marcada no momento."* Continua sendo `ok: true` — a pergunta foi
+respondida.
 
 **Recusas:** `whatsapp_invalido`, `paciente_nao_encontrado`.
 
@@ -361,8 +412,8 @@ um ID trocado no fluxo cancele a consulta de outra pessoa.
 ```json
 {
   "ok": true,
-  "data_hora": "2026-05-15T09:00",
-  "mensagem": "Sua consulta de 15/05/2026 às 09:00 com o Henrique Salles foi cancelada."
+  "data_hora": "2026-05-15T12:00:00+00:00",
+  "mensagem": "Sua consulta de quinta, 15/05/2026 às 09:00 com Henrique Salles foi cancelada."
 }
 ```
 
@@ -372,7 +423,7 @@ marcadas, o funil dele **não** muda: cancelar uma sessão não é desistir do
 tratamento.
 
 **Recusas:** `nao_encontrada`, `nao_pertence`, `ja_cancelada`, `nao_cancelavel`
-(consulta já realizada).
+(consulta já realizada), `dados_invalidos` (sem `consulta_id`).
 
 ```bash
 curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/cancelar' \
@@ -400,9 +451,9 @@ paciente ficaria sem consulta nenhuma e ninguém perceberia.
 ```json
 {
   "ok": true,
-  "data_hora": "2026-05-16T14:00",
+  "data_hora": "2026-05-16T17:00:00+00:00",
   "profissional": "Henrique Salles",
-  "mensagem": "Sua consulta foi remarcada para sexta, 16/05/2026, às 14:00, com o Henrique Salles."
+  "mensagem": "Sua consulta foi remarcada para sexta, 16/05/2026, às 14:00, com Henrique Salles."
 }
 ```
 
@@ -411,7 +462,7 @@ contaria a mesma consulta duas vezes, uma no mês original e outra no mês para 
 qual foi adiada.
 
 **Recusas:** `nao_encontrada`, `nao_pertence`, `horario_ocupado`,
-`sem_profissional_livre`, `fora_expediente`.
+`sem_profissional_livre`, `fora_expediente`, `dados_invalidos`, `data_invalida`.
 
 ```bash
 curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/remarcar' \
@@ -449,11 +500,16 @@ vira encenação — o valor continua lá, visível para quem tiver acesso.
 **Revogar não apaga.** A linha fica com `ativo = false`, para o histórico de quem
 teve acesso e quando não desaparecer.
 
-**`ultimo_acesso`** é atualizado no máximo uma vez a cada poucos minutos por
+**`ultimo_acesso`** é atualizado no máximo uma vez a cada **5 minutos** por
 token, não a cada chamada — senão cada consulta de disponibilidade viraria
 também uma escrita.
 
 ### Tela: Configurações → Tokens
+
+> ⏳ **Esta tela ainda não existe** — é a próxima etapa. A tabela `api_tokens` e
+> a validação na API já estão no ar, mas **não há nenhum token cadastrado**, e
+> por isso hoje toda chamada responde 401. O que está descrito abaixo é o
+> combinado do que a tela vai fazer.
 
 - Lista com nome, prefixo, status, último acesso e quem criou
 - Criar: pede só o nome
