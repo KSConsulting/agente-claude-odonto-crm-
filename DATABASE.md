@@ -19,16 +19,19 @@ Para colocar um projeto novo no ar, na ordem:
 
 ### 1.1. Criar o projeto Supabase
 
-Crie um projeto novo em [supabase.com](https://supabase.com). Anote o **project ref**
-(o identificador na URL, ex.: `xngzwqvhrjyekanpvxzi`).
+Crie um projeto novo em [supabase.com](https://supabase.com). Anote o **project
+ref** — o identificador que aparece na URL do painel, no formato
+`abcdefghijklmnopqrst` (20 letras).
 
 ### 1.2. Rodar a migração
 
 Abra o **SQL Editor** no painel do Supabase, cole todo o conteúdo de
 `supabase/migrations/0001_schema_inicial.sql` e execute.
 
-Isso cria: 6 tabelas, 1 view, 8 índices, 13 políticas de RLS, 2 buckets de
-Storage, 2 funções, 2 triggers e os dados iniciais.
+Isso cria: 6 tabelas, 1 view, 9 índices, 13 políticas de RLS, 2 buckets de
+Storage, 2 funções, 2 triggers, a publicação de Realtime e os dados iniciais.
+
+Confira o resultado com as consultas da [seção 10](#10-consultas-úteis-para-verificação).
 
 ### 1.3. Configurar as variáveis de ambiente
 

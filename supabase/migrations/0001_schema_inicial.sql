@@ -1,6 +1,6 @@
 -- =============================================================================
 -- SISTEMA CLÍNICA — SCHEMA INICIAL
--- Projeto Supabase: Odonto Clinica (xngzwqvhrjyekanpvxzi)
+-- Rode este arquivo no SQL Editor de um projeto Supabase novo.
 --
 -- ✅ APLICADO NO BANCO. Rode este arquivo inteiro num projeto Supabase novo
 --    para recriar tudo do zero.
