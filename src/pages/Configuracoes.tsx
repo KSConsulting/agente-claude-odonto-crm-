@@ -143,7 +143,7 @@ function TabPerfil({ userId }: { userId: string }) {
     const { error: dbError } = await dbOp
     if (dbError) { setLogoError('Logo enviada, mas erro ao salvar configuração.') }
     else {
-      setClinica((prev) => prev ? { ...prev, logo_url: url } : { id: '', nome_clinica: null, logo_url: url, created_at: '', updated_at: '' })
+      setClinica((prev) => prev ? { ...prev, logo_url: url } : { id: '', nome_clinica: null, logo_url: url, fuso_horario: 'America/Sao_Paulo', created_at: '', updated_at: '' })
       window.dispatchEvent(new Event('clinica-logo-updated'))
     }
     setUploadingLogo(false); e.target.value = ''

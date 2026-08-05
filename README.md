@@ -46,6 +46,31 @@ Quadro com as 9 etapas do funil e arrastar-e-soltar entre colunas.
   anda na tela sem precisar recarregar (via Supabase Realtime)
 - Cada card mostra há quanto tempo foi a última interação
 
+### 📅 Agenda
+
+Calendário com **todas as agendas da clínica ao mesmo tempo**, cada profissional
+na sua cor.
+
+- Visualização **semanal** (grade de horas, estilo Google Calendar) e **mensal**
+- Filtro por profissional — ligue e desligue agendas para comparar
+- Clique num horário vazio para já abrir o agendamento naquele dia e hora
+- **Novo agendamento**: escolhe a agenda, data, horário, duração e procedimento
+  em texto livre. Se o paciente ainda não existir, é criado no CRM na hora
+- Avisa antes de marcar fora da jornada do profissional ou sobre um bloqueio
+- **Atualiza sozinha**: consulta marcada pelo Agente de IA aparece na tela
+- Consulta duplicada é **impossível** — quem impede é o próprio banco, não a tela
+
+### 🦷 Profissionais
+
+Os dentistas da clínica: nome, sobrenome, cor e horários de atuação.
+
+Cadastrar um profissional **já cria a agenda dele** — não existe passo separado,
+porque a agenda de alguém são as consultas dessa pessoa. A cor escolhida aqui é
+a cor dos blocos no calendário.
+
+Profissional com consultas não pode ser excluído (o banco impede, para preservar
+o histórico) — pode ser **desativado**, o que o tira da agenda e dos seletores.
+
 ### 👥 Leads e 🦷 Clientes
 
 Duas páginas separadas, alimentadas pela mesma base:
@@ -126,23 +151,29 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-Copie **todo** o conteúdo de
-[`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql),
-cole e clique em **Run**.
+São **dois arquivos, nesta ordem** — o segundo depende do primeiro:
 
-Isso cria de uma vez:
+1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
+2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
+
+Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
+
+Ao final você terá:
 
 ```
-6 tabelas + 1 view      estrutura de dados
-9 índices               desempenho das consultas
-13 políticas de RLS     controle de acesso
-2 buckets de Storage    fotos de perfil e logotipo
-2 funções + 2 triggers  automações internas
-1 publicação Realtime   atualização automática da tela
+9 tabelas + 1 view       estrutura de dados
+15 índices               desempenho das consultas
+16 políticas de RLS      controle de acesso (10 no banco + 6 no Storage)
+2 buckets de Storage     fotos de perfil e logotipo
+4 funções + 6 triggers   automações internas
+1 restrição de exclusão  impede duas consultas no mesmo horário
+2 tabelas no Realtime    atualização automática da tela
 ```
 
 E já deixa cadastrados o horário comercial padrão e alguns procedimentos de
-exemplo — todos editáveis depois pela tela de Configurações.
+exemplo — todos editáveis depois pela tela de Configurações. Profissionais não
+vêm de exemplo: cadastre os seus na tela **Profissionais**, e a agenda de cada
+um nasce junto.
 
 ### 4. Configurar as variáveis de ambiente
 
@@ -197,17 +228,35 @@ npm run lint      # análise estática
 
 ## Como o banco está organizado
 
-Sete objetos no schema `public`:
+Dez objetos no schema `public`:
 
 | Objeto | Papel |
 |---|---|
 | `crm_clinica_dados` | Tabela principal — leads e pacientes |
 | `crm_clinica` | **View** sobre a tabela acima (leia o aviso abaixo) |
-| `consultas` | Agendamentos, ligados a um lead |
+| `consultas` | Agendamentos — ligam um lead a um profissional e a um horário |
+| `profissionais` | Dentistas. **A agenda de cada um são as consultas dele** |
+| `profissional_horarios` | Jornada de trabalho, por dia da semana |
+| `profissional_bloqueios` | Férias, feriados, almoço |
 | `usuarios` | Perfis da equipe, espelhando o Auth |
-| `configuracoes_clinica` | Nome e logotipo da clínica |
-| `horario_comercial` | Grade de atendimento |
+| `configuracoes_clinica` | Nome, logotipo e fuso horário da clínica |
+| `horario_comercial` | Grade de atendimento da clínica |
 | `servicos_clinica` | Catálogo de procedimentos |
+
+### ⚠️ Não existe tabela de agenda — e é de propósito
+
+A agenda de um profissional é o conjunto de consultas com o `profissional_id`
+dele. Cadastrar o dentista já cria a agenda; não há como as duas coisas ficarem
+fora de sincronia, porque são a mesma coisa.
+
+### ⚠️ O banco impede agendamento duplo
+
+A restrição `consultas_sem_sobreposicao` não deixa um profissional ter duas
+consultas ativas se sobrepondo. Está no banco, e não na tela, porque a recepção
+e o Agente de IA marcam ao mesmo tempo: verificar antes e gravar depois deixa uma
+janela em que os dois passam — e o resultado é dois pacientes na mesma cadeira.
+
+Consulta cancelada libera o horário automaticamente.
 
 ### ⚠️ `crm_clinica` é uma view, não uma tabela
 
@@ -283,7 +332,8 @@ continua no histórico do Git. É preciso revogar a credencial e gerar outra.
 
 ### Controle de acesso
 
-O RLS está ativo nas 6 tabelas, com 13 políticas. O modelo atual é:
+O RLS está ativo nas 9 tabelas, com 10 políticas (mais 6 no Storage). O modelo
+atual é:
 
 - Quem **não** está autenticado não enxerga absolutamente nada
 - Quem está autenticado é considerado parte da equipe e enxerga tudo
@@ -309,6 +359,26 @@ A tabela `crm_clinica_dados` já tem as colunas de integração
 (`id_conta_chatwoot`, `id_conversa_chatwoot`, `id_lead_chatwoot`,
 `inbox_id_chatwoot`) e os carimbos dos três follow-ups.
 
+### Ao agendar, o agente escreve em `consultas`
+
+Não em `data_agendamento` da ficha do lead. Uma consulta gravada só na ficha
+apareceria no CRM e sumiria da Agenda. A linha em `consultas` deve trazer
+`profissional_id`, `duracao_minutos`, `origem = 'agente_ia'` e uma
+`chave_externa` — esta última é o que impede um retry do n8n de criar duas
+consultas idênticas. O resto (data na ficha, status no funil) um trigger do banco
+mantém sozinho.
+
+### A API da agenda ainda não existe
+
+O próximo passo é expor ao agente as cinco operações de que ele precisa —
+consultar disponibilidade, marcar, consultar, cancelar e reagendar — chamadas
+pelo n8n via nó HTTP.
+
+O banco já foi desenhado para isso: a restrição anti-conflito, a idempotência,
+os bloqueios de agenda e o fuso horário da clínica estão no PostgreSQL
+justamente porque essas chamadas não passam pela interface. Detalhes na seção 8
+do [`DATABASE.md`](DATABASE.md).
+
 ### ⚠️ A automação precisa da chave `service_role`
 
 As políticas de RLS liberam apenas o papel `authenticated`, que corresponde a uma
@@ -327,13 +397,14 @@ O fluxo esperado está descrito na seção 8 do [`DATABASE.md`](DATABASE.md).
 ```
 odonto-clinica/
 ├── src/
-│   ├── components/       Sidebar, Layout, rota protegida, página de pessoas
-│   ├── pages/            Login, Dashboard, CRM, Leads, Clientes, Ficha, Config.
-│   ├── lib/              cliente Supabase e regra Lead × Paciente
+│   ├── components/       Sidebar, Layout, rota protegida, pessoas, calendário
+│   ├── pages/            Login, Dashboard, CRM, Agenda, Profissionais, Leads,
+│   │                     Clientes, Ficha, Configurações
+│   ├── lib/              Supabase, regra Lead × Paciente, cores e lógica da agenda
 │   ├── types/            tipos espelhando o schema do banco
 │   └── index.css         fonte, Tailwind e animações
 ├── supabase/
-│   └── migrations/       o SQL que cria o banco inteiro
+│   └── migrations/       o SQL que cria o banco inteiro (rode em ordem)
 ├── public/               favicon
 ├── DATABASE.md           documentação completa do banco
 ├── CLAUDE.md             convenções e orientações de desenvolvimento
@@ -377,7 +448,7 @@ select tgname from pg_trigger where tgname = 'on_auth_user_created';
 <details>
 <summary><strong>As telas abrem vazias, mesmo com dados no banco</strong></summary>
 
-Provável falha nas políticas de RLS. Verifique se as 13 políticas foram criadas:
+Provável falha nas políticas de RLS. Verifique se as 16 políticas foram criadas:
 
 ```sql
 select tablename, policyname from pg_policies
@@ -408,6 +479,44 @@ alter publication supabase_realtime add table public.crm_clinica_dados;
 
 Ela está usando a chave `anon`. Troque pela `service_role`, que ignora o RLS.
 Veja [Integração com o Agente de IA](#integração-com-o-agente-de-ia).
+</details>
+
+<details>
+<summary><strong>"Esse horário acabou de ser ocupado" ao tentar agendar</strong></summary>
+
+Não é erro do sistema: o banco recusou duas consultas se sobrepondo na agenda do
+mesmo profissional. Costuma acontecer quando o Agente de IA marcou naquele
+horário com o modal já aberto na tela.
+
+Escolha outro horário, outra agenda, ou cancele a consulta que está ocupando o
+espaço — cancelamento libera o horário na hora. Repetir a mesma tentativa dá
+sempre o mesmo resultado.
+</details>
+
+<details>
+<summary><strong>Não consigo excluir um profissional</strong></summary>
+
+Ele tem consultas registradas, e o banco protege o histórico. Use o botão de
+**desativar**: ele sai da agenda e dos seletores de agendamento, mas as consultas
+antigas continuam íntegras.
+</details>
+
+<details>
+<summary><strong>A Agenda não mostra o que o Agente de IA marcou</strong></summary>
+
+Duas causas possíveis.
+
+A automação ainda está gravando `data_agendamento` na ficha do lead em vez de
+criar a linha em `consultas` — veja
+[Integração com o Agente de IA](#integração-com-o-agente-de-ia).
+
+Ou a tabela não está publicada no Realtime, e a tela só atualiza ao recarregar:
+
+```sql
+select tablename from pg_publication_tables
+where pubname = 'supabase_realtime';
+-- deve retornar: crm_clinica_dados e consultas
+```
 </details>
 
 ---

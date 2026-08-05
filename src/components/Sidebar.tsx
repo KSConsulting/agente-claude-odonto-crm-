@@ -3,6 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   KanbanSquare,
+  CalendarDays,
+  BriefcaseMedical,
   Users,
   UserCheck,
   Settings,
@@ -17,8 +19,10 @@ import type { Usuario, ConfiguracoesClinica } from '../types'
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'CRM', icon: KanbanSquare },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/leads', label: 'Leads', icon: Users, end: true },
   { to: '/clientes', label: 'Clientes', icon: UserCheck },
+  { to: '/profissionais', label: 'Profissionais', icon: BriefcaseMedical },
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 

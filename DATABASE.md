@@ -23,13 +23,21 @@ Crie um projeto novo em [supabase.com](https://supabase.com). Anote o **project
 ref** — o identificador que aparece na URL do painel, no formato
 `abcdefghijklmnopqrst` (20 letras).
 
-### 1.2. Rodar a migração
+### 1.2. Rodar as migrações
 
-Abra o **SQL Editor** no painel do Supabase, cole todo o conteúdo de
-`supabase/migrations/0001_schema_inicial.sql` e execute.
+Abra o **SQL Editor** no painel do Supabase e execute os dois arquivos, **nesta
+ordem**:
 
-Isso cria: 6 tabelas, 1 view, 9 índices, 13 políticas de RLS, 2 buckets de
-Storage, 2 funções, 2 triggers, a publicação de Realtime e os dados iniciais.
+1. `supabase/migrations/0001_schema_inicial.sql` — 6 tabelas, 1 view, 9 índices,
+   13 políticas de RLS, 2 buckets de Storage, 2 funções, 2 triggers, a
+   publicação de Realtime e os dados iniciais.
+2. `supabase/migrations/0002_agenda_profissionais.sql` — agenda e profissionais:
+   3 tabelas, 7 colunas novas em `consultas`, a restrição que impede
+   agendamento duplo, 3 políticas de RLS, 1 função, 3 triggers e o fuso horário
+   da clínica.
+
+O `0002` depende do `0001` (usa a função `set_updated_at` e a tabela
+`consultas`). Rodar fora de ordem falha.
 
 Confira o resultado com as consultas da [seção 10](#10-consultas-úteis-para-verificação).
 
@@ -76,6 +84,9 @@ erDiagram
     auth_users ||--|| usuarios : "id (mesmo UUID)"
     crm_clinica_dados ||--o{ consultas : "lead_id"
     crm_clinica_dados ||--|| crm_clinica : "view calculada"
+    profissionais ||--o{ consultas : "profissional_id"
+    profissionais ||--o{ profissional_horarios : "jornada"
+    profissionais ||--o{ profissional_bloqueios : "indisponibilidade"
 
     usuarios {
         uuid id PK_FK
@@ -94,13 +105,32 @@ erDiagram
     consultas {
         uuid id PK
         uuid lead_id FK
+        uuid profissional_id FK
         timestamptz data_consulta
+        int duracao_minutos
         numeric valor_pago
+    }
+    profissionais {
+        uuid id PK
+        text nome
+        text cor
+        boolean ativo
+    }
+    profissional_horarios {
+        uuid id PK
+        uuid profissional_id FK
+        smallint dia_semana
+    }
+    profissional_bloqueios {
+        uuid id PK
+        uuid profissional_id FK "nulo = clínica toda"
+        timestamptz inicio
+        timestamptz fim
     }
     configuracoes_clinica {
         uuid id PK
         text nome_clinica
-        text logo_url
+        text fuso_horario
     }
     horario_comercial {
         uuid id PK
@@ -117,11 +147,19 @@ erDiagram
 |---|---|---|
 | `crm_clinica_dados` | tabela | Núcleo — dados dos leads/pacientes |
 | `crm_clinica` | **view** | O que a aplicação lê e escreve (ver seção 3) |
-| `consultas` | tabela | Agendamentos vinculados a um lead |
+| `consultas` | tabela | Agendamentos — lead + profissional + horário |
+| `profissionais` | tabela | Dentistas. **A agenda de cada um são as consultas dele** |
+| `profissional_horarios` | tabela | Jornada, 1 linha por dia da semana |
+| `profissional_bloqueios` | tabela | Férias, feriado, almoço |
 | `usuarios` | tabela | Perfil da equipe, espelha `auth.users` |
-| `configuracoes_clinica` | tabela | Nome e logo da clínica (linha única) |
+| `configuracoes_clinica` | tabela | Nome, logo e fuso da clínica (linha única) |
 | `horario_comercial` | tabela | Grade de atendimento, 1 linha por dia |
 | `servicos_clinica` | tabela | Catálogo de procedimentos |
+
+> **Não existe tabela `agendas`, e isso é proposital.** A agenda de um
+> profissional é o conjunto de consultas com o `profissional_id` dele. Cadastrar
+> o profissional já cria a agenda; não há como as duas coisas divergirem, nem
+> estado intermediário para consertar.
 
 ---
 
@@ -248,26 +286,93 @@ WhatsApp, ou um paciente cadastrado manualmente.
 
 ### 4.2. `consultas`
 
-Agendamentos de um lead. Um lead tem N consultas.
+Agendamentos. Um lead tem N consultas; um profissional tem N consultas — e é
+esse segundo vínculo que forma a agenda dele.
 
-**Usada em:** `LeadDetail.tsx`
+**Usada em:** `Agenda.tsx`, `NovoAgendamentoModal.tsx`, `LeadDetail.tsx`
 
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
 | `id` | `uuid` | não | `gen_random_uuid()` | PK |
 | `lead_id` | `uuid` | **não** | — | FK → `crm_clinica_dados(id)` **ON DELETE CASCADE** |
-| `procedimento` | `text` | não | — | |
-| `data_consulta` | `timestamptz` | não | — | |
+| `profissional_id` | `uuid` | sim | — | FK → `profissionais(id)` **ON DELETE RESTRICT** |
+| `procedimento` | `text` | não | — | Texto livre |
+| `data_consulta` | `timestamptz` | não | — | Quando começa |
+| `duracao_minutos` | `integer` | não | `60` | `CHECK` 1..600 |
+| `data_fim` | `timestamptz` | não | *trigger* | **Derivada.** Nunca grave nela |
 | `status` | `text` | não | `'agendada'` | `agendada` \| `realizada` \| `cancelada` |
+| `origem` | `text` | não | `'equipe'` | `equipe` \| `agente_ia` |
+| `chave_externa` | `text` | sim | — | Idempotência da API. **UNIQUE** quando preenchida |
 | `valor_pago` | `numeric(10,2)` | sim | — | |
 | `observacoes` | `text` | sim | — | |
+| `cancelado_em` | `timestamptz` | sim | — | |
+| `motivo_cancelamento` | `text` | sim | — | |
 | `created_at` | `timestamptz` | não | `now()` | |
+| `updated_at` | `timestamptz` | não | `now()` | Trigger `consultas_updated_at` |
 
-**Índice:** `consultas_lead_data_idx` em `(lead_id, data_consulta DESC)`.
+**Índices:**
 
-> **`ON DELETE CASCADE`:** excluir um lead apaga **todas** as consultas dele,
-> incluindo o histórico financeiro. Foi uma decisão consciente. Se o seu caso
-> exigir preservar histórico, troque para `ON DELETE RESTRICT`.
+| Índice | Colunas | Para quê |
+|---|---|---|
+| `consultas_lead_data_idx` | `(lead_id, data_consulta DESC)` | Histórico na ficha do paciente |
+| `consultas_profissional_data_idx` | `(profissional_id, data_consulta)` | Agenda de um profissional num período |
+| `consultas_data_idx` | `(data_consulta)` | Agenda sem filtro de profissional |
+| `consultas_chave_externa_idx` | `(chave_externa)` parcial | Idempotência — impede consulta duplicada em retry |
+
+#### ⚠️ `consultas_sem_sobreposicao` — a restrição que impede agendamento duplo
+
+```sql
+exclude using gist (
+  profissional_id with =,
+  tstzrange(data_consulta, data_fim) with &&
+) where (status = 'agendada' and profissional_id is not null)
+```
+
+Um profissional não pode ter duas consultas **ativas** se sobrepondo. Vale só
+para `status = 'agendada'`: cancelada libera o horário, realizada é passado.
+
+#### Por que `data_fim` existe como coluna
+
+O caminho óbvio seria calcular o fim dentro da própria restrição, com
+`data_consulta + make_interval(mins => duracao_minutos)`. O PostgreSQL recusa:
+
+```
+42P17 -> functions in index expression must be marked IMMUTABLE
+```
+
+Não é o `make_interval` — esse é imutável. O problema é o operador
+`timestamptz + interval`, que é apenas **STABLE**: um `interval` pode conter dias
+e meses, e somar dias a um `timestamptz` depende do fuso e do horário de verão.
+Aqui o intervalo é sempre em minutos, o que seria exato, mas o planejador não
+tem como saber disso.
+
+Por isso o fim é materializado em `data_fim`, mantido pelo trigger
+**`consultas_data_fim`** (BEFORE INSERT/UPDATE — precisa estar preenchido antes
+da checagem da restrição, que acontece depois dos triggers BEFORE). A restrição
+compara duas colunas, o que é imutável por definição.
+
+Coluna `GENERATED` não resolveria: sofre da mesma exigência de imutabilidade.
+
+> **Isto foi descoberto aplicando a migração no banco real**, não lendo o SQL. É
+> o tipo de erro que só aparece na execução.
+
+Está no banco, e não no código, porque a recepção e o Agente de IA escrevem pelo
+mesmo caminho ao mesmo tempo. Verificar em JavaScript ("já tem algo nesse
+horário?") e depois inserir deixa uma janela entre a leitura e a escrita — e o
+resultado é dois pacientes na mesma cadeira. É intermitente e ninguém reproduz.
+
+Quem violar recebe **`23P01` (`exclusion_violation`)**. A interface já traduz
+isso ("Esse horário acabou de ser ocupado"); a API deve devolver **409** e nunca
+repetir a chamada — repetir dá o mesmo erro.
+
+Exige a extensão `btree_gist` (criada pela migração).
+
+> **`ON DELETE CASCADE` do lead:** excluir um lead apaga **todas** as consultas
+> dele, incluindo o histórico financeiro. Decisão consciente.
+>
+> **`ON DELETE RESTRICT` do profissional:** o oposto — o banco **impede** apagar
+> um profissional que tenha consultas. A tela oferece desativar (`ativo = false`),
+> que tira da agenda sem destruir histórico.
 
 ---
 
@@ -314,8 +419,16 @@ Nome e logo da clínica. **Tem no máximo uma linha.**
 | `id` | `uuid` | não | `gen_random_uuid()` |
 | `nome_clinica` | `text` | sim | — |
 | `logo_url` | `text` | sim | — |
+| `fuso_horario` | `text` | não | `'America/Sao_Paulo'` |
 | `created_at` | `timestamptz` | não | `now()` |
 | `updated_at` | `timestamptz` | não | `now()` |
+
+> **`fuso_horario` não é enfeite.** `profissional_horarios` guarda `time` sem
+> fuso e `consultas.data_consulta` é `timestamptz`; cruzar os dois exige saber em
+> que fuso "08:00" foi escrito. O servidor do Supabase roda em UTC — sem fixar
+> isto, o cálculo de disponibilidade da API erra em 3 horas e o Agente de IA
+> passa a oferecer consulta de madrugada. Fica no banco, e não no código, para
+> mudar sem novo deploy.
 
 A unicidade é garantida por um índice sobre uma expressão constante:
 
@@ -375,6 +488,99 @@ Catálogo de procedimentos oferecidos.
 
 ---
 
+### 4.7. `profissionais`
+
+Os dentistas da clínica.
+
+**Usada em:** `Profissionais.tsx`, `Agenda.tsx`, `NovoAgendamentoModal.tsx`,
+`LeadDetail.tsx`
+
+| Coluna | Tipo | Nulo | Default | Observação |
+|---|---|:---:|---|---|
+| `id` | `uuid` | não | `gen_random_uuid()` | PK |
+| `nome` | `text` | não | — | |
+| `sobrenome` | `text` | não | `''` | |
+| `cor` | `text` | não | `'#1E6E8C'` | `CHECK` hex de 6 dígitos |
+| `ativo` | `boolean` | não | `true` | Inativo some da agenda e dos seletores |
+| `created_at` | `timestamptz` | não | `now()` | |
+| `updated_at` | `timestamptz` | não | `now()` | Trigger `profissionais_updated_at` |
+
+**Índice:** `profissionais_ativo_idx` em `(ativo, nome)`.
+
+> **O profissional não é usuário do sistema.** Não faz login, não tem linha em
+> `usuarios` e não está vinculado a procedimentos — é só um recurso de agenda.
+> Se um dia cada dentista precisar ver apenas a própria agenda, será preciso
+> acrescentar `usuario_id` aqui e reescrever as políticas da seção 6. Mais fácil
+> decidir antes de haver dados.
+
+> **A `cor` é dado, não identidade visual.** Serve para distinguir uma agenda da
+> outra no calendário — a mesma lógica das cores de status. Trocar a marca da
+> clínica não deve trocar isto. A paleta oferecida na interface é fixa
+> (`src/lib/cores.ts`), mas o banco aceita qualquer hex válido, então ampliá-la
+> não exige migração.
+
+---
+
+### 4.8. `profissional_horarios`
+
+Jornada de trabalho — **uma linha por dia da semana, por profissional**. Mesma
+modelagem de `horario_comercial`, porque cada dentista tem horário diferente.
+
+**Usada em:** `Profissionais.tsx` (edição), `Agenda.tsx` (sombreado fora do
+expediente), `NovoAgendamentoModal.tsx` (aviso de encaixe)
+
+| Coluna | Tipo | Nulo | Default | Observação |
+|---|---|:---:|---|---|
+| `id` | `uuid` | não | `gen_random_uuid()` | PK |
+| `profissional_id` | `uuid` | **não** | — | FK → `profissionais(id)` **ON DELETE CASCADE** |
+| `dia_semana` | `smallint` | não | — | `CHECK (0..6)` |
+| `hora_inicio` | `time` | não | — | Sem fuso — ver `fuso_horario` na seção 4.4 |
+| `hora_fim` | `time` | não | — | `CHECK (hora_fim > hora_inicio)` |
+| `ativo` | `boolean` | não | `true` | Dia sem atendimento = `false` |
+
+**UNIQUE `(profissional_id, dia_semana)`** — a interface acha o dia com um
+`find()`, e linhas duplicadas fariam todas menos a primeira sumirem em silêncio.
+Aqui é pior que em `horario_comercial`: a API de disponibilidade leria só a
+primeira e ofereceria horário errado ao paciente.
+
+**Índice:** `profissional_horarios_prof_idx` em `(profissional_id)`.
+
+> `dia_semana`: **0 = domingo … 6 = sábado**, igual a `horario_comercial` e ao
+> `getDay()` do JavaScript. Manter idêntico é o que permite comparar as duas
+> grades sem conversão.
+
+---
+
+### 4.9. `profissional_bloqueios`
+
+Férias, feriado, almoço, congresso, compromisso pessoal.
+
+**Usada em:** `NovoAgendamentoModal.tsx` e, na fase 2, pelo cálculo de
+disponibilidade da API.
+
+| Coluna | Tipo | Nulo | Default | Observação |
+|---|---|:---:|---|---|
+| `id` | `uuid` | não | `gen_random_uuid()` | PK |
+| `profissional_id` | `uuid` | **sim** | — | FK → `profissionais(id)` CASCADE. **Nulo = clínica inteira** |
+| `inicio` | `timestamptz` | não | — | |
+| `fim` | `timestamptz` | não | — | `CHECK (fim > inicio)` |
+| `motivo` | `text` | não | `''` | |
+| `created_at` | `timestamptz` | não | `now()` | |
+
+**Índices:** `profissional_bloqueios_periodo_idx` em `(inicio, fim)` e
+`profissional_bloqueios_prof_idx` em `(profissional_id, inicio)`.
+
+> **Por que `profissional_id` aceita nulo:** feriado, dedetização e
+> confraternização valem para todo mundo. Sem isso, marcar um feriado exigiria
+> uma linha por dentista — e esquecer um deles significa o Agente de IA
+> oferecendo consulta em dia de clínica fechada.
+
+> **Bloqueio não entra na restrição de exclusão da seção 4.2.** Ele impede que a
+> agenda *ofereça* o horário, mas não impede a equipe de encaixar alguém por
+> cima conscientemente. Emergência odontológica em feriado existe.
+
+---
+
 ## 5. Status do funil
 
 `crm_clinica_dados.status` aceita exatamente estes 9 valores, garantidos por
@@ -399,6 +605,42 @@ Catálogo de procedimentos oferecidos.
 
 `consultas.status` aceita: `agendada`, `realizada`, `cancelada`.
 
+### O funil acompanha a agenda sozinho
+
+O trigger **`consultas_sincroniza_lead`** (função
+`public.sincronizar_agendamento_lead`) mantém a ficha do lead coerente com o que
+acontece na agenda:
+
+| Escrita em `consultas` | Efeito em `crm_clinica_dados` |
+|---|---|
+| INSERT com `status = 'agendada'` | `data_agendamento` = a consulta ativa mais próxima do lead; `data_marcacao_agendamento` = agora; `status` → `consulta_agendada` |
+| UPDATE de `data_consulta` (remarcação) | `data_agendamento` é recalculada. **`data_marcacao_agendamento` não muda** |
+| UPDATE para `status = 'cancelada'`, **restando outra consulta ativa** | `data_agendamento` passa para a próxima. **O `status` não muda** |
+| UPDATE para `status = 'cancelada'`, **era a última** | `data_agendamento` = nulo; `status` → `consulta_cancelada` |
+
+Três decisões embutidas aí:
+
+1. **Remarcar não é marcar de novo.** Se `data_marcacao_agendamento` fosse
+   reescrita a cada remarcação, o Dashboard contaria a mesma consulta duas vezes
+   — uma no mês original, outra no mês para o qual foi adiada.
+2. **Quem já é paciente não volta a ser lead.** Os status `consulta_realizada` e
+   `paciente_recorrente` são preservados: são eles que separam `/leads` de
+   `/clientes` (`src/lib/pessoas.ts`), e rebaixá-los jogaria um paciente
+   recorrente de volta na lista de contatos a cada retorno que marcasse.
+3. **Cancelar uma sessão não é desistir do tratamento.** Odontologia trabalha com
+   tratamentos de várias sessões marcadas de uma vez. Por isso o trigger sempre
+   **recalcula** `data_agendamento` a partir das consultas ativas que restam
+   (`min(data_consulta)`), em vez de deduzir da linha que disparou a operação — e
+   só muda o funil para `consulta_cancelada` quando não sobra nenhuma.
+
+Está num trigger, e não no React, porque a API do Agente de IA (seção 8) não
+passa pelo React. Escreveu consulta, o funil acompanha — venha de onde vier.
+
+> **`status = 'realizada'` é deliberadamente ignorado pelo trigger.** Marcar
+> comparecimento continua sendo ato manual, feito na ficha do paciente junto com
+> o `valor_pago`. Automatizar o salto de funil a partir do calendário produziria
+> mudanças de status que ninguém pediu.
+
 > **Ao alterar qualquer um destes valores, mude nos dois lugares:** o `CHECK` no
 > banco **e** os tipos `LeadStatus` / `ConsultaStatus` em
 > [`src/types/index.ts`](src/types/index.ts). Eles não são sincronizados
@@ -415,12 +657,15 @@ Catálogo de procedimentos oferecidos.
 **Premissa: sistema interno.** Todo usuário autenticado é da equipe e enxerga
 tudo. Quem não estiver logado não enxerga nada.
 
-RLS está **ativo nas 6 tabelas**. São 13 políticas:
+RLS está **ativo nas 9 tabelas**. São 10 políticas:
 
 | Tabela | Política | Operação | Regra |
 |---|---|---|---|
 | `crm_clinica_dados` | `leads_all` | ALL | `authenticated` — acesso total |
 | `consultas` | `consultas_all` | ALL | `authenticated` — acesso total |
+| `profissionais` | `profissionais_all` | ALL | `authenticated` — acesso total |
+| `profissional_horarios` | `profissional_horarios_all` | ALL | `authenticated` — acesso total |
+| `profissional_bloqueios` | `profissional_bloqueios_all` | ALL | `authenticated` — acesso total |
 | `configuracoes_clinica` | `clinica_all` | ALL | `authenticated` — acesso total |
 | `horario_comercial` | `horario_all` | ALL | `authenticated` — acesso total |
 | `servicos_clinica` | `servicos_all` | ALL | `authenticated` — acesso total |
@@ -428,6 +673,10 @@ RLS está **ativo nas 6 tabelas**. São 13 políticas:
 | `usuarios` | `usuarios_update_own` | UPDATE | **só o próprio** (`auth.uid() = id`) |
 
 Mais 6 políticas em `storage.objects` (seção 7).
+
+A função `sincronizar_agendamento_lead` (seção 5) **não** usa `security definer`:
+roda com as permissões de quem chamou, que já tem acesso total pelas políticas.
+Elevar privilégio ali só ampliaria o estrago de uma chamada indevida da API.
 
 A view `crm_clinica` não tem políticas próprias: ela **herda** o RLS de
 `crm_clinica_dados` por causa do `security_invoker = true`.
@@ -487,12 +736,47 @@ para o frontend.
 2. n8n busca o lead por `id_conversa_chatwoot` *(indexado)*
 3. Se não existe, insere em `crm_clinica` com os `id_*_chatwoot` preenchidos
 4. A cada mensagem, atualiza `ultima_mensagem = now()` e `resumo_conversa`
-5. Ao agendar, grava `data_agendamento`, `data_marcacao_agendamento`,
-   `id_agendamento` e muda `status` para `consulta_agendada`
+5. Ao agendar, **insere uma linha em `consultas`** com `lead_id`,
+   `profissional_id`, `data_consulta`, `duracao_minutos`, `origem = 'agente_ia'`
+   e `chave_externa`. O trigger da seção 5 cuida sozinho de `data_agendamento`,
+   `data_marcacao_agendamento` e do `status` do lead
 6. Nos follow-ups, carimba `follow_up_1/2/3` e ajusta o `status`
 
 > **`minutos_ultima_mensagem` não precisa de escrita.** Basta manter
 > `ultima_mensagem` em dia — a view calcula o resto sozinha.
+
+### O que o agente NÃO deve fazer
+
+**Gravar `data_agendamento` direto na ficha do lead.** Era assim antes de existir
+a Agenda, e o resultado agora seria uma consulta que aparece no CRM mas não no
+calendário — duas telas contando histórias diferentes sobre o mesmo fato. A
+fonte da verdade do agendamento é a linha em `consultas`; `data_agendamento`
+virou reflexo, mantido pelo trigger.
+
+### A API da agenda (fase 2 — ainda não implementada)
+
+O schema já nasceu preparado para as cinco operações que o agente precisa:
+consultar disponibilidade, criar, consultar os agendamentos de um paciente,
+cancelar e reagendar. O que está no banco por causa disso:
+
+| Peça | Por quê |
+|---|---|
+| `consultas_sem_sobreposicao` (4.2) | Recepção e agente escrevem ao mesmo tempo; só o banco fecha a janela |
+| `chave_externa` UNIQUE (4.2) | Retry de automação não pode virar consulta duplicada |
+| `profissional_bloqueios` (4.9) | Sem isso não existe "disponibilidade" confiável |
+| `configuracoes_clinica.fuso_horario` (4.4) | Servidor em UTC; sem fixar o fuso, a disponibilidade erra em 3 horas |
+| `origem` (4.2) | Sem isso é impossível medir ou auditar o que o agente marcou sozinho |
+
+Recomendações de implementação:
+
+- **Edge Function do Supabase**, com a lógica de disponibilidade numa função SQL.
+  Dar a `service_role key` para a camada de ferramentas do agente significa que
+  uma injeção de prompt numa mensagem de WhatsApp vira acesso total ao banco. Uma
+  Edge Function com segredo próprio expõe cinco operações e nada mais.
+- **Reagendar precisa ser operação atômica**, não "cancela e cria": se o segundo
+  passo falhar, o paciente fica sem consulta nenhuma e ninguém percebe.
+- **A regra de disponibilidade em SQL precisa espelhar `src/lib/agenda.ts`.** Se
+  divergirem, o agente oferece horário que a recepção vê como ocupado.
 
 ---
 
@@ -502,11 +786,19 @@ O CRM e a tela de detalhe assinam `postgres_changes` para reagir sozinhos
 quando o Agente de IA mexe num lead: o card anda de coluna no Kanban sem
 ninguém apertar F5.
 
-Para isso funcionar, a tabela precisa estar publicada:
+A Agenda faz o mesmo com `consultas`: a tela fica aberta na recepção o dia
+inteiro enquanto o Agente de IA marca pelo WhatsApp.
+
+Para isso funcionar, as tabelas precisam estar publicadas:
 
 ```sql
-alter publication supabase_realtime add table public.crm_clinica_dados;
+alter publication supabase_realtime add table public.crm_clinica_dados;  -- 0001
+alter publication supabase_realtime add table public.consultas;          -- 0002
 ```
+
+> A Agenda **recarrega o período** a cada evento em vez de aplicar o payload: o
+> evento vem da tabela e não traz o nome do paciente, que na tela vem de um join
+> com `crm_clinica_dados`.
 
 ### ⚠️ Publique a TABELA, nunca a VIEW
 
@@ -543,6 +835,7 @@ necessário para ler valores antigos de colunas fora da PK.
 select schemaname, tablename from pg_publication_tables
 where pubname = 'supabase_realtime';
 -- esperado: public | crm_clinica_dados
+--           public | consultas
 ```
 
 Se essa consulta voltar vazia, o Realtime está morto — e nada na interface vai
@@ -570,6 +863,22 @@ Lista do que quebra este banco de formas não óbvias:
    do Dashboard erradas, sem nenhum sinal de erro.
 9. **Excluir um lead** → apaga em cascata todas as consultas e o histórico
    financeiro dele.
+10. **Rodar `0002` sem `0001`** → falha: o `0002` usa `set_updated_at` e altera
+    `consultas`, que só existem depois do primeiro arquivo.
+11. **Repetir a chamada depois de um `23P01`** → dá exatamente o mesmo erro. Isso
+    não é falha transitória: é o banco recusando duas consultas no mesmo horário
+    do mesmo profissional. A saída é outro horário.
+12. **Automação inserindo em `consultas` sem `chave_externa`** → o retry cria uma
+    segunda consulta idêntica e o paciente recebe duas confirmações.
+13. **Gravar `data_agendamento` direto na ficha do lead pela automação** → a
+    consulta aparece no CRM e some da Agenda. A fonte da verdade é `consultas`.
+14. **Cadastrar profissional sem jornada** → ele existe, mas a agenda o trata
+    como quem nunca atende, e todo agendamento com ele vira "fora do expediente".
+15. **Apagar um profissional com consultas** → bloqueado pelo `ON DELETE
+    RESTRICT` (`23503`). Use `ativo = false`.
+16. **Gravar em `consultas.data_fim`** → é coluna derivada, sobrescrita pelo
+    trigger na próxima escrita de `data_consulta` ou `duracao_minutos`. Grave
+    esses dois e deixe o fim com o banco.
 
 ---
 
@@ -578,18 +887,26 @@ Lista do que quebra este banco de formas não óbvias:
 Depois de rodar a migração, confira se está tudo de pé:
 
 ```sql
--- Objetos criados (esperado: 6 tabelas + 1 view)
+-- Objetos criados (esperado: 9 tabelas + 1 view)
 select table_name, table_type from information_schema.tables
 where table_schema = 'public' order by table_name;
 
--- RLS ativo em todas as tabelas (esperado: 6 linhas, todas true)
+-- RLS ativo em todas as tabelas (esperado: 9 linhas, todas true)
 select relname, relrowsecurity from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r' order by relname;
 
--- Políticas (esperado: 13)
-select schemaname, tablename, policyname, cmd from pg_policies
-where schemaname in ('public','storage') order by tablename, policyname;
+-- Políticas (esperado: 16 — 10 em public + 6 em storage)
+select schemaname, count(*) from pg_policies
+where schemaname in ('public','storage') group by schemaname;
+
+-- A restrição anti-conflito existe? (esperado: 1 linha, contype = 'x')
+select conname, contype from pg_constraint
+where conname = 'consultas_sem_sobreposicao';
+
+-- Triggers da agenda (esperado: as 3 linhas)
+select tgname from pg_trigger
+where tgname in ('consultas_sincroniza_lead', 'consultas_data_fim', 'consultas_updated_at');
 
 -- A view respeita o RLS? (esperado: security_invoker=true)
 select c.relname, c.reloptions from pg_class c

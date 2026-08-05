@@ -11,6 +11,9 @@ export type LeadStatus =
 
 export type ConsultaStatus = 'agendada' | 'realizada' | 'cancelada'
 
+/** Quem criou a consulta. `agente_ia` chega pela API; `equipe`, pela tela. */
+export type ConsultaOrigem = 'equipe' | 'agente_ia'
+
 export interface Usuario {
   id: string
   nome: string
@@ -22,6 +25,8 @@ export interface ConfiguracoesClinica {
   id: string
   nome_clinica: string | null
   logo_url: string | null
+  /** IANA (ex.: 'America/Sao_Paulo'). Base do cálculo de disponibilidade. */
+  fuso_horario: string
   created_at: string
   updated_at: string
 }
@@ -71,10 +76,68 @@ export interface LeadClinica {
 export interface Consulta {
   id: string
   lead_id: string
+  profissional_id: string | null
   procedimento: string
   data_consulta: string
+  duracao_minutos: number
+  /**
+   * Fim da consulta, mantido pelo trigger `consultas_data_fim`.
+   * **Somente leitura** — grave `data_consulta` e `duracao_minutos`.
+   * Existe como coluna porque a restrição anti-conflito precisa de uma
+   * expressão imutável, e `timestamptz + interval` não é.
+   */
+  data_fim: string
   status: ConsultaStatus
+  origem: ConsultaOrigem
+  chave_externa: string | null
   valor_pago: number | null
   observacoes: string | null
+  cancelado_em: string | null
+  motivo_cancelamento: string | null
   created_at: string
+  updated_at: string
+}
+
+/**
+ * Dentista da clínica. NÃO é usuário do sistema — não faz login, é só um
+ * recurso de agenda. A agenda dele são as consultas com este `id`; não existe
+ * tabela de agenda.
+ */
+export interface Profissional {
+  id: string
+  nome: string
+  sobrenome: string
+  /** Hex de 6 dígitos. Identifica o profissional em toda a agenda. */
+  cor: string
+  ativo: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Jornada do profissional. Uma linha por dia — 0 = domingo … 6 = sábado. */
+export interface ProfissionalHorario {
+  id: string
+  profissional_id: string
+  dia_semana: number
+  hora_inicio: string
+  hora_fim: string
+  ativo: boolean
+}
+
+/** Férias, feriado, almoço. `profissional_id` nulo = clínica inteira. */
+export interface ProfissionalBloqueio {
+  id: string
+  profissional_id: string | null
+  inicio: string
+  fim: string
+  motivo: string
+  created_at: string
+}
+
+/**
+ * Consulta com os dados que a agenda precisa mostrar no bloco: de quem é a
+ * consulta e qual o nome do paciente. Vem do join da Agenda.tsx.
+ */
+export interface ConsultaAgenda extends Consulta {
+  lead: { id: string; nome_lead: string | null; whatsapp_lead: string | null } | null
 }

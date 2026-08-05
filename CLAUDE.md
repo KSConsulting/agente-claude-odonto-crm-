@@ -65,7 +65,10 @@ integração com o agente e armadilhas conhecidas estão todos lá.
 A migração executável fica em
 [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql).
 
-Os três pontos que mais causam erro:
+A migração é aplicada em **dois arquivos, nesta ordem**: `0001_schema_inicial.sql`
+e depois `0002_agenda_profissionais.sql` (agenda e profissionais).
+
+Os pontos que mais causam erro:
 
 1. **`crm_clinica` é uma VIEW**, não uma tabela. A tabela física é
    `crm_clinica_dados`. A view acrescenta `minutos_ultima_mensagem`, calculado
@@ -80,7 +83,14 @@ Os três pontos que mais causam erro:
 4. **Realtime assina a TABELA, não a view.** Leitura e escrita usam
    `crm_clinica`; as assinaturas de `postgres_changes` usam
    `crm_clinica_dados`. O Postgres só replica tabelas — assinar a view não dá
-   erro, apenas nunca dispara.
+   erro, apenas nunca dispara. (`consultas` já é tabela, então a Agenda assina
+   ela direto.)
+5. **Não existe tabela de agenda.** A agenda de um profissional são as consultas
+   com o `profissional_id` dele. Cadastrar o profissional já cria a agenda.
+6. **`consultas` tem uma restrição de exclusão** (`consultas_sem_sobreposicao`)
+   que impede duas consultas ativas se sobrepondo na mesma agenda. Ela devolve
+   `23P01`, e a interface precisa traduzir isso — repetir a chamada dá o mesmo
+   erro.
 
 ---
 
@@ -94,7 +104,9 @@ src/
 ├── App.css                     ⚠️ arquivo morto — não é importado em lugar nenhum
 ├── lib/
 │   ├── supabase.ts             cliente Supabase (lê as env vars)
-│   └── pessoas.ts              regra que separa Lead de Paciente
+│   ├── pessoas.ts              regra que separa Lead de Paciente
+│   ├── cores.ts                paleta das agendas (cor do profissional)
+│   └── agenda.ts               lógica pura: datas, conflito, layout dos blocos
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
 ├── components/
@@ -102,16 +114,38 @@ src/
 │   ├── Sidebar.tsx             navegação lateral, logo, logout
 │   ├── ProtectedRoute.tsx      guarda de sessão
 │   ├── PessoasPage.tsx         implementação compartilhada de /leads e /clientes
+│   ├── AgendaSemana.tsx        grade semanal (7 colunas × horas)
+│   ├── AgendaMes.tsx           grade mensal (semanas inteiras)
+│   ├── NovoAgendamentoModal.tsx  criar consulta; cria o paciente se não existir
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
     ├── Dashboard.tsx           métricas, gráficos, próximas consultas
     ├── CRM.tsx                 Kanban do funil (drag and drop)
+    ├── Agenda.tsx              calendário de todas as agendas + filtros
+    ├── Profissionais.tsx       dentistas: nome, cor e jornada
     ├── Leads.tsx               invólucro: <PessoasPage mode="leads" />
     ├── Clientes.tsx            invólucro: <PessoasPage mode="clientes" />
     ├── LeadDetail.tsx          ficha do lead + consultas + anotações
     └── Configuracoes.tsx       perfil, clínica, horários, procedimentos
 ```
+
+### A agenda não é uma entidade
+
+`Agenda.tsx` desenha as consultas agrupadas por `profissional_id`. Não há tabela
+`agendas`, nem tela para criar uma: cadastrar o profissional já basta, e a cor
+escolhida no cadastro é a cor dos blocos no calendário.
+
+O calendário é desenhado à mão, sem biblioteca. As prontas (FullCalendar e
+afins) trazem CSS e sistema de temas próprios, que brigariam com a estilização
+inline daqui, e somariam peso a um bundle que já está grande.
+
+A lógica de datas, conflito e posicionamento fica em
+[`src/lib/agenda.ts`](src/lib/agenda.ts), fora de qualquer componente. Isso é
+proposital: a API do Agente de IA vai precisar responder "que horários estão
+livres?" com estas mesmas regras, só que em SQL. **Mudou uma regra aqui, a outra
+implementação precisa acompanhar** — se divergirem, o agente oferece horário que
+a recepção vê como ocupado.
 
 ### Leads e Clientes são a mesma implementação
 
@@ -134,9 +168,11 @@ componente quebra o Fast Refresh (o ESLint acusa isso).
 /login              público
 /                   Dashboard              ┐
 /crm                CRM (Kanban)           │
+/agenda             Agenda (calendário)    │
 /leads              Contatos (Leads)       │ dentro de ProtectedRoute
 /clientes           Pacientes (Clientes)   │ e de Layout (Sidebar)
 /leads/:id          Detalhe da pessoa      │
+/profissionais      Profissionais          │
 /configuracoes      Configurações          ┘
 *                   redireciona para /
 ```
@@ -223,6 +259,18 @@ e `LeadDetail.tsx`.
 > `iniciou_conversa` usa deliberadamente a cor da marca (lead novo = destaque).
 > Por isso `conversando` foi movido para índigo: os dois eram azuis e ficavam
 > indistinguíveis no Kanban.
+
+### Cores das agendas — também são dado
+
+A cor de cada profissional segue a mesma lógica: distingue uma agenda da outra
+no calendário, não comunica a marca. A paleta fica em
+[`src/lib/cores.ts`](src/lib/cores.ts) — dez cores separáveis entre si e
+legíveis com texto branco.
+
+É uma lista fixa de propósito. Um seletor de cor livre garante que, mais cedo ou
+mais tarde, alguém escolha amarelo-limão e o bloco suma no fundo branco. O banco
+aceita qualquer hex válido, então ampliar a paleta não exige migração — e
+`fundoSuave()` tem fallback para cores fora da lista.
 
 ### Ícones
 
@@ -325,11 +373,6 @@ compartilhado.
 
 Nenhum deles quebra nada — mas confundem quem procura onde algo está definido.
 
-### README desatualizado
-
-O [`README.md`](README.md) ainda é o template padrão do Vite, sem nenhuma
-informação sobre o sistema.
-
 ---
 
 ## Integração com o Agente de IA
@@ -344,3 +387,20 @@ automação precisa da `service_role key`.
 
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.
+
+### Ao agendar, o agente escreve em `consultas`
+
+Antes da Agenda existir, o agente gravava `data_agendamento` direto na ficha do
+lead. **Isso não vale mais:** a consulta precisa virar linha em `consultas`, com
+`profissional_id`, `duracao_minutos`, `origem = 'agente_ia'` e `chave_externa`.
+`data_agendamento` continua existindo, mas virou reflexo — quem o mantém é o
+trigger `consultas_sincroniza_lead`.
+
+### A API da agenda ainda não existe
+
+A fase seguinte é expor cinco operações ao agente (consultar disponibilidade,
+criar, consultar, cancelar, reagendar), chamadas pelo **n8n via nó HTTP**. O
+schema já foi desenhado para isso — restrição anti-conflito, idempotência,
+bloqueios e fuso da clínica estão no banco justamente porque a API não passa
+pela interface. Os detalhes e as recomendações estão na **seção 8 do
+`DATABASE.md`**.

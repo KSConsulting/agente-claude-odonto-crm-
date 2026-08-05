@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
-import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus } from '../types'
+import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional } from '../types'
 
 /* ──────────────────────────────────────────────
    Constants
@@ -83,13 +83,17 @@ function InfoRow({ label, value }: { label: string; value: string | React.ReactN
 interface NewConsultaForm {
   procedimento: string
   data_consulta: string
+  profissional_id: string
+  duracao_minutos: string
   status: ConsultaStatus
   valor_pago: string
   observacoes: string
 }
 
-function NewConsultaModal({ leadId, onClose, onSaved }: { leadId: string; onClose: () => void; onSaved: (c: Consulta) => void }) {
-  const [form, setForm] = useState<NewConsultaForm>({ procedimento: '', data_consulta: '', status: 'agendada', valor_pago: '', observacoes: '' })
+const DURACOES = [15, 30, 45, 60, 90, 120]
+
+function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId: string; profissionais: Profissional[]; onClose: () => void; onSaved: (c: Consulta) => void }) {
+  const [form, setForm] = useState<NewConsultaForm>({ procedimento: '', data_consulta: '', profissional_id: '', duracao_minutos: '60', status: 'agendada', valor_pago: '', observacoes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -100,14 +104,24 @@ function NewConsultaModal({ leadId, onClose, onSaved }: { leadId: string; onClos
     setSaving(true); setError('')
     const { data, error: err } = await supabase.from('consultas').insert({
       lead_id: leadId,
+      profissional_id: form.profissional_id || null,
       procedimento: form.procedimento.trim(),
       data_consulta: form.data_consulta,
+      duracao_minutos: Number(form.duracao_minutos),
       status: form.status,
+      origem: 'equipe',
       valor_pago: form.valor_pago ? parseFloat(form.valor_pago.replace(',', '.')) : null,
       observacoes: form.observacoes.trim() || null,
     }).select().single()
     setSaving(false)
-    if (err) { setError('Erro ao salvar consulta.'); return }
+    if (err) {
+      // 23P01 = exclusion_violation: a restrição `consultas_sem_sobreposicao`
+      // barrou uma consulta em cima de outra na agenda desse profissional.
+      setError(err.code === '23P01'
+        ? 'Esse profissional já tem consulta nesse horário. Escolha outro horário ou outra agenda.'
+        : 'Erro ao salvar consulta.')
+      return
+    }
     onSaved(data as Consulta)
     onClose()
   }
@@ -126,13 +140,32 @@ function NewConsultaModal({ leadId, onClose, onSaved }: { leadId: string; onClos
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Procedimento *</label>
-            <input value={form.procedimento} onChange={(e) => set('procedimento', e.target.value)} placeholder="Ex: Lipoaspiração" style={inputStyle}
+            <input value={form.procedimento} onChange={(e) => set('procedimento', e.target.value)} placeholder="Ex: Avaliação inicial, Limpeza, Canal..." style={inputStyle}
               onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
           </div>
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Data da Consulta *</label>
             <input type="datetime-local" value={form.data_consulta} onChange={(e) => set('data_consulta', e.target.value)} style={inputStyle}
               onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 2 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Profissional</label>
+              <select value={form.profissional_id} onChange={(e) => set('profissional_id', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                <option value="">Sem profissional definido</option>
+                {profissionais.filter((p) => p.ativo).map((p) => (
+                  <option key={p.id} value={p.id}>{`${p.nome} ${p.sobrenome}`.trim()}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Duração</label>
+              <select value={form.duracao_minutos} onChange={(e) => set('duracao_minutos', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                {DURACOES.map((d) => (
+                  <option key={d} value={d}>{d} min</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Status *</label>
@@ -176,6 +209,7 @@ export default function LeadDetail() {
 
   const [lead, setLead] = useState<LeadClinica | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
+  const [profissionais, setProfissionais] = useState<Profissional[]>([])
   const [loading, setLoading] = useState(true)
 
   const [selectedStatus, setSelectedStatus] = useState<LeadStatus>('iniciou_conversa')
@@ -202,7 +236,8 @@ export default function LeadDetail() {
     Promise.all([
       supabase.from('crm_clinica').select('*').eq('id', id).single(),
       supabase.from('consultas').select('*').eq('lead_id', id).order('data_consulta', { ascending: false }),
-    ]).then(([{ data: leadData }, { data: consultasData }]) => {
+      supabase.from('profissionais').select('*').order('nome'),
+    ]).then(([{ data: leadData }, { data: consultasData }, { data: profissionaisData }]) => {
       if (leadData) {
         setLead(leadData)
         setSelectedStatus(leadData.status)
@@ -211,6 +246,7 @@ export default function LeadDetail() {
         setValorPago(leadData.valor_pago_acumulado !== null && leadData.valor_pago_acumulado !== undefined ? String(leadData.valor_pago_acumulado) : '')
       }
       setConsultas(consultasData ?? [])
+      setProfissionais((profissionaisData ?? []) as Profissional[])
       setLoading(false)
     })
   }, [id])
@@ -354,7 +390,7 @@ export default function LeadDetail() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #DCE6EA' }}>
-                    {['Procedimento', 'Data', 'Status', 'Valor Pago', 'Observações'].map((h) => (
+                    {['Procedimento', 'Data', 'Profissional', 'Status', 'Valor Pago', 'Observações'].map((h) => (
                       <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#6B818C', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -362,10 +398,22 @@ export default function LeadDetail() {
                 <tbody>
                   {consultas.map((c, idx) => {
                     const cs = CONSULTA_STYLE[c.status]
+                    const prof = profissionais.find((p) => p.id === c.profissional_id)
                     return (
                       <tr key={c.id} style={{ borderBottom: '1px solid #EDF2F4', background: idx % 2 === 0 ? '#fff' : '#F7FAFB' }}>
                         <td style={{ padding: '11px 12px', fontWeight: 600, color: '#16232B' }}>{c.procedimento}</td>
-                        <td style={{ padding: '11px 12px', color: '#6B818C', whiteSpace: 'nowrap' }}>{fmtDate(c.data_consulta)}</td>
+                        <td style={{ padding: '11px 12px', color: '#6B818C', whiteSpace: 'nowrap' }}>
+                          {fmtDate(c.data_consulta)}
+                          <span style={{ color: '#B9C8CE' }}> · {c.duracao_minutos} min</span>
+                        </td>
+                        <td style={{ padding: '11px 12px', color: '#6B818C', whiteSpace: 'nowrap' }}>
+                          {prof ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: prof.cor, display: 'inline-block', flexShrink: 0 }} />
+                              {`${prof.nome} ${prof.sobrenome}`.trim()}
+                            </span>
+                          ) : '—'}
+                        </td>
                         <td style={{ padding: '11px 12px' }}>
                           <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 600, background: cs.bg, color: cs.color, whiteSpace: 'nowrap' }}>
                             {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
@@ -485,6 +533,7 @@ export default function LeadDetail() {
       {showModal && (
         <NewConsultaModal
           leadId={lead.id}
+          profissionais={profissionais}
           onClose={() => setShowModal(false)}
           onSaved={(c) => setConsultas((prev) => [c, ...prev])}
         />
