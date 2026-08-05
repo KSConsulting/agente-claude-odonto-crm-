@@ -8,6 +8,7 @@ import {
   diasDaSemana, fimDaConsulta, gradeDoMes, inicioDaConsulta, limitesDaGrade, rotuloDoPeriodo, somarDias,
 } from '../lib/agenda'
 import { COR_SEM_PROFISSIONAL } from '../lib/cores'
+import { formatarParaExibicao } from '../lib/telefones'
 import AgendaSemana from '../components/AgendaSemana'
 import AgendaMes from '../components/AgendaMes'
 import NovoAgendamentoModal from '../components/NovoAgendamentoModal'
@@ -92,7 +93,7 @@ function DetalheConsulta({
             </div>
             {consulta.lead?.whatsapp_lead && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: '#16232B' }}>
-                <User size={14} color="#6B818C" /> {consulta.lead.whatsapp_lead}
+                <User size={14} color="#6B818C" /> {formatarParaExibicao(consulta.lead.whatsapp_lead)}
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>

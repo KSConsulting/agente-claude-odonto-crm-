@@ -32,12 +32,14 @@ ordem**:
    13 políticas de RLS, 2 buckets de Storage, 2 funções, 2 triggers, a
    publicação de Realtime e os dados iniciais.
 2. `supabase/migrations/0002_agenda_profissionais.sql` — agenda e profissionais:
-   3 tabelas, 7 colunas novas em `consultas`, a restrição que impede
-   agendamento duplo, 3 políticas de RLS, 1 função, 3 triggers e o fuso horário
+   3 tabelas, 8 colunas novas em `consultas`, a restrição que impede
+   agendamento duplo, 3 políticas de RLS, 2 funções, 3 triggers e o fuso horário
    da clínica.
+3. `supabase/migrations/0003_whatsapp_unico.sql` — WhatsApp normalizado e único:
+   1 função, 1 trigger e o índice que impede duas pessoas com o mesmo número.
 
-O `0002` depende do `0001` (usa a função `set_updated_at` e a tabela
-`consultas`). Rodar fora de ordem falha.
+A ordem importa: o `0002` usa a função `set_updated_at` e a tabela `consultas`
+do `0001`, e o `0003` age sobre `crm_clinica_dados`. Rodar fora de ordem falha.
 
 Confira o resultado com as consultas da [seção 10](#10-consultas-úteis-para-verificação).
 
@@ -238,7 +240,7 @@ WhatsApp, ou um paciente cadastrado manualmente.
 | `id` | `uuid` | não | `gen_random_uuid()` | PK |
 | **Dados do paciente** ||||
 | `nome_lead` | `text` | sim | — | |
-| `whatsapp_lead` | `text` | sim | — | Indexado |
+| `whatsapp_lead` | `text` | sim | — | **ÚNICO.** Só dígitos com DDI — ver abaixo |
 | `procedimento_interesse` | `text` | sim | — | Texto livre |
 | `data_nascimento` | `date` | sim | — | Só a data, sem hora |
 | `anotacoes` | `text` | sim | — | Campo livre da equipe |
@@ -265,6 +267,33 @@ WhatsApp, ou um paciente cadastrado manualmente.
 | `valor_pago_acumulado` | `numeric(10,2)` | sim | `0` | Total já pago pelo paciente |
 | `created_at` | `timestamptz` | não | `now()` | |
 
+#### ⚠️ `whatsapp_lead`: formato canônico e unicidade
+
+O número é gravado **só com dígitos, incluindo o código do país, sem `+`,
+espaço ou traço**: `5511987654321`. É o formato que o n8n já usava ao abrir o
+lead da conversa; a partir da migração `0003` o sistema grava igual.
+
+Duas peças garantem isso, ambas no banco:
+
+| Peça | O que faz |
+|---|---|
+| `crm_clinica_normaliza_whatsapp` (trigger BEFORE) | Remove qualquer pontuação antes de gravar. Protege de colar `+55 11 98765-4321` no campo |
+| `crm_clinica_whatsapp_unico` (índice único parcial) | Uma pessoa, um número. Ignora nulos, então vários contatos sem telefone convivem |
+
+**O formato importa tanto quanto a unicidade.** Se a tela gravasse
+`+55 (11) 98765-4321` e o agente `5511987654321`, seriam dois textos diferentes
+para o mesmo telefone: o índice deixaria os dois entrarem, a busca do
+agendamento não acharia o contato criado pelo agente, e a recepção cadastraria a
+pessoa de novo — o mesmo bug, por outro caminho.
+
+O trigger **não inventa código de país**. Um número sem DDI continua sem DDI:
+adivinhar o país pelo tamanho acertaria no Brasil e erraria em silêncio no resto.
+Quem garante o DDI é quem escreve — a tela, pelo seletor de país
+([`src/lib/telefones.ts`](src/lib/telefones.ts)), e o n8n, que já manda inteiro.
+
+Violação devolve **`23505`**. As telas traduzem para "esse número já é de
+Fulano" e oferecem abrir ou usar o contato existente.
+
 > **Cuidado com as duas datas de agendamento.** Elas são diferentes e o
 > Dashboard usa cada uma para uma coisa:
 > `data_marcacao_agendamento` conta quantas consultas foram *marcadas* no
@@ -280,7 +309,7 @@ WhatsApp, ou um paciente cadastrado manualmente.
 | `crm_clinica_status_idx` | `status` | Colunas do Kanban |
 | `crm_clinica_inicio_idx` | `inicio_atendimento` | Métricas do Dashboard |
 | `crm_clinica_agendamento_idx` | `data_agendamento` | Próximas consultas |
-| `crm_clinica_whatsapp_idx` | `whatsapp_lead` | Busca por telefone |
+| `crm_clinica_whatsapp_unico` | `whatsapp_lead` parcial | **Impede duas pessoas com o mesmo número** e atende a busca por telefone |
 
 ---
 
@@ -747,6 +776,14 @@ para o frontend.
 
 ### O que o agente NÃO deve fazer
 
+**Gravar o WhatsApp sem o código do país.** O formato canônico
+(`5511987654321`) é o que o n8n já usa — nada muda para a automação. Só não vale
+mandar o número local: ele entra, mas passa a ser um segundo registro do mesmo
+telefone, invisível para a busca e para a unicidade (seção 4.1).
+
+Se o insert do agente devolver **`23505`**, o lead daquele número já existe:
+busque por `whatsapp_lead` e siga com o que voltou, em vez de tentar de novo.
+
 **Gravar `data_agendamento` direto na ficha do lead.** Era assim antes de existir
 a Agenda, e o resultado agora seria uma consulta que aparece no CRM mas não no
 calendário — duas telas contando histórias diferentes sobre o mesmo fato. A
@@ -879,6 +916,12 @@ Lista do que quebra este banco de formas não óbvias:
 16. **Gravar em `consultas.data_fim`** → é coluna derivada, sobrescrita pelo
     trigger na próxima escrita de `data_consulta` ou `duracao_minutos`. Grave
     esses dois e deixe o fim com o banco.
+17. **Gravar WhatsApp sem o código do país** → o número entra (o trigger só tira
+    pontuação, não inventa DDI) e passa a conviver com o mesmo telefone escrito
+    de outra forma. A unicidade não pega, e a busca não acha.
+18. **Criar o índice `crm_clinica_whatsapp_unico` com duplicatas no banco** →
+    o Postgres recusa. Rode a consulta de duplicados da seção 4.1 e resolva
+    antes.
 
 ---
 
@@ -907,6 +950,17 @@ where conname = 'consultas_sem_sobreposicao';
 -- Triggers da agenda (esperado: as 3 linhas)
 select tgname from pg_trigger
 where tgname in ('consultas_sincroniza_lead', 'consultas_data_fim', 'consultas_updated_at');
+
+-- Algum WhatsApp fora do formato canônico? (esperado: 0 linhas)
+select id, nome_lead, whatsapp_lead from public.crm_clinica_dados
+where whatsapp_lead is not null
+  and whatsapp_lead <> regexp_replace(whatsapp_lead, '[^0-9]', '', 'g');
+
+-- Algum número repetido? (esperado: 0 linhas — se vier alguma, o índice único
+-- não existe)
+select whatsapp_lead, count(*), string_agg(nome_lead, ' | ')
+from public.crm_clinica_dados where whatsapp_lead is not null
+group by 1 having count(*) > 1;
 
 -- A view respeita o RLS? (esperado: security_invoker=true)
 select c.relname, c.reloptions from pg_class c

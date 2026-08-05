@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import {
   bloqueioNoPeriodo, dentroDoExpediente, haConflito, paraDatetimeLocal, somarMinutos,
 } from '../lib/agenda'
+import { buscarPorWhatsapp, ERRO_DUPLICADO } from '../lib/contatos'
+import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
+import CampoTelefone from './CampoTelefone'
 import type {
   Consulta, ConsultaAgenda, Profissional, ProfissionalBloqueio, ProfissionalHorario,
 } from '../types'
@@ -80,6 +83,8 @@ export default function NovoAgendamentoModal({
   const [modoNovo, setModoNovo] = useState(false)
   const [novoNome, setNovoNome] = useState('')
   const [novoWhatsapp, setNovoWhatsapp] = useState('')
+  const [novoWhatsappValido, setNovoWhatsappValido] = useState(false)
+  const [duplicado, setDuplicado] = useState<PacienteResumo | null>(null)
 
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
@@ -93,9 +98,14 @@ export default function NovoAgendamentoModal({
     if (paciente || termo.length < 2) return
     let cancelado = false
     const timer = setTimeout(() => {
+      // O telefone é procurado por dígitos: o banco guarda '5511987654321' e a
+      // pessoa digita '(11) 98765-4321'. Buscar pelo texto cru não acharia.
+      const digitos = apenasDigitos(termo)
+      const filtros = [`nome_lead.ilike.%${termo}%`]
+      if (digitos.length >= 3) filtros.push(`whatsapp_lead.ilike.%${digitos}%`)
       supabase.from('crm_clinica')
         .select('id, nome_lead, whatsapp_lead')
-        .or(`nome_lead.ilike.%${termo}%,whatsapp_lead.ilike.%${termo}%`)
+        .or(filtros.join(','))
         .limit(8)
         .then(({ data }) => {
           if (cancelado) return
@@ -139,6 +149,8 @@ export default function NovoAgendamentoModal({
     if (!inicio || isNaN(inicio.getTime())) { setErro('Escolha a data e o horário.'); return }
     if (!procedimento.trim()) { setErro('Descreva o procedimento.'); return }
     if (!paciente && !(modoNovo && novoNome.trim())) { setErro('Escolha o paciente ou cadastre um novo.'); return }
+    if (!paciente && !novoWhatsappValido) { setErro('Informe um WhatsApp válido, com o código do país.'); return }
+    if (!paciente && duplicado) { setErro('Esse WhatsApp já é de outra pessoa — use o contato existente.'); return }
 
     setSalvando(true); setErro('')
 
@@ -150,11 +162,22 @@ export default function NovoAgendamentoModal({
     if (!leadId) {
       const { data, error } = await supabase.from('crm_clinica').insert({
         nome_lead: novoNome.trim(),
-        whatsapp_lead: novoWhatsapp.trim() || null,
+        whatsapp_lead: novoWhatsapp,
         status: 'iniciou_conversa',
         inicio_atendimento: new Date().toISOString(),
       }).select('id, nome_lead, whatsapp_lead').single()
-      if (error || !data) { setSalvando(false); setErro('Erro ao cadastrar o paciente. Tente novamente.'); return }
+      if (error || !data) {
+        setSalvando(false)
+        // Rede de segurança do índice único: entre a checagem e este insert, o
+        // Agente de IA pode ter criado a mesma pessoa pelo WhatsApp.
+        if (error?.code === ERRO_DUPLICADO) {
+          setErro('Esse WhatsApp acabou de ser cadastrado. Use o contato existente.')
+          buscarPorWhatsapp(novoWhatsapp).then(setDuplicado)
+          return
+        }
+        setErro('Erro ao cadastrar o paciente. Tente novamente.')
+        return
+      }
       leadId = (data as PacienteResumo).id
       nomePaciente = (data as PacienteResumo).nome_lead
       whatsappPaciente = (data as PacienteResumo).whatsapp_lead
@@ -287,7 +310,7 @@ export default function NovoAgendamentoModal({
                   <Check size={14} color="#1E6E8C" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 13.5, fontWeight: 600, color: '#16232B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {paciente.nome_lead ?? 'Sem nome'}
-                    {paciente.whatsapp_lead && <span style={{ fontWeight: 500, color: '#6B818C' }}> · {paciente.whatsapp_lead}</span>}
+                    {paciente.whatsapp_lead && <span style={{ fontWeight: 500, color: '#6B818C' }}> · {formatarParaExibicao(paciente.whatsapp_lead)}</span>}
                   </span>
                 </div>
                 <button onClick={() => { setPaciente(null); setBusca('') }}
@@ -302,9 +325,37 @@ export default function NovoAgendamentoModal({
                 </div>
                 <input value={novoNome} onChange={(e) => { setNovoNome(e.target.value); setErro('') }} placeholder="Nome do paciente *" style={inputStyle}
                   onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
-                <input value={novoWhatsapp} onChange={(e) => setNovoWhatsapp(e.target.value)} placeholder="WhatsApp (opcional)" style={inputStyle}
-                  onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
-                <button onClick={() => { setModoNovo(false); setNovoNome(''); setNovoWhatsapp('') }}
+
+                <CampoTelefone
+                  valor={novoWhatsapp}
+                  onChange={(canonico, valido) => {
+                    setNovoWhatsapp(canonico)
+                    setNovoWhatsappValido(valido)
+                    setDuplicado(null)
+                    setErro('')
+                    if (valido) buscarPorWhatsapp(canonico).then((p) => setDuplicado(p as PacienteResumo | null))
+                  }}
+                  aviso={duplicado && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: '#B45309', lineHeight: 1.5 }}>
+                      Esse número já é de <strong>{duplicado.nome_lead ?? 'um contato sem nome'}</strong>.
+                      <button
+                        onClick={() => {
+                          // Era isto que faltava: em vez de recusar e deixar a
+                          // equipe travada, leva direto para a pessoa certa.
+                          setPaciente(duplicado)
+                          setModoNovo(false)
+                          setDuplicado(null)
+                          setNovoNome(''); setNovoWhatsapp(''); setNovoWhatsappValido(false)
+                        }}
+                        style={{ display: 'block', marginTop: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#1E6E8C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                      >
+                        Agendar para essa pessoa →
+                      </button>
+                    </div>
+                  )}
+                />
+
+                <button onClick={() => { setModoNovo(false); setNovoNome(''); setNovoWhatsapp(''); setNovoWhatsappValido(false); setDuplicado(null) }}
                   style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#1E6E8C', fontFamily: "'Plus Jakarta Sans', sans-serif", padding: 0 }}>
                   ← Buscar um paciente já cadastrado
                 </button>
@@ -327,7 +378,7 @@ export default function NovoAgendamentoModal({
                         <button key={r.id} onClick={() => { setPaciente(r); setResultados([]) }}
                           style={{ width: '100%', textAlign: 'left', padding: '10px 13px', border: 'none', borderBottom: idx < resultados.length - 1 ? '1px solid #EDF2F4' : 'none', background: idx % 2 === 0 ? '#fff' : '#F7FAFB', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                           <div style={{ fontSize: 13.5, fontWeight: 600, color: '#16232B' }}>{r.nome_lead ?? 'Sem nome'}</div>
-                          <div style={{ fontSize: 12, color: '#6B818C', marginTop: 2 }}>{r.whatsapp_lead ?? 'Sem WhatsApp'}</div>
+                          <div style={{ fontSize: 12, color: '#6B818C', marginTop: 2 }}>{formatarParaExibicao(r.whatsapp_lead) || 'Sem WhatsApp'}</div>
                         </button>
                       ))
                     ) : (

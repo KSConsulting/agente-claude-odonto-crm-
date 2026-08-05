@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { formatarParaExibicao } from '../lib/telefones'
 import type { LeadClinica, HorarioComercial, LeadStatus } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -562,7 +563,7 @@ export default function Dashboard() {
                     >
                       <td style={{ padding: '12px 12px' }}>
                         <div style={{ fontWeight: 600, color: '#16232B' }}>{lead.nome_lead ?? '—'}</div>
-                        <div style={{ fontSize: 12, color: '#6B818C' }}>{lead.whatsapp_lead ?? ''}</div>
+                        <div style={{ fontSize: 12, color: '#6B818C' }}>{formatarParaExibicao(lead.whatsapp_lead)}</div>
                       </td>
                       <td style={{ padding: '12px 12px', color: '#6B818C' }}>{lead.procedimento_interesse ?? '—'}</td>
                       <td style={{ padding: '12px 12px' }}>

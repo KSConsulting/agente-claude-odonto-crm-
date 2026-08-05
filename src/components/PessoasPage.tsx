@@ -5,6 +5,9 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
+import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
+import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
+import CampoTelefone from './CampoTelefone'
 import type { LeadClinica, LeadStatus } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -173,21 +176,35 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
   const [form, setForm] = useState<NewLeadForm>({
     tipo: tipoPadrao, nome: '', whatsapp: '', procedimento: '', data_nascimento: '', anotacoes: '',
   })
+  const [whatsappValido, setWhatsappValido] = useState(false)
+  const [duplicado, setDuplicado] = useState<PessoaResumo | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const navigate = useNavigate()
 
   const set = (field: keyof NewLeadForm, value: string) => setForm((f) => ({ ...f, [field]: value }))
 
+  const handleWhatsapp = (canonico: string, valido: boolean) => {
+    set('whatsapp', canonico)
+    setWhatsappValido(valido)
+    setDuplicado(null)
+    setError('')
+    // Só vale procurar quando o número está completo — com número pela metade
+    // a busca não acha nada e a equipe acha que está livre.
+    if (valido) buscarPorWhatsapp(canonico).then(setDuplicado)
+  }
+
   const handleSave = async () => {
     if (!form.nome.trim()) { setError('O nome é obrigatório.'); return }
-    if (!form.whatsapp.trim()) { setError('O WhatsApp é obrigatório.'); return }
+    if (!whatsappValido) { setError('Informe um WhatsApp válido, com o código do país.'); return }
+    if (duplicado) { setError('Esse WhatsApp já pertence a outra pessoa.'); return }
     setSaving(true); setError('')
 
     const status: LeadStatus = form.tipo === 'paciente' ? 'consulta_realizada' : 'iniciou_conversa'
 
     const { data, error: err } = await supabase.from('crm_clinica').insert({
       nome_lead: form.nome.trim(),
-      whatsapp_lead: form.whatsapp.trim(),
+      whatsapp_lead: form.whatsapp,
       status,
       procedimento_interesse: form.procedimento.trim() || null,
       data_nascimento: form.data_nascimento || null,
@@ -195,7 +212,17 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
     }).select().single()
 
     setSaving(false)
-    if (err) { setError('Erro ao cadastrar. Tente novamente.'); return }
+    if (err) {
+      // Rede de segurança: entre a busca acima e este insert, o Agente de IA
+      // pode ter criado a mesma pessoa. Quem decide é o índice do banco.
+      if (err.code === ERRO_DUPLICADO) {
+        setError('Esse WhatsApp acabou de ser cadastrado para outra pessoa.')
+        buscarPorWhatsapp(form.whatsapp).then(setDuplicado)
+        return
+      }
+      setError('Erro ao cadastrar. Tente novamente.')
+      return
+    }
     onSaved(data as LeadClinica)
     onClose()
   }
@@ -260,11 +287,21 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
           </div>
 
           {/* WhatsApp */}
-          <div>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>WhatsApp *</label>
-            <input value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="(11) 99999-9999" style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
-          </div>
+          <CampoTelefone
+            valor={form.whatsapp}
+            onChange={handleWhatsapp}
+            aviso={duplicado && (
+              <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: '#B45309', lineHeight: 1.5 }}>
+                Esse número já é de <strong>{duplicado.nome_lead ?? 'um contato sem nome'}</strong>.
+                <button
+                  onClick={() => navigate(`/leads/${duplicado.id}`)}
+                  style={{ display: 'block', marginTop: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#1E6E8C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  Abrir a ficha dessa pessoa →
+                </button>
+              </div>
+            )}
+          />
 
           {/* Procedimento */}
           <div>
@@ -304,8 +341,8 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
           <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Cancelar
           </button>
-          <button onClick={handleSave} disabled={saving}
-            style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: saving ? '#4C90A8' : '#1E6E8C', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <button onClick={handleSave} disabled={saving || !!duplicado}
+            style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: duplicado ? '#DCE6EA' : saving ? '#4C90A8' : '#1E6E8C', cursor: (saving || duplicado) ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: duplicado ? '#6B818C' : '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {saving ? 'Cadastrando...' : 'Cadastrar'}
           </button>
         </div>
@@ -349,9 +386,13 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
   const searched = periodFiltered.filter((l) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
+    // O telefone é comparado só por dígitos: quem busca digita "(11) 98525" ou
+    // "11985254512", e o banco guarda "5511987654321". Comparar o texto cru
+    // faria a busca por telefone nunca achar nada.
+    const digitos = apenasDigitos(search)
     return (
       (l.nome_lead ?? '').toLowerCase().includes(q) ||
-      (l.whatsapp_lead ?? '').toLowerCase().includes(q)
+      (digitos.length > 0 && (l.whatsapp_lead ?? '').includes(digitos))
     )
   })
 
@@ -365,7 +406,7 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
       ['Nome', 'Telefone', 'Procedimento', 'Status', 'Início Atendimento', 'Data Consulta'],
       ...displayed.map((l) => [
         l.nome_lead ?? '',
-        l.whatsapp_lead ?? '',
+        formatarParaExibicao(l.whatsapp_lead),
         l.procedimento_interesse ?? '',
         STATUS_LABELS[l.status],
         fmtDate(l.inicio_atendimento),
@@ -394,7 +435,7 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
       head: [['Nome', 'Telefone', 'Procedimento', 'Status', 'Início Atendimento', 'Data Consulta']],
       body: displayed.map((l) => [
         l.nome_lead ?? '—',
-        l.whatsapp_lead ?? '—',
+        formatarParaExibicao(l.whatsapp_lead) || '—',
         l.procedimento_interesse ?? '—',
         STATUS_LABELS[l.status],
         fmtDate(l.inicio_atendimento),
@@ -537,7 +578,7 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
                     onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = idx % 2 === 0 ? '#fff' : '#F7FAFB')}>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ fontWeight: 600, color: '#16232B' }}>{lead.nome_lead ?? '—'}</div>
-                      <div style={{ fontSize: 12, color: '#6B818C', marginTop: 2 }}>{lead.whatsapp_lead ?? ''}</div>
+                      <div style={{ fontSize: 12, color: '#6B818C', marginTop: 2 }}>{formatarParaExibicao(lead.whatsapp_lead)}</div>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#6B818C' }}>{lead.procedimento_interesse ?? '—'}</td>
                     <td style={{ padding: '12px 16px' }}><StatusBadge status={lead.status} /></td>

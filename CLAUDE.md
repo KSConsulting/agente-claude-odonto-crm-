@@ -65,8 +65,9 @@ integração com o agente e armadilhas conhecidas estão todos lá.
 A migração executável fica em
 [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql).
 
-A migração é aplicada em **dois arquivos, nesta ordem**: `0001_schema_inicial.sql`
-e depois `0002_agenda_profissionais.sql` (agenda e profissionais).
+A migração é aplicada em **três arquivos, nesta ordem**: `0001_schema_inicial.sql`,
+`0002_agenda_profissionais.sql` (agenda e profissionais) e
+`0003_whatsapp_unico.sql` (WhatsApp normalizado e único).
 
 Os pontos que mais causam erro:
 
@@ -91,6 +92,11 @@ Os pontos que mais causam erro:
    que impede duas consultas ativas se sobrepondo na mesma agenda. Ela devolve
    `23P01`, e a interface precisa traduzir isso — repetir a chamada dá o mesmo
    erro.
+7. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
+   do país (`5511987654321`). Nunca grave formatado — um trigger tira a
+   pontuação, mas ninguém adivinha o DDI que faltar. Repetido devolve `23505`.
+   O formato é o mesmo que o n8n já usa; a regra dos países vive em
+   [`src/lib/telefones.ts`](src/lib/telefones.ts).
 
 ---
 
@@ -106,7 +112,9 @@ src/
 │   ├── supabase.ts             cliente Supabase (lê as env vars)
 │   ├── pessoas.ts              regra que separa Lead de Paciente
 │   ├── cores.ts                paleta das agendas (cor do profissional)
-│   └── agenda.ts               lógica pura: datas, conflito, layout dos blocos
+│   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
+│   ├── telefones.ts            países atendidos, dígitos e formato canônico
+│   └── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
 ├── components/
@@ -117,6 +125,7 @@ src/
 │   ├── AgendaSemana.tsx        grade semanal (7 colunas × horas)
 │   ├── AgendaMes.tsx           grade mensal (semanas inteiras)
 │   ├── NovoAgendamentoModal.tsx  criar consulta; cria o paciente se não existir
+│   ├── CampoTelefone.tsx       seletor de país + contagem de dígitos
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -139,6 +148,22 @@ escolhida no cadastro é a cor dos blocos no calendário.
 O calendário é desenhado à mão, sem biblioteca. As prontas (FullCalendar e
 afins) trazem CSS e sistema de temas próprios, que brigariam com a estilização
 inline daqui, e somariam peso a um bundle que já está grande.
+
+### Telefone: um lugar só
+
+Toda pessoa criada pelo sistema passa por
+[`CampoTelefone`](src/components/CampoTelefone.tsx) — modal da agenda, novo
+contato e novo paciente. O componente existe para que a regra de país e de
+contagem de dígitos não se repita (nem divirja) em três telas.
+
+Os países atendidos ficam em [`src/lib/telefones.ts`](src/lib/telefones.ts),
+numa lista curta e deliberada: cobrir "todos" com regra escrita à mão é promessa
+impossível de manter. Acrescentar país é acrescentar um item nessa lista.
+
+O que vai para o banco é sempre o canônico — dígitos com DDI. O formato bonito
+existe só na tela, via `formatarParaExibicao()`.
+
+### A lógica da agenda
 
 A lógica de datas, conflito e posicionamento fica em
 [`src/lib/agenda.ts`](src/lib/agenda.ts), fora de qualquer componente. Isso é

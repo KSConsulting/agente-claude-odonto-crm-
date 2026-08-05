@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
+import { formatarParaExibicao } from '../lib/telefones'
 import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -346,7 +347,7 @@ export default function LeadDetail() {
               </span>
               {lead.whatsapp_lead && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#6B818C' }}>
-                  <Phone size={13} /> {lead.whatsapp_lead}
+                  <Phone size={13} /> {formatarParaExibicao(lead.whatsapp_lead)}
                 </span>
               )}
               {lead.ultima_mensagem && (

@@ -151,10 +151,11 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **dois arquivos, nesta ordem** — o segundo depende do primeiro:
+São **três arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
+3. [`supabase/migrations/0003_whatsapp_unico.sql`](supabase/migrations/0003_whatsapp_unico.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
@@ -162,10 +163,11 @@ Ao final você terá:
 
 ```
 9 tabelas + 1 view       estrutura de dados
-15 índices               desempenho das consultas
+16 índices               desempenho e integridade (um deles impede
+                         duas pessoas com o mesmo WhatsApp)
 16 políticas de RLS      controle de acesso (10 no banco + 6 no Storage)
 2 buckets de Storage     fotos de perfil e logotipo
-4 funções + 6 triggers   automações internas
+5 funções + 7 triggers   automações internas
 1 restrição de exclusão  impede duas consultas no mesmo horário
 2 tabelas no Realtime    atualização automática da tela
 ```
@@ -248,6 +250,21 @@ Dez objetos no schema `public`:
 A agenda de um profissional é o conjunto de consultas com o `profissional_id`
 dele. Cadastrar o dentista já cria a agenda; não há como as duas coisas ficarem
 fora de sincronia, porque são a mesma coisa.
+
+### ⚠️ Um WhatsApp, uma pessoa
+
+O `whatsapp_lead` é gravado sempre no mesmo formato — só dígitos, com o código
+do país: `5511987654321`, exatamente como o n8n já mandava. Um índice único
+impede que duas pessoas fiquem com o mesmo número, e um gatilho tira a
+pontuação antes de gravar, para `+55 (11) 98765-4321` e `5511987654321` não
+virarem dois registros do mesmo telefone.
+
+Nos formulários, o campo tem seletor de país e trava a quantidade de dígitos de
+cada um. Se o número já for de alguém, a tela diz de quem é e leva até essa
+pessoa em vez de criar contato repetido.
+
+Contato sem telefone é permitido, e vários deles convivem — o índice ignora
+vazios.
 
 ### ⚠️ O banco impede agendamento duplo
 
@@ -400,7 +417,7 @@ odonto-clinica/
 │   ├── components/       Sidebar, Layout, rota protegida, pessoas, calendário
 │   ├── pages/            Login, Dashboard, CRM, Agenda, Profissionais, Leads,
 │   │                     Clientes, Ficha, Configurações
-│   ├── lib/              Supabase, regra Lead × Paciente, cores e lógica da agenda
+│   ├── lib/              Supabase, regra Lead × Paciente, cores, agenda e telefones
 │   ├── types/            tipos espelhando o schema do banco
 │   └── index.css         fonte, Tailwind e animações
 ├── supabase/
@@ -491,6 +508,28 @@ horário com o modal já aberto na tela.
 Escolha outro horário, outra agenda, ou cancele a consulta que está ocupando o
 espaço — cancelamento libera o horário na hora. Repetir a mesma tentativa dá
 sempre o mesmo resultado.
+</details>
+
+<details>
+<summary><strong>"Esse número já é de outra pessoa" ao cadastrar</strong></summary>
+
+É a proteção contra contato duplicado funcionando. O aviso mostra de quem é o
+número e oferece abrir a ficha (ou, no agendamento, marcar direto para essa
+pessoa) — normalmente é o que você quer, porque o paciente já estava no sistema.
+
+Se as duas pessoas realmente existem e uma delas está com o telefone errado,
+corrija o número na ficha dela antes.
+</details>
+
+<details>
+<summary><strong>O campo não aceita o telefone que eu digitei</strong></summary>
+
+A quantidade de dígitos precisa bater com a do país escolhido no seletor. O
+próprio campo mostra quantos faltam enquanto você digita.
+
+Atenção ao país: Brasil tem 11 dígitos no celular (com o 9) e 10 no fixo, e
+celular argentino no WhatsApp leva um 9 antes do código de área. Estados Unidos
+e Canadá dividem o código +1 — tanto faz qual dos dois você escolher.
 </details>
 
 <details>
