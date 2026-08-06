@@ -51,6 +51,9 @@ ordem**:
    view, montada de `horario_comercial` por `horario_atendimento_texto()`.
 8. `supabase/migrations/0008_procedimentos_view.sql` — a view
    `procedimentos_clinica_agente`, de coluna única, com os procedimentos ativos.
+9. `supabase/migrations/0009_profissionais_view.sql` — a view
+   `profissionais_clinica_agente`, com a jornada de cada dentista, e a função
+   `jornada_texto()`, que unifica a montagem da frase de horário.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -173,6 +176,7 @@ erDiagram
 | `configuracoes_clinica` | tabela | Identidade, endereço e fuso da clínica (linha única) |
 | `informacoes_clinica_agente` | **view** | Os dados da clínica em frases prontas, uma por linha, para o Agente de IA (ver 4.12) |
 | `procedimentos_clinica_agente` | **view** | Os procedimentos ativos, um por linha, para o Agente de IA (ver 4.13) |
+| `profissionais_clinica_agente` | **view** | Os dentistas ativos e a jornada de cada um, um por linha, para o Agente de IA (ver 4.14) |
 | `horario_comercial` | tabela | Grade de atendimento, 1 linha por dia |
 | `servicos_clinica` | tabela | Catálogo de procedimentos |
 
@@ -765,21 +769,12 @@ Site: https://clinica.com.br
 ```
 
 **A linha `Atendimento:` não vem de campo digitado.** Ela é montada de
-`horario_comercial` pela função `horario_atendimento_texto()`, a mesma grade que
-a clínica preenche em Configurações → Horários de Funcionamento. Mudou a grade,
-mudou a frase na leitura seguinte — ninguém digita horário duas vezes.
+`horario_comercial` por `jornada_texto(null)` (4.15), a mesma grade que a clínica
+preenche em Configurações → Horários de Funcionamento. Mudou a grade, mudou a
+frase na leitura seguinte — ninguém digita horário duas vezes.
 
-A função agrupa dias seguidos com o mesmo horário: seis linhas repetindo "das
-08:00 às 18:00" não é como se fala, e o agente leria tudo. O agrupamento é a
-técnica clássica de ilhas (`ordem - row_number()`), e domingo vira 7 para a
-frase começar na segunda, como em português. Nenhum dia ativo devolve `NULL` e a
-linha some, igual aos outros campos.
-
-> ⚠️ **`horario_comercial` é o horário da clínica, não o da agenda.** Os
-> horários realmente oferecidos vêm de `profissional_horarios`, a jornada de
-> cada dentista. Os dois podem divergir: a clínica que anuncia até as 18:00 sem
-> nenhum dentista depois das 17:00 faz o agente prometer um horário que a
-> consulta de disponibilidade recusa em seguida.
+> ⚠️ **`horario_comercial` é o horário da clínica, não o da agenda** — ver o
+> aviso ao fim da seção 4.15.
 
 > **Por que view e não tabela.** Uma segunda tabela precisaria ser mantida em
 > sincronia com `configuracoes_clinica`, e um dia não estaria — alguém edita o
@@ -852,6 +847,76 @@ agente, sem ninguém mexer no n8n.
 ```sql
 select procedimento from public.procedimentos_clinica_agente;
 ```
+
+---
+
+### 4.14. `profissionais_clinica_agente` (view)
+
+Os dentistas ativos, **uma coluna, um por linha**, com a jornada de cada um —
+que é o que o paciente pergunta logo em seguida.
+
+| Coluna | Tipo |
+|---|---|
+| `profissional` | `text` |
+
+```
+Estevão Jorge: atende segunda a sexta das 08:00 às 18:00
+Mariana Guedes: atende terça das 13:00 às 19:00, quinta das 13:00 às 19:00
+Paulo Lima
+```
+
+O nome ocupa a posição do rótulo, como na 4.13. Sem jornada cadastrada, a linha
+é só o nome — o `coalesce` sobre o `||` derruba o trecho inteiro em vez de
+deixar um "atende" pendurado. Ordem alfabética, que é como se lê lista de gente.
+Só os ativos: desligar o dentista na tela Profissionais tira ele da boca do
+agente.
+
+> ⚠️ **A view não traz o `id`, de propósito.** Ela é para **conversar**. Para
+> marcar com um dentista específico, o `profissional_id` vem de
+> `GET /profissionais` da API — um UUID no meio de uma frase falável só serviria
+> para o agente ter que extrair de volta, e ninguém lê UUID em voz alta.
+
+```sql
+select profissional from public.profissionais_clinica_agente;
+```
+
+---
+
+### 4.15. `jornada_texto(profissional)`
+
+A função que transforma grade de horário em frase. Serve às duas coisas:
+
+| Argumento | Lê | Usada por |
+|---|---|---|
+| `null` | `horario_comercial` | `informacoes_clinica_agente` (4.12) |
+| `uuid` | `profissional_horarios` daquele dentista | `profissionais_clinica_agente` (4.14) |
+
+```sql
+select public.jornada_texto(null);   -- segunda a sexta das 08:00 às 18:00, sábado das 08:00 às 12:00
+```
+
+**O trabalho é agrupar dias seguidos com o mesmo horário.** Sem isso a frase
+vira seis linhas repetindo "das 08:00 às 18:00", que ninguém fala assim e o
+agente leria inteiro. O agrupamento é a técnica clássica de ilhas:
+`ordem - row_number()` fica constante enquanto a sequência não quebra.
+
+**Domingo vira 7 na ordenação.** A semana do banco começa nele, mas a frase em
+português começa na segunda — assim sai "segunda a sexta, sábado, domingo", e
+não o contrário.
+
+Nenhum dia ativo devolve `NULL`, o `||` propaga e a linha some da view.
+
+> As duas tabelas de horário têm as mesmas colunas relevantes (`dia_semana`,
+> `hora_inicio`, `hora_fim`, `ativo`), por isso **uma função só** atende as
+> duas. A migração 0007 tinha criado `horario_atendimento_texto()` apenas para a
+> clínica; a 0009 unificou e a apagou. Duas cópias da regra de agrupamento seria
+> uma a mais do que o necessário, e a segunda envelheceria calada.
+
+> ⚠️ **`horario_comercial` é o horário da clínica; `profissional_horarios` é o
+> que a agenda realmente oferece.** Os dois podem divergir: anunciar até as
+> 18:00 sem nenhum dentista depois das 17:00 faz o agente prometer horário que a
+> consulta de disponibilidade recusa em seguida. Agora que as duas frases
+> existem lado a lado, a divergência ao menos fica visível.
 
 ---
 
@@ -1008,16 +1073,24 @@ por `INSERT` do n8n.
 | `crm_clinica` | view sobre `crm_clinica_dados` | **lê e grava** | Registrar quem chegou pelo WhatsApp, atualizar `ultima_mensagem`, `resumo_conversa`, `status` e os carimbos de follow-up |
 | `informacoes_clinica_agente` | view (4.12) | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Maps, Instagram e site — em frases prontas |
 | `procedimentos_clinica_agente` | view (4.13) | **só lê** | Os procedimentos ativos, um por linha, com a descrição |
+| `profissionais_clinica_agente` | view (4.14) | **só lê** | Os dentistas ativos e a jornada de cada um |
 
 ```sql
 select informacao   from public.informacoes_clinica_agente;
 select procedimento from public.procedimentos_clinica_agente;
+select profissional from public.profissionais_clinica_agente;
 ```
 
 **Nenhum outro objeto do banco é acessado pelo n8n.** `consultas`,
 `profissionais`, `profissional_horarios`, `profissional_bloqueios`,
 `servicos_clinica`, `configuracoes_clinica`, `horario_comercial`, `usuarios` e
-`api_tokens` ficam fora do alcance dele — o que a agenda precisa chega pela API.
+`api_tokens` ficam fora do alcance dele — as tabelas, inclusive as que alimentam
+as views acima; o que a agenda precisa chega pela API.
+
+> **As três views são para conversar, não para operar.** Nenhuma traz `id`. Para
+> marcar com um dentista específico, o `profissional_id` vem de
+> `GET /profissionais` da API — UUID no meio de frase falável só daria trabalho
+> de extrair de volta.
 
 > **Por que a agenda não entra nessa lista.** Marcar consulta não é gravar uma
 > linha: é conferir jornada, recusar conflito com o que já existe, escolher

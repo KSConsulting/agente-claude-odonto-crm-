@@ -66,14 +66,15 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **oito arquivos, nesta ordem**:
+A migração é aplicada em **nove arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
 `0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica),
 `0006_informacoes_clinica.sql` (endereço da clínica e a view do agente),
-`0007_horario_na_view.sql` (o horário de atendimento nessa view) e
-`0008_procedimentos_view.sql` (a view de procedimentos do agente).
+`0007_horario_na_view.sql` (o horário de atendimento nessa view),
+`0008_procedimentos_view.sql` (a view de procedimentos) e
+`0009_profissionais_view.sql` (a view de profissionais e a `jornada_texto()`).
 
 Os pontos que mais causam erro:
 
@@ -422,6 +423,7 @@ A tabela `crm_clinica_dados` guarda os identificadores do **Chatwoot**
 | `crm_clinica` | **lê e grava** — os leads do WhatsApp |
 | `informacoes_clinica_agente` | **só lê** — dados da clínica em frases prontas |
 | `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
+| `profissionais_clinica_agente` | **só lê** — dentistas ativos e a jornada de cada um |
 
 Nada mais. Agenda é sempre pela API — `consultas` é escrita pela Edge Function,
 nunca por `INSERT` do n8n. Detalhes na **seção 8.1 do
@@ -500,12 +502,19 @@ já usa para gravar os leads em `crm_clinica`; não há endpoint para isso, de
 propósito.
 
 A linha `Atendimento:` **não é campo digitado**: sai de `horario_comercial` pela
-função `horario_atendimento_texto()`, que agrupa dias seguidos com o mesmo
-horário ("segunda a sexta das 08:00 às 18:00, sábado das 08:00 às 12:00"). A
-grade é a mesma da aba Horários — mudou lá, mudou a frase. Mas atenção: essa é a
-grade **da clínica**, e os horários que a agenda realmente oferece vêm de
-`profissional_horarios`. Se divergirem, o agente promete horário que a
-disponibilidade recusa em seguida.
+função `jornada_texto(null)`, que agrupa dias seguidos com o mesmo horário
+("segunda a sexta das 08:00 às 18:00, sábado das 08:00 às 12:00"). A grade é a
+mesma da aba Horários — mudou lá, mudou a frase.
+
+**`jornada_texto()` é uma função só, para os dois usos.** Com `null` lê
+`horario_comercial`; com um uuid lê a jornada daquele dentista. As duas tabelas
+têm as mesmas colunas relevantes, e duas cópias da regra de agrupamento seria
+uma a mais do que o necessário — a segunda envelheceria calada.
+
+> ⚠️ **A grade da clínica não é a da agenda.** `horario_comercial` é o que a
+> clínica anuncia; quem manda na disponibilidade é `profissional_horarios`.
+> Anunciar até as 18:00 sem dentista depois das 17:00 faz o agente prometer
+> horário que a própria API recusa em seguida.
 
 Três coisas que a definem (detalhes na seção 4.12 do
 [`DATABASE.md`](DATABASE.md)):
@@ -530,6 +539,12 @@ prefixo `Procedimento:`, porque aqui todas as linhas são da mesma natureza e a
 palavra repetida vinte vezes viraria ruído lido em voz alta. Sem descrição, a
 linha é só o nome.
 
-> O endpoint `GET /procedimentos` da API continua existindo, mas ordena por nome
-> e devolve só o nome, sem descrição. São superfícies diferentes para
-> consumidores diferentes — mexeu numa, confira a outra.
+`profissionais_clinica_agente` faz o mesmo com os dentistas ativos, trazendo a
+jornada de cada um: `Estevão Jorge: atende segunda a sexta das 08:00 às 18:00`.
+
+> **As três views são para conversar, não para operar — nenhuma traz `id`.** Para
+> marcar com um dentista específico, o `profissional_id` vem de
+> `GET /profissionais` da API. Os endpoints `GET /procedimentos` e
+> `GET /profissionais` continuam existindo e respondem às mesmas perguntas por
+> outro caminho: ordenam por nome e devolvem menos. Mexeu numa superfície,
+> confira a outra.

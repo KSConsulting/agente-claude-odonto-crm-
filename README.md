@@ -154,7 +154,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **oito arquivos, nesta ordem** — cada um depende do anterior:
+São **nove arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -164,13 +164,14 @@ São **oito arquivos, nesta ordem** — cada um depende do anterior:
 6. [`supabase/migrations/0006_informacoes_clinica.sql`](supabase/migrations/0006_informacoes_clinica.sql)
 7. [`supabase/migrations/0007_horario_na_view.sql`](supabase/migrations/0007_horario_na_view.sql)
 8. [`supabase/migrations/0008_procedimentos_view.sql`](supabase/migrations/0008_procedimentos_view.sql)
+9. [`supabase/migrations/0009_profissionais_view.sql`](supabase/migrations/0009_profissionais_view.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
 Ao final você terá:
 
 ```
-10 tabelas + 3 views     estrutura de dados
+10 tabelas + 4 views     estrutura de dados
 17 índices               desempenho e integridade (um deles impede
                          duas pessoas com o mesmo WhatsApp)
 17 políticas de RLS      controle de acesso (11 no banco + 6 no Storage)
@@ -239,7 +240,7 @@ npm run lint      # análise estática
 
 ## Como o banco está organizado
 
-Dez tabelas e três views no schema `public`:
+Dez tabelas e quatro views no schema `public`:
 
 | Objeto | Papel |
 |---|---|
@@ -256,6 +257,7 @@ Dez tabelas e três views no schema `public`:
 | `api_tokens` | Chaves de acesso da API, guardadas hasheadas |
 | `informacoes_clinica_agente` | **View** — dados da clínica em frases prontas, para o Agente de IA |
 | `procedimentos_clinica_agente` | **View** — procedimentos ativos em frases prontas, para o Agente de IA |
+| `profissionais_clinica_agente` | **View** — dentistas ativos e a jornada de cada um, para o Agente de IA |
 
 ### ⚠️ Não existe tabela de agenda — e é de propósito
 
@@ -397,8 +399,9 @@ Esta é a lista fechada. **Ele grava em um lugar só: `crm_clinica`.**
 | `crm_clinica` | **lê e grava** | Registrar quem chegou pelo WhatsApp e manter a conversa em dia — última mensagem, resumo, status no funil, follow-ups |
 | `informacoes_clinica_agente` | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Google Maps, Instagram e site |
 | `procedimentos_clinica_agente` | **só lê** | Os procedimentos ativos, com a descrição de cada um |
+| `profissionais_clinica_agente` | **só lê** | Os dentistas ativos e a jornada de cada um |
 
-As duas últimas são **views de coluna única**, com uma informação por linha, já
+As três últimas são **views de coluna única**, com uma informação por linha, já
 escrita como frase — o agente lê e fala, sem montar texto:
 
 ```sql
@@ -410,16 +413,23 @@ select informacao   from public.informacoes_clinica_agente;
 select procedimento from public.procedimentos_clinica_agente;
 -- Clareamento Dental: Gel clareador que remove manchas e deixa os dentes
 -- vários tons mais claros
+
+select profissional from public.profissionais_clinica_agente;
+-- Estevão Jorge: atende segunda a sexta das 08:00 às 18:00
 ```
 
 Elas são **calculadas na leitura**, a partir de `configuracoes_clinica`,
-`horario_comercial` e `servicos_clinica`. O que a equipe salva em Configurações
-vale na conversa seguinte: não há nada para sincronizar, e não existe o estado
-"desatualizada".
+`horario_comercial`, `servicos_clinica`, `profissionais` e
+`profissional_horarios`. O que a equipe salva nas telas vale na conversa
+seguinte: não há nada para sincronizar, e não existe o estado "desatualizada".
 
-**Nenhum outro objeto do banco é acessado pelo n8n.** `consultas`,
-`profissionais`, jornadas, bloqueios, `usuarios` e `api_tokens` ficam fora do
-alcance dele.
+**Nenhum outro objeto do banco é acessado pelo n8n** — nem mesmo as tabelas que
+alimentam essas views. `consultas`, `profissionais`, jornadas, bloqueios,
+`usuarios` e `api_tokens` ficam fora do alcance dele.
+
+> As views são para **conversar**, não para operar: nenhuma traz `id`. Para
+> marcar com um dentista específico, o `profissional_id` vem de
+> `GET /profissionais` da API.
 
 ### Agenda é sempre pela API, nunca por `INSERT`
 
