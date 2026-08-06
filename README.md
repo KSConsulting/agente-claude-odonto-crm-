@@ -239,7 +239,7 @@ npm run lint      # análise estática
 
 ## Como o banco está organizado
 
-Dez objetos no schema `public`:
+Dez tabelas e três views no schema `public`:
 
 | Objeto | Papel |
 |---|---|
@@ -250,9 +250,12 @@ Dez objetos no schema `public`:
 | `profissional_horarios` | Jornada de trabalho, por dia da semana |
 | `profissional_bloqueios` | Férias, feriados, almoço |
 | `usuarios` | Perfis da equipe, espelhando o Auth |
-| `configuracoes_clinica` | Nome, logotipo e fuso horário da clínica |
+| `configuracoes_clinica` | Identidade, endereço e fuso horário da clínica |
 | `horario_comercial` | Grade de atendimento da clínica |
 | `servicos_clinica` | Catálogo de procedimentos |
+| `api_tokens` | Chaves de acesso da API, guardadas hasheadas |
+| `informacoes_clinica_agente` | **View** — dados da clínica em frases prontas, para o Agente de IA |
+| `procedimentos_clinica_agente` | **View** — procedimentos ativos em frases prontas, para o Agente de IA |
 
 ### ⚠️ Não existe tabela de agenda — e é de propósito
 
@@ -385,14 +388,52 @@ A tabela `crm_clinica_dados` já tem as colunas de integração
 (`id_conta_chatwoot`, `id_conversa_chatwoot`, `id_lead_chatwoot`,
 `inbox_id_chatwoot`) e os carimbos dos três follow-ups.
 
-### Ao agendar, o agente escreve em `consultas`
+### O que o agente lê e o que ele grava
 
-Não em `data_agendamento` da ficha do lead. Uma consulta gravada só na ficha
-apareceria no CRM e sumiria da Agenda. A linha em `consultas` deve trazer
-`profissional_id`, `duracao_minutos`, `origem = 'agente_ia'` e uma
-`chave_externa` — esta última é o que impede um retry do n8n de criar duas
-consultas idênticas. O resto (data na ficha, status no funil) um trigger do banco
-mantém sozinho.
+Esta é a lista fechada. **Ele grava em um lugar só: `crm_clinica`.**
+
+| Objeto | Acesso | Para quê |
+|---|:---:|---|
+| `crm_clinica` | **lê e grava** | Registrar quem chegou pelo WhatsApp e manter a conversa em dia — última mensagem, resumo, status no funil, follow-ups |
+| `informacoes_clinica_agente` | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Google Maps, Instagram e site |
+| `procedimentos_clinica_agente` | **só lê** | Os procedimentos ativos, com a descrição de cada um |
+
+As duas últimas são **views de coluna única**, com uma informação por linha, já
+escrita como frase — o agente lê e fala, sem montar texto:
+
+```sql
+select informacao   from public.informacoes_clinica_agente;
+-- Rua: Av. Eng. Domingos Ferreira, 170
+-- Cidade: Recife/PE
+-- Atendimento: segunda a sexta das 08:00 às 18:00, sábado das 08:00 às 12:00
+
+select procedimento from public.procedimentos_clinica_agente;
+-- Clareamento Dental: Gel clareador que remove manchas e deixa os dentes
+-- vários tons mais claros
+```
+
+Elas são **calculadas na leitura**, a partir de `configuracoes_clinica`,
+`horario_comercial` e `servicos_clinica`. O que a equipe salva em Configurações
+vale na conversa seguinte: não há nada para sincronizar, e não existe o estado
+"desatualizada".
+
+**Nenhum outro objeto do banco é acessado pelo n8n.** `consultas`,
+`profissionais`, jornadas, bloqueios, `usuarios` e `api_tokens` ficam fora do
+alcance dele.
+
+### Agenda é sempre pela API, nunca por `INSERT`
+
+O agente **não** insere em `consultas` e **não** grava `data_agendamento` na
+ficha do lead. Ele chama `POST /marcar`, e a Edge Function é que grava.
+
+Marcar consulta não é gravar uma linha: é conferir a jornada do dentista,
+recusar conflito com o que já existe, escolher um profissional livre quando o
+paciente não tem preferência e, ao remarcar, mover tudo num passo só. Um
+`INSERT` direto pularia tudo isso — e, ao bater na restrição de sobreposição,
+devolveria um erro cru do Postgres bem na hora de responder alguém que está
+esperando no WhatsApp.
+
+O resto (data na ficha, status no funil) um trigger do banco mantém sozinho.
 
 ### A API da agenda
 

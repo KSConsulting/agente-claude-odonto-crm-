@@ -415,18 +415,33 @@ A tabela `crm_clinica_dados` guarda os identificadores do **Chatwoot**
 (`id_conta_chatwoot`, `id_conversa_chatwoot`, `id_lead_chatwoot`,
 `inbox_id_chatwoot`) e os carimbos de follow-up (`follow_up_1/2/3`).
 
-O fluxo esperado — mensagem no Chatwoot → webhook → n8n → banco — está detalhado
-na **seção 8 do [`DATABASE.md`](DATABASE.md)**, junto com o motivo pelo qual a
-automação precisa da `service_role key`.
+**O que ele toca no banco — lista fechada.** Grava em um lugar só:
+
+| Objeto | Acesso |
+|---|:---:|
+| `crm_clinica` | **lê e grava** — os leads do WhatsApp |
+| `informacoes_clinica_agente` | **só lê** — dados da clínica em frases prontas |
+| `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
+
+Nada mais. Agenda é sempre pela API — `consultas` é escrita pela Edge Function,
+nunca por `INSERT` do n8n. Detalhes na **seção 8.1 do
+[`DATABASE.md`](DATABASE.md)**, junto com o motivo pelo qual a automação precisa
+da `service_role key`.
 
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.
 
-### Ao agendar, o agente escreve em `consultas`
+### Ao agendar, o agente chama a API — não escreve no banco
 
 Antes da Agenda existir, o agente gravava `data_agendamento` direto na ficha do
-lead. **Isso não vale mais:** a consulta precisa virar linha em `consultas`, com
-`profissional_id`, `duracao_minutos`, `origem = 'agente_ia'` e `chave_externa`.
+lead. **Isso não vale mais.** A consulta vira linha em `consultas`, com
+`profissional_id`, `duracao_minutos`, `origem = 'agente_ia'` e `chave_externa` —
+mas quem grava é a Edge Function, chamada por `POST /marcar`, e não o n8n.
+
+`INSERT` direto pula a conferência de jornada, a escolha de profissional livre e
+a idempotência da `chave_externa`; ao bater na restrição de sobreposição, devolve
+um `23P01` cru, sem frase para dizer a quem está esperando no WhatsApp.
+
 `data_agendamento` continua existindo, mas virou reflexo — quem o mantém é o
 trigger `consultas_sincroniza_lead`.
 

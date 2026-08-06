@@ -997,6 +997,41 @@ Dois buckets **públicos**, porque o código usa `getPublicUrl()` nos dois casos
 O sistema pressupõe um agente conversando no WhatsApp via **Chatwoot**, com
 orquestração em **n8n**, gravando direto neste banco.
 
+### 8.1. O que o agente toca no banco
+
+Esta é a lista fechada. **Ele grava em um lugar só: `crm_clinica`.** Tudo o mais
+que ele acessa direto é leitura; e tudo que mexe na agenda passa pela API, nunca
+por `INSERT` do n8n.
+
+| Objeto | Tipo | Acesso | Para quê |
+|---|---|:---:|---|
+| `crm_clinica` | view sobre `crm_clinica_dados` | **lê e grava** | Registrar quem chegou pelo WhatsApp, atualizar `ultima_mensagem`, `resumo_conversa`, `status` e os carimbos de follow-up |
+| `informacoes_clinica_agente` | view (4.12) | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Maps, Instagram e site — em frases prontas |
+| `procedimentos_clinica_agente` | view (4.13) | **só lê** | Os procedimentos ativos, um por linha, com a descrição |
+
+```sql
+select informacao   from public.informacoes_clinica_agente;
+select procedimento from public.procedimentos_clinica_agente;
+```
+
+**Nenhum outro objeto do banco é acessado pelo n8n.** `consultas`,
+`profissionais`, `profissional_horarios`, `profissional_bloqueios`,
+`servicos_clinica`, `configuracoes_clinica`, `horario_comercial`, `usuarios` e
+`api_tokens` ficam fora do alcance dele — o que a agenda precisa chega pela API.
+
+> **Por que a agenda não entra nessa lista.** Marcar consulta não é gravar uma
+> linha: é conferir jornada, recusar conflito com o que já existe, escolher
+> profissional livre e, no caso de remarcar, mover tudo num passo atômico. Um
+> `INSERT` direto do n8n em `consultas` passaria por cima disso e criaria
+> agendamento sobreposto — a restrição do banco até barraria a sobreposição, mas
+> o fluxo receberia um `23P01` cru, sem nenhuma frase para dizer ao paciente.
+> Por isso: **agenda é sempre pela API** (seção 4.11 e `API_AGENTE.md`).
+
+> **Por que as duas views são lidas direto, e não por endpoint.** O n8n já entra
+> no banco com a `service_role key` para gravar os leads. Ler duas views pela
+> conexão que já existe não acrescenta superfície nenhuma — e são dados sem
+> regra de negócio, que só precisam sair legíveis.
+
 ### A automação precisa usar a `service_role key`
 
 As políticas de RLS liberam apenas o papel `authenticated` — ou seja, sessões de
@@ -1015,11 +1050,12 @@ para o frontend.
 2. n8n busca o lead por `id_conversa_chatwoot` *(indexado)*
 3. Se não existe, insere em `crm_clinica` com os `id_*_chatwoot` preenchidos
 4. A cada mensagem, atualiza `ultima_mensagem = now()` e `resumo_conversa`
-5. Ao agendar, **insere uma linha em `consultas`** com `lead_id`,
-   `profissional_id`, `data_consulta`, `duracao_minutos`, `origem = 'agente_ia'`
-   e `chave_externa`. O trigger da seção 5 cuida sozinho de `data_agendamento`,
-   `data_marcacao_agendamento` e do `status` do lead
-6. Nos follow-ups, carimba `follow_up_1/2/3` e ajusta o `status`
+5. Perguntado sobre endereço, horário ou o que a clínica faz, lê
+   `informacoes_clinica_agente` e `procedimentos_clinica_agente` (8.1)
+6. Ao agendar, **chama `POST /marcar` da API** — não insere em `consultas`. A
+   Edge Function é que grava, e o trigger da seção 5 cuida sozinho de
+   `data_agendamento`, `data_marcacao_agendamento` e do `status` do lead
+7. Nos follow-ups, carimba `follow_up_1/2/3` e ajusta o `status`
 
 > **`minutos_ultima_mensagem` não precisa de escrita.** Basta manter
 > `ultima_mensagem` em dia — a view calcula o resto sozinha.
@@ -1039,6 +1075,16 @@ a Agenda, e o resultado agora seria uma consulta que aparece no CRM mas não no
 calendário — duas telas contando histórias diferentes sobre o mesmo fato. A
 fonte da verdade do agendamento é a linha em `consultas`; `data_agendamento`
 virou reflexo, mantido pelo trigger.
+
+**Inserir direto em `consultas`.** Existe a API para isso (8.1). Um `INSERT` do
+n8n pula a conferência de jornada, a escolha de profissional livre e a
+idempotência da `chave_externa` — e, quando bater na restrição de sobreposição,
+devolve um `23P01` cru, sem frase nenhuma para dizer ao paciente que está
+esperando resposta no WhatsApp.
+
+**Escrever em qualquer outra tabela.** Procedimentos, profissionais, jornadas e
+horários são cadastro da clínica, feito pelas telas. O agente lê o que precisa
+pelas views de 8.1 e não tem por que gravar em nada além de `crm_clinica`.
 
 ### A API da agenda — implantada
 
