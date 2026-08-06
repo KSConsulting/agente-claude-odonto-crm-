@@ -259,6 +259,9 @@ Dez tabelas e quatro views no schema `public`:
 | `procedimentos_clinica_agente` | **View** — procedimentos ativos em frases prontas, para o Agente de IA |
 | `profissionais_clinica_agente` | **View** — dentistas ativos e a jornada de cada um, para o Agente de IA |
 
+Mais uma tabela que **não vem das migrações**: `n8n_chat_histories`, a memória de
+conversa do agente, criada pelo próprio n8n na primeira mensagem que ele recebe.
+
 ### ⚠️ Não existe tabela de agenda — e é de propósito
 
 A agenda de um profissional é o conjunto de consultas com o `profissional_id`
@@ -392,11 +395,13 @@ A tabela `crm_clinica_dados` já tem as colunas de integração
 
 ### O que o agente lê e o que ele grava
 
-Esta é a lista fechada. **Ele grava em um lugar só: `crm_clinica`.**
+Esta é a lista fechada. **Ele grava em dois lugares:** a ficha do lead e a
+memória da própria conversa.
 
 | Objeto | Acesso | Para quê |
 |---|:---:|---|
 | `crm_clinica` | **lê e grava** | Registrar quem chegou pelo WhatsApp e manter a conversa em dia — última mensagem, resumo, status no funil, follow-ups |
+| `n8n_chat_histories` | **lê e grava** | A memória da conversa: cada mensagem trocada, para o agente lembrar do que já foi dito |
 | `informacoes_clinica_agente` | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Google Maps, Instagram e site |
 | `procedimentos_clinica_agente` | **só lê** | Os procedimentos ativos, com a descrição de cada um |
 | `profissionais_clinica_agente` | **só lê** | Os dentistas ativos e a jornada de cada um |
@@ -426,6 +431,11 @@ seguinte: não há nada para sincronizar, e não existe o estado "desatualizada"
 **Nenhum outro objeto do banco é acessado pelo n8n** — nem mesmo as tabelas que
 alimentam essas views. `consultas`, `profissionais`, jornadas, bloqueios,
 `usuarios` e `api_tokens` ficam fora do alcance dele.
+
+> **`n8n_chat_histories` não vem das migrações.** O nó de memória de conversa do
+> n8n cria essa tabela sozinho, na primeira mensagem que o agente recebe. O
+> schema é dele; o sistema não lê dessa tabela em nenhuma tela. Detalhes,
+> incluindo o estado de RLS, na seção 4.16 do [`DATABASE.md`](DATABASE.md).
 
 > As views são para **conversar**, não para operar: nenhuma traz `id`. Para
 > marcar com um dentista específico, o `profissional_id` vem de

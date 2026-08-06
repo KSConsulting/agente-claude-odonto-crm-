@@ -421,6 +421,7 @@ A tabela `crm_clinica_dados` guarda os identificadores do **Chatwoot**
 | Objeto | Acesso |
 |---|:---:|
 | `crm_clinica` | **lê e grava** — os leads do WhatsApp |
+| `n8n_chat_histories` | **lê e grava** — a memória da conversa. Criada pelo próprio n8n, não pelas migrações |
 | `informacoes_clinica_agente` | **só lê** — dados da clínica em frases prontas |
 | `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
 | `profissionais_clinica_agente` | **só lê** — dentistas ativos e a jornada de cada um |
@@ -429,6 +430,13 @@ Nada mais. Agenda é sempre pela API — `consultas` é escrita pela Edge Functi
 nunca por `INSERT` do n8n. Detalhes na **seção 8.1 do
 [`DATABASE.md`](DATABASE.md)**, junto com o motivo pelo qual a automação precisa
 da `service_role key`.
+
+> **`n8n_chat_histories` não está em `supabase/migrations/`, e não é
+> esquecimento.** O nó de memória de conversa do n8n cria a tabela sozinho, na
+> primeira mensagem que o agente recebe; o schema é dele. Escrever uma migração
+> para ela só criaria a chance de as duas definições divergirem. Ela também é a
+> única tabela de `public` sem RLS — estado conhecido e registrado na **seção
+> 4.16 do `DATABASE.md`**, com o caminho para fechar, se um dia for o caso.
 
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.

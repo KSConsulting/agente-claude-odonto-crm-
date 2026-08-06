@@ -174,6 +174,7 @@ erDiagram
 | `profissional_bloqueios` | tabela | Férias, feriado, almoço |
 | `usuarios` | tabela | Perfil da equipe, espelha `auth.users` |
 | `configuracoes_clinica` | tabela | Identidade, endereço e fuso da clínica (linha única) |
+| `n8n_chat_histories` | tabela | Memória de conversa do agente. **Criada pelo n8n**, não pelas migrações (ver 4.16) |
 | `informacoes_clinica_agente` | **view** | Os dados da clínica em frases prontas, uma por linha, para o Agente de IA (ver 4.12) |
 | `procedimentos_clinica_agente` | **view** | Os procedimentos ativos, um por linha, para o Agente de IA (ver 4.13) |
 | `profissionais_clinica_agente` | **view** | Os dentistas ativos e a jornada de cada um, um por linha, para o Agente de IA (ver 4.14) |
@@ -912,6 +913,72 @@ Nenhum dia ativo devolve `NULL`, o `||` propaga e a linha some da view.
 > clínica; a 0009 unificou e a apagou. Duas cópias da regra de agrupamento seria
 > uma a mais do que o necessário, e a segunda envelheceria calada.
 
+---
+
+### 4.16. `n8n_chat_histories`
+
+**A memória de conversa do Agente de IA** — cada mensagem trocada com um lead no
+WhatsApp, na ordem em que aconteceu. É o que permite ao agente lembrar do que já
+foi dito na mesma conversa, em vez de recomeçar a cada mensagem.
+
+> **Não está em `supabase/migrations/`, e não é esquecimento.** Esta tabela é
+> criada **pelo próprio n8n**, pelo nó de memória de conversa (Postgres Chat
+> Memory), na primeira mensagem que o agente recebe na vida. Ela aparece
+> sozinha, com este formato, e o schema é do n8n — não nosso. Escrever uma
+> migração para ela só criaria a chance de as duas definições divergirem.
+
+**Usada por:** n8n, e só ele. Nenhuma tela do sistema lê esta tabela.
+
+| Coluna | Tipo | Nulo | Default |
+|---|---|:---:|---|
+| `id` | `integer` | não | `nextval(...)` — sequência |
+| `session_id` | `varchar` | não | — |
+| `message` | `jsonb` | não | — |
+
+**Índice:** só a PK em `id`.
+
+`session_id` é **o WhatsApp do lead no formato canônico** (`5511987654321`), o
+mesmo valor de `crm_clinica_dados.whatsapp_lead`. É assim que se liga uma
+conversa à ficha:
+
+```sql
+select h.message
+  from public.n8n_chat_histories h
+  join public.crm_clinica_dados d on d.whatsapp_lead = h.session_id
+ where d.id = '...'
+ order by h.id;
+```
+
+> **Não existe chave estrangeira entre as duas.** A ligação é por convenção, e a
+> tabela é do n8n. Consequência prática: apagar um lead **não** apaga o histórico
+> de conversa dele — que continua ali, órfão, indexado pelo número.
+
+`message` é o formato do LangChain: `type` (`human` ou `ai`), `content` com o
+texto, mais `additional_kwargs`, `response_metadata` e `tool_calls`.
+
+```json
+{ "type": "ai", "content": "Oi, tudo bem? Eu sou a Alice, secretária da clínica.", "tool_calls": [], "additional_kwargs": {} }
+```
+
+> **Esta tabela não tem RLS, e isso é uma decisão registrada.** Toda tabela em
+> `public` é exposta pelo PostgREST, e a `anon key` é pública por natureza — vai
+> no bundle do site. Na prática, **as conversas e os telefones são legíveis por
+> quem tiver essa chave**, sem sessão. Verificado por requisição real: `200 OK`
+> com o conteúdo das mensagens.
+>
+> Se um dia isso for fechar, é uma linha, e **não muda nada para o n8n** — ele
+> fala com o banco como `service_role` ou como dono da tabela, e os dois ignoram
+> RLS. Não é preciso criar nenhuma política, porque nenhuma tela lê daqui:
+>
+> ```sql
+> alter table public.n8n_chat_histories enable row level security;
+> ```
+
+**Volume.** A tabela cresce por mensagem, não por lead — uma conversa comum
+passa das dezenas de linhas. Quando incomodar, **um índice em `session_id`** é a
+primeira coisa a fazer: hoje só existe a PK em `id`, e toda busca por conversa
+varre a tabela inteira.
+
 > ⚠️ **`horario_comercial` é o horário da clínica; `profissional_horarios` é o
 > que a agenda realmente oferece.** Os dois podem divergir: anunciar até as
 > 18:00 sem nenhum dentista depois das 17:00 faz o agente prometer horário que a
@@ -1064,13 +1131,15 @@ orquestração em **n8n**, gravando direto neste banco.
 
 ### 8.1. O que o agente toca no banco
 
-Esta é a lista fechada. **Ele grava em um lugar só: `crm_clinica`.** Tudo o mais
-que ele acessa direto é leitura; e tudo que mexe na agenda passa pela API, nunca
-por `INSERT` do n8n.
+Esta é a lista fechada. **Ele grava em dois lugares: `crm_clinica`, com a ficha
+do lead, e `n8n_chat_histories`, com o histórico da conversa.** Tudo o mais que
+ele acessa direto é leitura; e tudo que mexe na agenda passa pela API, nunca por
+`INSERT` do n8n.
 
 | Objeto | Tipo | Acesso | Para quê |
 |---|---|:---:|---|
 | `crm_clinica` | view sobre `crm_clinica_dados` | **lê e grava** | Registrar quem chegou pelo WhatsApp, atualizar `ultima_mensagem`, `resumo_conversa`, `status` e os carimbos de follow-up |
+| `n8n_chat_histories` | tabela (4.16) | **lê e grava** | A memória da conversa — cada mensagem trocada, para o agente lembrar do que já foi dito. Criada e mantida pelo próprio n8n |
 | `informacoes_clinica_agente` | view (4.12) | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Maps, Instagram e site — em frases prontas |
 | `procedimentos_clinica_agente` | view (4.13) | **só lê** | Os procedimentos ativos, um por linha, com a descrição |
 | `profissionais_clinica_agente` | view (4.14) | **só lê** | Os dentistas ativos e a jornada de cada um |
@@ -1122,7 +1191,8 @@ para o frontend.
 1. Mensagem chega no Chatwoot → webhook para o n8n
 2. n8n busca o lead por `id_conversa_chatwoot` *(indexado)*
 3. Se não existe, insere em `crm_clinica` com os `id_*_chatwoot` preenchidos
-4. A cada mensagem, atualiza `ultima_mensagem = now()` e `resumo_conversa`
+4. A cada mensagem, grava a linha em `n8n_chat_histories` (4.16) e atualiza
+   `ultima_mensagem = now()` e `resumo_conversa` na ficha
 5. Perguntado sobre endereço, horário ou o que a clínica faz, lê
    `informacoes_clinica_agente` e `procedimentos_clinica_agente` (8.1)
 6. Ao agendar, **chama `POST /marcar` da API** — não insere em `consultas`. A
@@ -1157,7 +1227,8 @@ esperando resposta no WhatsApp.
 
 **Escrever em qualquer outra tabela.** Procedimentos, profissionais, jornadas e
 horários são cadastro da clínica, feito pelas telas. O agente lê o que precisa
-pelas views de 8.1 e não tem por que gravar em nada além de `crm_clinica`.
+pelas views de 8.1 e não tem por que gravar em nada além de `crm_clinica` e da
+própria memória de conversa.
 
 ### A API da agenda — implantada
 
@@ -1251,30 +1322,6 @@ indicar isso.
 
 ## 9. Armadilhas conhecidas
 
-> 🔴 **Pendência de segurança em aberto: `n8n_chat_histories` sem RLS.**
->
-> Essa tabela **não é deste projeto** — o nó de memória de conversa do n8n a
-> cria sozinho em `public` na primeira execução, e o Postgres não liga RLS por
-> conta própria. Como toda tabela em `public` é exposta pelo PostgREST, e a
-> `anon key` é pública por natureza (vai no bundle do site), **qualquer pessoa
-> que abra o código-fonte da página consegue ler todas as conversas do WhatsApp**
-> — conteúdo das mensagens e o telefone do paciente, que o n8n usa como
-> `session_id`. Confirmado por requisição real, sem sessão: `200 OK` com as
-> conversas.
->
-> A correção é uma linha, e não quebra o n8n: ele fala com o banco como
-> `service_role` (ou como dono da tabela), e os dois ignoram RLS.
->
-> ```sql
-> alter table public.n8n_chat_histories enable row level security;
-> ```
->
-> Sem nenhuma política criada, `anon` e `authenticated` deixam de enxergar a
-> tabela — que é o desejado: o sistema não lê essa tabela, só o n8n.
->
-> **Vale a regra geral:** toda tabela que aparecer em `public`, venha de onde
-> vier, precisa de RLS. A consulta de conferência está na seção 10.
-
 Lista do que quebra este banco de formas não óbvias:
 
 1. **Recriar qualquer view sem `security_invoker = true`** → o RLS deixa de valer.
@@ -1312,6 +1359,14 @@ Lista do que quebra este banco de formas não óbvias:
     que a clínica está enrolando. **Conferir sempre que mexer numa das duas**,
     comparando `jornada_texto(null)` com `jornada_texto(id)` de cada dentista
     (4.15).
+17. **Apagar um lead achando que apaga a conversa** → `n8n_chat_histories` não
+    tem chave estrangeira para `crm_clinica_dados` (4.16). A ficha some, o
+    histórico do WhatsApp fica, indexado pelo número.
+18. **`n8n_chat_histories` está sem RLS, por decisão registrada** (4.16). Toda
+    tabela em `public` é exposta pelo PostgREST, e a `anon key` é pública — as
+    conversas e os telefones são legíveis por quem tiver essa chave. Quem for
+    revisar segurança precisa saber que este estado é conhecido, e não um
+    descuido: o caminho, se um dia for fechar, está na 4.16.
 15. **Apagar um profissional com consultas** → bloqueado pelo `ON DELETE
     RESTRICT` (`23503`). Use `ativo = false`.
 16. **Gravar em `consultas.data_fim`** → é coluna derivada, sobrescrita pelo
@@ -1339,7 +1394,7 @@ Depois de rodar a migração, confira se está tudo de pé:
 select table_name, table_type from information_schema.tables
 where table_schema = 'public' order by table_name;
 
--- RLS ativo em TODA tabela de `public` (esperado: nenhuma linha)
+-- Tabelas de `public` sem RLS (esperado: só `n8n_chat_histories`, ver 4.16)
 select relname from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
