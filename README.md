@@ -238,6 +238,64 @@ npm run lint      # análise estática
 
 ---
 
+## Deploy na Vercel
+
+O sistema é uma SPA estática que fala com o Supabase pelo navegador — não há
+servidor próprio, então a Vercel serve o `dist/` e pronto. A detecção automática
+já acerta o framework (Vite), o comando (`npm run build`) e a pasta (`dist`).
+
+**Duas coisas precisam ser feitas à mão, e sem elas o site sobe quebrado:**
+
+### 1. As variáveis de ambiente, no painel da Vercel
+
+O `.env` está no `.gitignore` — e deve continuar assim. Em
+**Settings → Environment Variables**, cadastre as duas, para todos os ambientes:
+
+```
+VITE_SUPABASE_URL=https://SEU_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=sua_anon_key
+```
+
+> ⚠️ **Sem elas o build não falha** — o Vite não reclama de variável ausente.
+> Ele embute `undefined`, o site sobe, e a tela fica em branco no primeiro
+> acesso ao Supabase. O sintoma não aponta para a causa.
+
+Variável do Vite só entra no bundle durante o build: **mudou a variável,
+precisa reimplantar.**
+
+### 2. O `vercel.json` — já está no repositório
+
+```json
+{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+```
+
+As rotas são client-side (`BrowserRouter`). Sem esse rewrite, entrar direto em
+`/agenda` ou dar F5 em `/leads/algum-id` devolve **404 da Vercel**: não existe
+arquivo nesses caminhos. Navegar pela barra lateral funcionaria, o que faz o
+problema aparecer só quando alguém compartilha um link — ou seja, na frente de
+outra pessoa.
+
+O rewrite não atrapalha os assets: a Vercel serve o arquivo real quando ele
+existe, e só cai no `index.html` quando não existe.
+
+### O que **não** precisa
+
+**Configurar Redirect URLs no Supabase Auth.** O login é
+`signInWithPassword`, sem OAuth e sem link mágico — nada volta por redirect.
+
+### Depois de subir, confira
+
+1. Entrar com um usuário e chegar no Dashboard
+2. Abrir `/agenda` **digitando na barra de endereço** — é o teste do rewrite
+3. Dar F5 dentro de uma ficha de paciente
+4. Configurações → Token e API: a URL dos cURLs tem que apontar para o seu
+   projeto do Supabase, e não para `undefined`
+
+> A Edge Function da API **não** vai para a Vercel — ela roda no Supabase e
+> continua onde está. O deploy aqui é só do sistema que a equipe usa.
+
+---
+
 ## Como o banco está organizado
 
 Dez tabelas e quatro views no schema `public`:

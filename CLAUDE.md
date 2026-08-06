@@ -324,6 +324,26 @@ em [`index.html`](index.html).
 
 ---
 
+## Deploy
+
+Vercel, SPA estática. A detecção automática acerta tudo (Vite → `npm run build`
+→ `dist`), e o [`vercel.json`](vercel.json) tem uma coisa só: o rewrite de
+`/(.*)` para `/index.html`.
+
+**Esse rewrite não é enfeite.** As rotas são client-side (`BrowserRouter`); sem
+ele, entrar direto em `/agenda` ou dar F5 em `/leads/:id` devolve 404 da Vercel.
+Navegar pela Sidebar continuaria funcionando, então o problema só aparece quando
+alguém compartilha um link.
+
+As duas variáveis do Supabase precisam estar cadastradas no painel da Vercel — o
+`.env` não vai para o Git. **Variável ausente não quebra o build:** o Vite embute
+`undefined` e a tela fica em branco no primeiro acesso ao banco. E como variável
+de Vite entra no bundle em tempo de build, **mudou a variável, reimplante.**
+
+Passo a passo e checklist pós-deploy no [`README.md`](README.md).
+
+---
+
 ## Variáveis de ambiente
 
 ```env
