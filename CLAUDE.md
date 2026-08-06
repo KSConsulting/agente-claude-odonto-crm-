@@ -66,13 +66,14 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **sete arquivos, nesta ordem**:
+A migração é aplicada em **oito arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
 `0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica),
-`0006_informacoes_clinica.sql` (endereço da clínica e a view do agente) e
-`0007_horario_na_view.sql` (o horário de atendimento nessa view).
+`0006_informacoes_clinica.sql` (endereço da clínica e a view do agente),
+`0007_horario_na_view.sql` (o horário de atendimento nessa view) e
+`0008_procedimentos_view.sql` (a view de procedimentos do agente).
 
 Os pontos que mais causam erro:
 
@@ -475,7 +476,7 @@ O valor em claro nunca é gravado: o banco guarda só o hash, e a tela mantém o
 valor em memória apenas enquanto a página está aberta, para os cURLs saírem
 preenchidos logo depois da criação.
 
-### Os dados da clínica o agente lê direto do banco, sem API
+### O que o agente lê direto do banco, sem API
 
 `informacoes_clinica_agente` é uma view de **coluna única**, com uma informação
 por linha, já escrita como frase — endereço, bairro, cidade/UF, CEP, horário de
@@ -507,3 +508,13 @@ que mostra no rodapé a prévia do que o agente lê — e essa prévia é **uma 
 real à view**, não uma reimplementação. Se ela fosse montada no TypeScript,
 haveria duas versões da mesma regra e um dia a tela mostraria uma coisa e o
 paciente ouviria outra.
+
+`procedimentos_clinica_agente` segue a mesma receita, com os procedimentos
+ativos — um por linha, `Nome: descrição`, na ordem da tela de Configurações. Sem
+prefixo `Procedimento:`, porque aqui todas as linhas são da mesma natureza e a
+palavra repetida vinte vezes viraria ruído lido em voz alta. Sem descrição, a
+linha é só o nome.
+
+> O endpoint `GET /procedimentos` da API continua existindo, mas ordena por nome
+> e devolve só o nome, sem descrição. São superfícies diferentes para
+> consumidores diferentes — mexeu numa, confira a outra.

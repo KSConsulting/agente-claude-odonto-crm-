@@ -154,7 +154,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **sete arquivos, nesta ordem** — cada um depende do anterior:
+São **oito arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -163,13 +163,14 @@ São **sete arquivos, nesta ordem** — cada um depende do anterior:
 5. [`supabase/migrations/0005_catalogo_procedimentos.sql`](supabase/migrations/0005_catalogo_procedimentos.sql)
 6. [`supabase/migrations/0006_informacoes_clinica.sql`](supabase/migrations/0006_informacoes_clinica.sql)
 7. [`supabase/migrations/0007_horario_na_view.sql`](supabase/migrations/0007_horario_na_view.sql)
+8. [`supabase/migrations/0008_procedimentos_view.sql`](supabase/migrations/0008_procedimentos_view.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
 Ao final você terá:
 
 ```
-10 tabelas + 2 views     estrutura de dados
+10 tabelas + 3 views     estrutura de dados
 17 índices               desempenho e integridade (um deles impede
                          duas pessoas com o mesmo WhatsApp)
 17 políticas de RLS      controle de acesso (11 no banco + 6 no Storage)

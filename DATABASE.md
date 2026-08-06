@@ -49,6 +49,8 @@ ordem**:
    `informacoes_clinica_agente`, de coluna única, que o Agente de IA lê.
 7. `supabase/migrations/0007_horario_na_view.sql` — a linha `Atendimento:` na
    view, montada de `horario_comercial` por `horario_atendimento_texto()`.
+8. `supabase/migrations/0008_procedimentos_view.sql` — a view
+   `procedimentos_clinica_agente`, de coluna única, com os procedimentos ativos.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -170,6 +172,7 @@ erDiagram
 | `usuarios` | tabela | Perfil da equipe, espelha `auth.users` |
 | `configuracoes_clinica` | tabela | Identidade, endereço e fuso da clínica (linha única) |
 | `informacoes_clinica_agente` | **view** | Os dados da clínica em frases prontas, uma por linha, para o Agente de IA (ver 4.12) |
+| `procedimentos_clinica_agente` | **view** | Os procedimentos ativos, um por linha, para o Agente de IA (ver 4.13) |
 | `horario_comercial` | tabela | Grade de atendimento, 1 linha por dia |
 | `servicos_clinica` | tabela | Catálogo de procedimentos |
 
@@ -806,6 +809,48 @@ pela API** — ele já entra no banco com a `service_role` para gravar os leads 
 
 ```sql
 select informacao from public.informacoes_clinica_agente;
+```
+
+---
+
+### 4.13. `procedimentos_clinica_agente` (view)
+
+Os procedimentos que a clínica oferece, **uma coluna, um por linha**, já escrito
+como frase. Mesma receita da 4.12, para o agente saber o que existe e não
+inventar tratamento.
+
+| Coluna | Tipo |
+|---|---|
+| `procedimento` | `text` |
+
+```
+Avaliação e Planejamento Digital do Sorriso: Primeira consulta com escaneamento e fotos, onde o dentista mostra o resultado simulado antes de começar
+Lentes de Contato: Lâminas finíssimas de porcelana coladas na frente dos dentes para mudar cor e formato
+Facetas em Resina: Camadas de resina aplicadas sobre o dente para corrigir cor, forma ou pequenas falhas
+…
+```
+
+> **O nome ocupa a posição do rótulo**, e não há prefixo `Procedimento:`. Aqui
+> todas as linhas são da mesma natureza — repetir a palavra em vinte linhas
+> seria ruído que o agente leria em voz alta. Na 4.12 o rótulo existe porque
+> cada linha é de um tipo diferente.
+
+> **Sem descrição, a linha é só o nome.** O `coalesce` sobre o `||` faz o trecho
+> inteiro sumir, em vez de deixar um dois-pontos pendurado no fim.
+
+**Ordem:** `created_at` — a mesma da tela de Configurações, que é a ordem que a
+clínica escolheu. Começa pela Avaliação, por onde todo tratamento passa;
+alfabética jogaria os Alinhadores para a frente e a Avaliação para o meio.
+
+> Note que **o endpoint `GET /procedimentos` da API ordena por nome**, não por
+> cadastro, e devolve só o nome, sem descrição. São superfícies diferentes para
+> consumidores diferentes: a API existe desde antes, e o agente agora lê a view.
+
+**Só os ativos.** Desligar o procedimento em Configurações tira ele da boca do
+agente, sem ninguém mexer no n8n.
+
+```sql
+select procedimento from public.procedimentos_clinica_agente;
 ```
 
 ---
