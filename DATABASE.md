@@ -1251,35 +1251,67 @@ indicar isso.
 
 ## 9. Armadilhas conhecidas
 
+> 🔴 **Pendência de segurança em aberto: `n8n_chat_histories` sem RLS.**
+>
+> Essa tabela **não é deste projeto** — o nó de memória de conversa do n8n a
+> cria sozinho em `public` na primeira execução, e o Postgres não liga RLS por
+> conta própria. Como toda tabela em `public` é exposta pelo PostgREST, e a
+> `anon key` é pública por natureza (vai no bundle do site), **qualquer pessoa
+> que abra o código-fonte da página consegue ler todas as conversas do WhatsApp**
+> — conteúdo das mensagens e o telefone do paciente, que o n8n usa como
+> `session_id`. Confirmado por requisição real, sem sessão: `200 OK` com as
+> conversas.
+>
+> A correção é uma linha, e não quebra o n8n: ele fala com o banco como
+> `service_role` (ou como dono da tabela), e os dois ignoram RLS.
+>
+> ```sql
+> alter table public.n8n_chat_histories enable row level security;
+> ```
+>
+> Sem nenhuma política criada, `anon` e `authenticated` deixam de enxergar a
+> tabela — que é o desejado: o sistema não lê essa tabela, só o n8n.
+>
+> **Vale a regra geral:** toda tabela que aparecer em `public`, venha de onde
+> vier, precisa de RLS. A consulta de conferência está na seção 10.
+
 Lista do que quebra este banco de formas não óbvias:
 
-1. **Recriar a view sem `security_invoker = true`** → o RLS deixa de valer e
-   todos os leads ficam expostos publicamente.
+1. **Recriar qualquer view sem `security_invoker = true`** → o RLS deixa de valer.
+   Vale para `crm_clinica` e para as três views do agente (4.12 a 4.14).
 2. **Assinar Realtime na view `crm_clinica`** → a inscrição é criada sem erro e
    nunca dispara. Assine sempre `crm_clinica_dados` (seção 8.5).
-2. **Tentar escrever em `minutos_ultima_mensagem`** → erro; é coluna calculada.
-3. **Automação usando a `anon key`** → gravações falham sem erro visível.
-4. **Alterar o `CHECK` de `status` sem atualizar `src/types/index.ts`**
+3. **Tentar escrever em `minutos_ultima_mensagem`** → erro; é coluna calculada.
+4. **Automação usando a `anon key`** → gravações falham sem erro visível.
+5. **Alterar o `CHECK` de `status` sem atualizar `src/types/index.ts`**
    (ou o contrário) → compila e quebra só em runtime.
-5. **Criar a linha em `usuarios` na mão** → conflito com o trigger.
-6. **Inserir duas linhas em `configuracoes_clinica`** → bloqueado pelo índice
+6. **Criar a linha em `usuarios` na mão** → conflito com o trigger.
+7. **Inserir duas linhas em `configuracoes_clinica`** → bloqueado pelo índice
    singleton; o código não trata esse erro.
-7. **Duplicar `dia_semana` em `horario_comercial`** → bloqueado pelo UNIQUE.
-8. **Confundir `data_agendamento` com `data_marcacao_agendamento`** → métricas
+8. **Duplicar `dia_semana` em `horario_comercial`** → bloqueado pelo UNIQUE.
+9. **Confundir `data_agendamento` com `data_marcacao_agendamento`** → métricas
    do Dashboard erradas, sem nenhum sinal de erro.
-9. **Excluir um lead** → apaga em cascata todas as consultas e o histórico
-   financeiro dele.
-10. **Rodar `0002` sem `0001`** → falha: o `0002` usa `set_updated_at` e altera
+10. **Excluir um lead** → apaga em cascata todas as consultas e o histórico
+    financeiro dele.
+11. **Rodar `0002` sem `0001`** → falha: o `0002` usa `set_updated_at` e altera
     `consultas`, que só existem depois do primeiro arquivo.
-11. **Repetir a chamada depois de um `23P01`** → dá exatamente o mesmo erro. Isso
+12. **Repetir a chamada depois de um `23P01`** → dá exatamente o mesmo erro. Isso
     não é falha transitória: é o banco recusando duas consultas no mesmo horário
     do mesmo profissional. A saída é outro horário.
-12. **Automação inserindo em `consultas` sem `chave_externa`** → o retry cria uma
+13. **Automação inserindo em `consultas` sem `chave_externa`** → o retry cria uma
     segunda consulta idêntica e o paciente recebe duas confirmações.
-13. **Gravar `data_agendamento` direto na ficha do lead pela automação** → a
+14. **Gravar `data_agendamento` direto na ficha do lead pela automação** → a
     consulta aparece no CRM e some da Agenda. A fonte da verdade é `consultas`.
-14. **Cadastrar profissional sem jornada** → ele existe, mas a agenda o trata
+15. **Cadastrar profissional sem jornada** → ele existe, mas a agenda o trata
     como quem nunca atende, e todo agendamento com ele vira "fora do expediente".
+16. **`horario_comercial` e `profissional_horarios` discordando** → é a armadilha
+    mais silenciosa desta lista, porque **não há erro nenhum**: os dois cadastros
+    estão certos cada um por si. A clínica que anuncia sábado das 08:00 às 12:00
+    sem nenhum dentista com sábado na jornada faz o agente dizer que atende no
+    sábado — e, na mesma conversa, não achar horário nenhum. O paciente entende
+    que a clínica está enrolando. **Conferir sempre que mexer numa das duas**,
+    comparando `jornada_texto(null)` com `jornada_texto(id)` de cada dentista
+    (4.15).
 15. **Apagar um profissional com consultas** → bloqueado pelo `ON DELETE
     RESTRICT` (`23503`). Use `ativo = false`.
 16. **Gravar em `consultas.data_fim`** → é coluna derivada, sobrescrita pelo
@@ -1303,18 +1335,24 @@ Lista do que quebra este banco de formas não óbvias:
 Depois de rodar a migração, confira se está tudo de pé:
 
 ```sql
--- Objetos criados (esperado: 9 tabelas + 1 view)
+-- Objetos criados (esperado: 10 tabelas + 4 views)
 select table_name, table_type from information_schema.tables
 where table_schema = 'public' order by table_name;
 
--- RLS ativo em todas as tabelas (esperado: 9 linhas, todas true)
-select relname, relrowsecurity from pg_class c
+-- RLS ativo em TODA tabela de `public` (esperado: nenhuma linha)
+select relname from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relkind = 'r' order by relname;
+where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
 
--- Políticas (esperado: 16 — 10 em public + 6 em storage)
+-- Políticas (esperado: 17 — 11 em public + 6 em storage)
 select schemaname, count(*) from pg_policies
 where schemaname in ('public','storage') group by schemaname;
+
+-- Divergência entre o horário anunciado e o que a agenda oferece (armadilha 16)
+select 'clínica' as quem, public.jornada_texto(null) as jornada
+union all
+select p.nome || ' ' || p.sobrenome, public.jornada_texto(p.id)
+  from public.profissionais p where p.ativo;
 
 -- A restrição anti-conflito existe? (esperado: 1 linha, contype = 'x')
 select conname, contype from pg_constraint
