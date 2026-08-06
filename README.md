@@ -154,7 +154,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **seis arquivos, nesta ordem** — cada um depende do anterior:
+São **sete arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -162,6 +162,7 @@ São **seis arquivos, nesta ordem** — cada um depende do anterior:
 4. [`supabase/migrations/0004_api_agente.sql`](supabase/migrations/0004_api_agente.sql)
 5. [`supabase/migrations/0005_catalogo_procedimentos.sql`](supabase/migrations/0005_catalogo_procedimentos.sql)
 6. [`supabase/migrations/0006_informacoes_clinica.sql`](supabase/migrations/0006_informacoes_clinica.sql)
+7. [`supabase/migrations/0007_horario_na_view.sql`](supabase/migrations/0007_horario_na_view.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
@@ -173,7 +174,7 @@ Ao final você terá:
                          duas pessoas com o mesmo WhatsApp)
 17 políticas de RLS      controle de acesso (11 no banco + 6 no Storage)
 2 buckets de Storage     fotos de perfil e logotipo
-12 funções + 7 triggers  automações internas e as regras da API
+13 funções + 7 triggers  automações internas e as regras da API
 1 restrição de exclusão  impede duas consultas no mesmo horário
 2 tabelas no Realtime    atualização automática da tela
 ```

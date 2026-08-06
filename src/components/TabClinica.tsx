@@ -247,6 +247,9 @@ export default function TabClinica() {
           Exatamente estas linhas, uma informação por linha, direto da view{' '}
           <code style={{ fontFamily: MONO, fontSize: 11.5, color: '#16232B' }}>informacoes_clinica_agente</code>.
           Campo em branco não vira linha — some da lista em vez de virar um rótulo vazio.
+          A linha <strong style={{ color: '#16232B' }}>Atendimento</strong> não se digita aqui:
+          ela é montada sozinha a partir da aba <strong style={{ color: '#16232B' }}>Horários de
+          Funcionamento</strong>.
         </p>
 
         {linhas.length === 0 ? (

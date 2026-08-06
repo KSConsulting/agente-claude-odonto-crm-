@@ -66,12 +66,13 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **seis arquivos, nesta ordem**:
+A migração é aplicada em **sete arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
-`0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica) e
-`0006_informacoes_clinica.sql` (endereço da clínica e a view do agente).
+`0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica),
+`0006_informacoes_clinica.sql` (endereço da clínica e a view do agente) e
+`0007_horario_na_view.sql` (o horário de atendimento nessa view).
 
 Os pontos que mais causam erro:
 
@@ -477,9 +478,18 @@ preenchidos logo depois da criação.
 ### Os dados da clínica o agente lê direto do banco, sem API
 
 `informacoes_clinica_agente` é uma view de **coluna única**, com uma informação
-por linha, já escrita como frase — endereço, bairro, cidade/UF, CEP, Maps,
-Instagram e site. O n8n lê com a mesma `service_role key` que já usa para gravar
-os leads em `crm_clinica`; não há endpoint para isso, de propósito.
+por linha, já escrita como frase — endereço, bairro, cidade/UF, CEP, horário de
+atendimento, Maps, Instagram e site. O n8n lê com a mesma `service_role key` que
+já usa para gravar os leads em `crm_clinica`; não há endpoint para isso, de
+propósito.
+
+A linha `Atendimento:` **não é campo digitado**: sai de `horario_comercial` pela
+função `horario_atendimento_texto()`, que agrupa dias seguidos com o mesmo
+horário ("segunda a sexta das 08:00 às 18:00, sábado das 08:00 às 12:00"). A
+grade é a mesma da aba Horários — mudou lá, mudou a frase. Mas atenção: essa é a
+grade **da clínica**, e os horários que a agenda realmente oferece vêm de
+`profissional_horarios`. Se divergirem, o agente promete horário que a
+disponibilidade recusa em seguida.
 
 Três coisas que a definem (detalhes na seção 4.12 do
 [`DATABASE.md`](DATABASE.md)):

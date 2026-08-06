@@ -47,6 +47,8 @@ ordem**:
 6. `supabase/migrations/0006_informacoes_clinica.sql` — endereço e links da
    clínica: 8 colunas novas em `configuracoes_clinica`, 2 restrições e a view
    `informacoes_clinica_agente`, de coluna única, que o Agente de IA lê.
+7. `supabase/migrations/0007_horario_na_view.sql` — a linha `Atendimento:` na
+   view, montada de `horario_comercial` por `horario_atendimento_texto()`.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -753,10 +755,28 @@ Rua: Rua Samuel Scott, 212 A - bloco 3
 Bairro: Carvoeira
 Cidade: Florianópolis/SC
 CEP: 88040-600
+Atendimento: segunda a sexta das 08:00 às 18:00, sábado das 08:00 às 12:00
 Link do Google Maps: https://maps.app.goo.gl/...
 Instagram: https://instagram.com/clinica
 Site: https://clinica.com.br
 ```
+
+**A linha `Atendimento:` não vem de campo digitado.** Ela é montada de
+`horario_comercial` pela função `horario_atendimento_texto()`, a mesma grade que
+a clínica preenche em Configurações → Horários de Funcionamento. Mudou a grade,
+mudou a frase na leitura seguinte — ninguém digita horário duas vezes.
+
+A função agrupa dias seguidos com o mesmo horário: seis linhas repetindo "das
+08:00 às 18:00" não é como se fala, e o agente leria tudo. O agrupamento é a
+técnica clássica de ilhas (`ordem - row_number()`), e domingo vira 7 para a
+frase começar na segunda, como em português. Nenhum dia ativo devolve `NULL` e a
+linha some, igual aos outros campos.
+
+> ⚠️ **`horario_comercial` é o horário da clínica, não o da agenda.** Os
+> horários realmente oferecidos vêm de `profissional_horarios`, a jornada de
+> cada dentista. Os dois podem divergir: a clínica que anuncia até as 18:00 sem
+> nenhum dentista depois das 17:00 faz o agente prometer um horário que a
+> consulta de disponibilidade recusa em seguida.
 
 > **Por que view e não tabela.** Uma segunda tabela precisaria ser mantida em
 > sincronia com `configuracoes_clinica`, e um dia não estaria — alguém edita o
