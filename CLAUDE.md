@@ -429,6 +429,24 @@ assistente virtual, inteligência artificial, bot, robô ou sistema.
 **São dois públicos e dois contratos.** Mexer em `agente.ts` muda a tela; mudar
 como ela se apresenta no WhatsApp é mexer no prompt. Um não é o outro.
 
+### Lista ou card, e o que decide
+
+As duas listagens da clínica não têm a mesma forma, e a diferença não é gosto:
+
+| Tela | Forma | Por quê |
+|---|---|---|
+| **Profissionais** | linhas empilhadas | Um dentista é **nome, cor e jornada** — três dados curtos que cabem numa linha. São poucos, e a cor à esquerda já separa um do outro. |
+| **Procedimentos** | grade de cards | Um procedimento é **um parágrafo**. São vinte. Vinte linhas com a descrição espremida numa faixa fina viram uma parede que o olho não separa. |
+
+A regra: **quando o item tem texto corrido, ele quer um card**; quando é um
+punhado de campos curtos, a linha é mais densa e melhor.
+
+No card, os botões que agem sobre o item ficam **dentro dele** — não numa coluna
+à direita, longe do nome, onde é fácil clicar no procedimento vizinho.
+
+> **O rodapé do card não esmaece junto.** Desligar um procedimento apaga o corpo
+> (`opacity: 0.5`), mas não o rodapé: apagar o botão que religa é apagar a saída.
+
 ### Ícones
 
 `lucide-react`. **Ela não tem ícone de dente** — foram verificados os 1.943
@@ -523,15 +541,15 @@ Ao mudar o banco, **prefira verificar contra o banco real** (consultas da seçã
 
 Problemas reais que já existiam e ainda não foram tratados. Não são regressões.
 
-### ESLint acusa 10 erros
+### ESLint acusa 9 erros
 
-- **5x — `ErrorMsg` declarado dentro do render** em
+- **4x — `ErrorMsg` declarado dentro do render** em
   [`Configuracoes.tsx:192`](src/pages/Configuracoes.tsx#L192). Não é só estilo:
   componentes criados durante o render são recriados a cada renderização e
   **perdem o estado**. É um bug esperando acontecer. A correção é mover a
   declaração para fora do componente.
-- **5x — uso de `any`** em `CRM.tsx`, `Dashboard.tsx` e `Procedimentos.tsx`,
-  além de uma variável não utilizada (`_e` em `CRM.tsx:123`).
+- **4x — uso de `any`** em `CRM.tsx` e `Dashboard.tsx`, além de uma variável
+  não utilizada (`_e` em `CRM.tsx:123`).
 
 ### Bundle de 2.2 MB (812 KB gzip)
 
