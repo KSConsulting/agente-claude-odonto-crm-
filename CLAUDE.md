@@ -151,7 +151,7 @@ src/
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
 ├── components/
-│   ├── Layout.tsx              casca com Sidebar + <Outlet/>
+│   ├── Layout.tsx              casca com Sidebar + <Outlet/> (ver Convenções)
 │   ├── Sidebar.tsx             navegação lateral, logo, logout
 │   ├── ProtectedRoute.tsx      guarda de sessão
 │   ├── PessoasPage.tsx         implementação compartilhada de /leads e /clientes
@@ -297,6 +297,20 @@ escalonam a entrada dos blocos da página — mais classes de media query
 declaradas localmente no próprio componente.
 
 **Siga o padrão inline.** Misturar Tailwind agora deixaria a base inconsistente.
+
+### A casca tem altura fixa, e quem rola é o conteúdo
+
+[`Layout.tsx`](src/components/Layout.tsx) usa `height: 100vh` com
+`overflow: hidden`, e o `<main>` é que rola. **Não troque por `minHeight`.**
+
+Com `minHeight`, o container cresce junto com a página e a barra lateral estica
+junto — ela é um item flex, e `stretch` é o padrão. O rodapé dela (o nome do
+usuário e o menu do sistema) vai parar no fim do **documento**: em telas altas
+como Dashboard, Agenda e Configurações, some abaixo da dobra e só reaparece
+rolando até o fim. Foi exatamente o que aconteceu.
+
+Consequência para páginas novas: use `height: '100%'`, não `100vh` — o `main`
+já é do tamanho da janela, e `100vh` dentro dele ignora qualquer margem futura.
 
 ### Modal vive dentro de `ModalPortal`
 

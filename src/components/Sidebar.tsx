@@ -103,8 +103,12 @@ export default function Sidebar() {
     navigate('/login')
   }
 
-  const initials = usuario?.nome
-    ? usuario.nome.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
+  // `.trim() ||` e não `??`: o cadastro nasce com `nome = ''`, e string vazia
+  // passa direto pelo `??`. O resultado era um nome em branco e um "?" no
+  // lugar da inicial, com cara de defeito.
+  const nomeUsuario = usuario?.nome?.trim() || 'Sua conta'
+  const initials = usuario?.nome?.trim()
+    ? nomeUsuario.split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase()
     : '?'
 
   return (
@@ -112,7 +116,9 @@ export default function Sidebar() {
       style={{
         width: collapsed ? 64 : 220,
         transition: 'width 0.25s ease',
-        minHeight: '100vh',
+        // A altura vem do Layout, que fixa a janela. `minHeight: 100vh` fazia
+        // a barra crescer com a página e levava o rodapé para fora da tela.
+        height: '100%',
         background: '#fff',
         borderRight: '1px solid #DCE6EA',
         display: 'flex',
@@ -220,7 +226,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -339,7 +345,7 @@ export default function Sidebar() {
 
         <button
           onClick={() => setMenuAberto((a) => !a)}
-          title={collapsed ? (usuario?.nome ?? 'Conta') : undefined}
+          title={collapsed ? nomeUsuario : undefined}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -386,7 +392,7 @@ export default function Sidebar() {
                   textOverflow: 'ellipsis',
                 }}
               >
-                {usuario?.nome ?? 'Usuário'}
+                {nomeUsuario}
               </div>
               <div style={{ fontSize: 11, color: '#6B818C' }}>Secretária</div>
             </div>

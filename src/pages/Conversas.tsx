@@ -156,7 +156,7 @@ export default function Conversas() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#fff' }}>
+    <div style={{ display: 'flex', height: '100%', background: '#fff' }}>
       <ListaConversas
         conversas={conversas}
         selecionada={selecionada}
