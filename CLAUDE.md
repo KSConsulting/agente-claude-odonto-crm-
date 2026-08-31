@@ -559,6 +559,7 @@ mortas: as colunas `*_chatwoot` de `crm_clinica_dados` e a tabela
 | `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
 | `profissionais_clinica_agente` | **só lê** — dentistas ativos e a jornada de cada um |
 | `servicos_clinica` | **só lê** — a `descricao_longa` de **um** procedimento, pela ferramenta `detalhes_do_procedimento` |
+| `consultas` | **só lê** para a memória — a consulta futura e o histórico do paciente. Escrita é sempre por função SQL |
 | `configuracoes_agente` | **só lê** — modelo, prompt e a regra do modo teste |
 | `configuracoes_clinica` | **só lê** — só o `fuso_horario` |
 
@@ -566,6 +567,38 @@ Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.
 
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.
+
+### A memória dela tem duas camadas
+
+**Ela não tem "conversas".** Não há sessão nem começo: é uma linha do tempo só
+por número de WhatsApp, para sempre.
+
+| Camada | O que é | Alcance |
+|---|---|---|
+| **Janela** | As últimas **50 mensagens** de `mensagens_whatsapp` | Curto. Cada balão conta uma linha, e ela responde em 2 ou 3 — 50 mensagens são umas **16 trocas** |
+| **Ficha** | `nome_lead`, `procedimento_interesse`, `resumo_conversa` e as consultas, montados por `montarFicha()` no fim do prompt | **Permanente.** É o que ela lembra de um paciente que sumiu por um ano |
+
+> **A ficha só existe se ela escrever.** Quem preenche é a ferramenta
+> `atualizar_ficha`, chamada por ela mesma durante a conversa. Prompt fraco nesse
+> ponto = ficha vazia = nenhuma memória longa. Por isso a regra virou
+> inegociável: *"nunca termine uma resposta em que descobriu algo novo sem usar
+> `atualizar_ficha`"*.
+
+**O histórico de consultas não entra no prompt.** Um paciente de cinco anos tem
+dezenas de linhas, cobradas em toda mensagem para serem usadas quase nunca. Da
+ficha sai só uma linha de placar — quantas fez e quando foi a última —, e o
+detalhe vem pela ferramenta `historico_do_paciente`. **É a mesma divisão dos
+procedimentos:** catálogo no prompt, detalhe sob demanda.
+
+### A ordem do prompt não é estética
+
+O que é igual para todo mundo (identidade, regras, clínica) vem **primeiro**; o
+que muda a cada conversa e a cada minuto (`{{DATA_HOJE}}` e
+`{{FICHA_DO_PACIENTE}}`) vem **por último**.
+
+É assim que o cache de prompt funciona: ele reaproveita o **prefixo comum** entre
+chamadas. Um dado volátil no começo joga fora o desconto do texto inteiro — de
+todas as conversas de uma vez. **Não mova as duas seções finais para cima.**
 
 ### Ao agendar, o agente chama função SQL — nunca `INSERT`
 

@@ -20,7 +20,7 @@
 
 import { rpc, selecionar, inserir, atualizar, subirMidia } from '../_shared/db.ts'
 import { conversar, transcrever, type MensagemLLM, type Parte } from '../_shared/llm.ts'
-import { montarPrompt } from '../_shared/prompt.ts'
+import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
 import { digitando, enviarTexto, baixarMidia, numeroDoJid, fotoDoPerfil } from '../_shared/evolution.ts'
@@ -34,8 +34,14 @@ const ESPERA_MS = 8_000
 /** Teto de idas e voltas com as ferramentas numa mesma resposta. */
 const MAX_VOLTAS = 6
 
-/** Quantas mensagens da conversa vão para o modelo. */
-const HISTORICO = 30
+/**
+ * Quantas mensagens da conversa vão para o modelo.
+ *
+ * **Cada balão conta uma linha**, e ela responde em 2 ou 3 — então 50 mensagens
+ * são umas 16 trocas, não 50. O que passar disso a Letícia não enxerga mais: a
+ * memória longa dela é a ficha (`montarFicha`), não esta janela.
+ */
+const HISTORICO = 50
 
 const FUSO_PADRAO = 'America/Sao_Paulo'
 
@@ -43,7 +49,14 @@ interface Lead {
   id: string
   nome_lead: string | null
   agente_pausado: boolean
+  status: string
+  procedimento_interesse: string | null
+  resumo_conversa: string | null
 }
+
+/** As colunas do lead que a ficha do prompt precisa. Uma consulta só. */
+const CAMPOS_LEAD =
+  'id,nome_lead,agente_pausado,status,procedimento_interesse,resumo_conversa'
 
 interface Mensagem {
   id: string
@@ -207,7 +220,7 @@ async function processar(
 
   // ---- As duas travas ----------------------------------------------------
   const atual = await selecionar<Lead>(
-    `crm_clinica?select=id,nome_lead,agente_pausado&id=eq.${lead.id}&limit=1`,
+    `crm_clinica?select=${CAMPOS_LEAD}&id=eq.${lead.id}&limit=1`,
   )
   if (atual[0]?.agente_pausado) return
 
@@ -225,7 +238,10 @@ async function processar(
   )
   const fuso = clinica[0]?.fuso_horario || FUSO_PADRAO
 
-  const sistema = await montarPrompt(cfg[0]?.prompt)
+  // A ficha sai do lead RECÉM-LIDO (`atual`), não do que chegou no começo da
+  // execução: nos 8 segundos de espera a Letícia pode ter gravado o nome.
+  const ficha = await montarFicha(lead.id, atual[0] ?? lead, fuso)
+  const sistema = await montarPrompt(cfg[0]?.prompt, ficha)
   const mensagens = await montarHistorico(lead.id, imagem)
   const ctx: Contexto = { leadId: lead.id, whatsapp, fuso }
 
@@ -412,7 +428,7 @@ async function criadaEm(mensagemId: string): Promise<string> {
 
 async function acharOuCriarLead(whatsapp: string, nome?: string): Promise<Lead> {
   const achados = await selecionar<Lead>(
-    `crm_clinica?select=id,nome_lead,agente_pausado&whatsapp_lead=eq.${whatsapp}&limit=1`,
+    `crm_clinica?select=${CAMPOS_LEAD}&whatsapp_lead=eq.${whatsapp}&limit=1`,
   )
   if (achados.length) return achados[0]
 
@@ -425,7 +441,7 @@ async function acharOuCriarLead(whatsapp: string, nome?: string): Promise<Lead> 
 
   // Corrida: outra execução criou entre o select e o insert.
   const denovo = await selecionar<Lead>(
-    `crm_clinica?select=id,nome_lead,agente_pausado&whatsapp_lead=eq.${whatsapp}&limit=1`,
+    `crm_clinica?select=${CAMPOS_LEAD}&whatsapp_lead=eq.${whatsapp}&limit=1`,
   )
   return denovo[0]
 }

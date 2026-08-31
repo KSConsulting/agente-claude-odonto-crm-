@@ -400,7 +400,7 @@ perderia justamente o sinal que ela existe para dar.
 
 ## 7. As ferramentas
 
-O que a Letícia consegue fazer no sistema. Sete coisas — nada além.
+O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
 
 | Ferramenta | Quando ela usa | Já existe? |
 |---|---|---|
@@ -410,6 +410,7 @@ O que a Letícia consegue fazer no sistema. Sete coisas — nada além.
 | `cancelar_consulta` | "preciso desmarcar" | Sim |
 | `ver_minhas_consultas` | Antes de remarcar ou cancelar, e no "que dia mesmo é a minha?" | Sim |
 | `detalhes_do_procedimento` | "como funciona o clareamento?", "tenho medo de doer" | Sim — lê `descricao_longa` de `servicos_clinica` |
+| `historico_do_paciente` | "da última vez", "o que eu fiz mesmo?" | Sim — as consultas realizadas e canceladas |
 | `atualizar_ficha` | Quando descobre nome, procedimento de interesse, ou o funil avança | Escrita direta no CRM |
 
 > ⚠️ **O agente nunca escreve consulta direto no banco.** Sempre pelas funções
@@ -417,6 +418,44 @@ O que a Letícia consegue fazer no sistema. Sete coisas — nada além.
 > de quem está livre e a trava de horário sobreposto — e o paciente descobriria
 > o problema no dia da consulta. Mesma regra da seção "Ao agendar, o agente
 > chama a API" do [`CLAUDE.md`](../CLAUDE.md).
+
+### A memória dela — duas camadas, e uma delas ela mesma escreve
+
+**Ela não tem "conversas".** Não existe sessão, nem começo, nem fim: é uma linha
+do tempo só por número de WhatsApp, para sempre.
+
+| Camada | O que é | Alcance |
+|---|---|---|
+| **Janela** | As últimas **50 mensagens** da tabela `mensagens_whatsapp` | Curto — umas **16 trocas** |
+| **Ficha** | Nome, interesse, resumo e as consultas, montados por `montarFicha()` | **Permanente** |
+
+**Por que 50 mensagens são só 16 trocas:** cada balão é uma linha, e ela responde
+em 2 ou 3. Na conversa de teste real, 10 mensagens do paciente geraram 19 dela.
+
+**A ficha é o que sobra quando a janela acaba.** Um paciente que sumiu por um ano
+volta e ela lembra do nome, do que ele procurava e do que já fez — não porque
+leu a conversa antiga, mas porque a ficha está no fim do prompt.
+
+> ⚠️ **A ficha só existe se ela escrever.** Quem preenche é `atualizar_ficha`,
+> chamada por ela mesma. Na primeira conversa de teste ela gravou o nome e
+> **nada mais** — interesse e resumo ficaram vazios, mesmo depois de falar de
+> lentes e de limpeza. Foi por isso que a regra virou inegociável no prompt.
+> **Se a memória longa falhar, o primeiro lugar para olhar é se a ficha do lead
+> está preenchida.**
+
+O que entra na ficha, e o que fica de fora:
+
+| No prompt, sempre | Pela ferramenta, quando pedem |
+|---|---|
+| Nome | O histórico completo de atendimentos (`historico_do_paciente`) |
+| Se já é paciente da clínica | |
+| Procedimento de interesse | |
+| Resumo da conversa | |
+| **A consulta já marcada** (data, hora, dentista) | |
+| Uma linha de placar: quantas consultas fez e quando foi a última | |
+
+A consulta marcada é a linha mais importante da ficha: **oferecer agendamento a
+quem já tem hora na quinta** é o erro mais constrangedor que ela pode cometer.
 
 ### O que ela sabe sem precisar perguntar
 

@@ -123,6 +123,16 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
     },
   },
   {
+    nome: 'historico_do_paciente',
+    descricao:
+      'Abre o histórico de atendimento deste paciente: o que ele já fez na ' +
+      'clínica, quando, e com qual dentista. Use quando ele falar do passado ' +
+      '("da última vez", "o que eu fiz mesmo?", "aquele tratamento") ou quando ' +
+      'precisar do que já foi feito para responder. Só traz o que já aconteceu ' +
+      '— para consulta futura, use ver_minhas_consultas.',
+    parametros: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     nome: 'atualizar_ficha',
     descricao:
       'Guarda o que você descobriu na conversa. Use assim que souber de algo ' +
@@ -328,6 +338,37 @@ export async function executar(
           // Sem texto longo, devolve o curto. Nunca "não tenho informação" —
           // isso faria a Letícia dizer que não sabe do que a clínica faz.
           detalhes: p.descricao_longa?.trim() || p.descricao || '',
+        }
+      }
+
+      case 'historico_do_paciente': {
+        // Só o que JÁ ACONTECEU. A consulta futura é assunto de
+        // `ver_minhas_consultas`, que devolve o id que remarcar e cancelar
+        // precisam — e misturar as duas faria ela tentar cancelar uma
+        // consulta de 2023.
+        const linhas = await selecionar<{
+          procedimento: string; data_consulta: string; status: string
+          profissional: { nome: string; sobrenome: string } | null
+        }>(
+          `consultas?select=procedimento,data_consulta,status,profissional:profissionais(nome,sobrenome)` +
+          `&lead_id=eq.${ctx.leadId}&status=in.(realizada,cancelada)` +
+          `&order=data_consulta.desc&limit=20`,
+        )
+
+        if (!linhas.length) {
+          return { ok: true, historico: [], mensagem: 'Este paciente ainda não tem atendimento concluído aqui.' }
+        }
+
+        return {
+          ok: true,
+          historico: linhas.map((c) => ({
+            procedimento: c.procedimento,
+            quando: dataHora(c.data_consulta, ctx.fuso),
+            situacao: c.status,
+            dentista: c.profissional
+              ? `${c.profissional.nome} ${c.profissional.sobrenome}`
+              : null,
+          })),
         }
       }
 

@@ -1292,7 +1292,7 @@ Esta é a lista fechada. Nada fora dela é acessado pela função `whatsapp`.
 |---|---|:---:|---|
 | `crm_clinica` | view sobre `crm_clinica_dados` | **lê e grava** | Cria o lead na primeira mensagem, avança `iniciou_conversa` → `conversando`, e grava `nome_lead`, `procedimento_interesse` e `resumo_conversa` pela ferramenta `atualizar_ficha` |
 | `mensagens_whatsapp` | tabela (4.17) | **lê e grava** | A memória da conversa: cada mensagem trocada, dos dois lados. Lê as últimas 30 para montar o histórico |
-| `consultas` | tabela (4.2) | **grava só por função SQL** | Marcar, remarcar e cancelar passam por `agenda_marcar`, `agenda_remarcar` e `agenda_cancelar` (4.11). A leitura é direta, e **só das consultas daquele lead** |
+| `consultas` | tabela (4.2) | **grava só por função SQL** | Marcar, remarcar e cancelar passam por `agenda_marcar`, `agenda_remarcar` e `agenda_cancelar` (4.11). Lê direto, **só as daquele lead**: a consulta futura entra na ficha do prompt, e o histórico sai pela ferramenta `historico_do_paciente` |
 | Storage `midias-whatsapp` | bucket privado (7) | **grava** | O áudio e a foto que o paciente mandou |
 | `informacoes_clinica_agente` | view (4.12) | **só lê** | Nome, endereço, bairro, cidade/UF, CEP, horário de atendimento, Maps, Instagram e site — em frases prontas |
 | `procedimentos_clinica_agente` | view (4.13) | **só lê** | Os procedimentos ativos, um por linha, com a descrição curta |
