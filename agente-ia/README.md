@@ -12,7 +12,7 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 >
 > **O agente está no ar e respondendo** — ligado, em modo teste, só para os
 > números cadastrados. Ligar, desligar, trocar o modelo e editar o prompt já são
-> pela tela: **Configurações → Agente de IA**.
+> pela tela: **menu do usuário → Secretária de IA**.
 >
 > A tela **Conversas** existe em `/conversas`: a equipe lê o que a Letícia
 > respondeu, assume a conversa quando precisa e responde pelo mesmo WhatsApp.
@@ -53,7 +53,7 @@ caminhos próprios. Esta é a lista completa, para ninguém procurar:
 | `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
 | `src/components/ListaConversas.tsx`<br>`src/components/JanelaConversa.tsx` | As duas colunas dessa tela |
-| `src/components/TabAgenteIA.tsx` | A aba de Configurações: modelo e prompt |
+| `src/pages/SecretariaIA.tsx` | A página do menu do usuário: modelo e prompt |
 | `src/lib/conversas.ts` | Ler, enviar, assumir e devolver conversa |
 
 > **Regra:** conteúdo (prompt, exemplos, chaves, documentação) fica **nesta
@@ -83,7 +83,7 @@ com revisão e histórico.
 | 2 | Banco de dados — [`0010_agente_conversas.sql`](../supabase/migrations/0010_agente_conversas.sql) | ✅ |
 | 3 | O cérebro — [`whatsapp/index.ts`](../supabase/functions/whatsapp/index.ts) | ✅ **no ar** |
 | 4 | Página Conversas — [`Conversas.tsx`](../src/pages/Conversas.tsx) | ✅ **no ar** |
-| 5 | Aba "Agente de IA" em Configurações — [`TabAgenteIA.tsx`](../src/components/TabAgenteIA.tsx) | ✅ **no ar** |
+| 5 | Tela "Secretária de IA" — [`SecretariaIA.tsx`](../src/pages/SecretariaIA.tsx) | ✅ **no ar** |
 | 6 | Documentação e verificação | ⬜ |
 
 ---
@@ -278,7 +278,7 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `src/components/PainelLead.tsx` | 4 | Coluna extra: ficha da pessoa, consultas e a foto do WhatsApp |
 | `src/lib/statusLead.ts` | 4 | Cores e rótulos de status, para código novo não fazer a quinta cópia |
 | `src/lib/agente.ts` | 4 | Como ela se chama **na tela** — separado de como se apresenta ao paciente |
-| `src/components/TabAgenteIA.tsx` | 5 | Aba de Configurações: modelo, prompt, liga/desliga |
+| `src/pages/SecretariaIA.tsx` | 5 | Página do menu do usuário: modelo, prompt, liga/desliga |
 | `src/components/EditorProcedimento.tsx` | 5 | Modal de edição do procedimento: as duas descrições, com as réguas |
 | `src/components/ModalPortal.tsx` | 5 | Leva o modal para o `<body>` — ver Convenções no [`CLAUDE.md`](../CLAUDE.md) |
 | `supabase/migrations/0011_procedimentos_detalhados.sql` | 5 | A coluna `descricao_longa` e os 20 textos |
@@ -482,7 +482,7 @@ prompt, seriam cobrados de toda mensagem, inclusive a de quem só mandou "oi",
 para carregar 19 explicações que aquela conversa nunca vai usar. Fora dele, o
 prompt continua nos mesmos **1.961 caracteres** de antes de a coluna existir.
 
-Quem escreve esses textos é a equipe, em **Configurações → Procedimentos →
+Quem escreve esses textos é a equipe, na página **Procedimentos →
 Editar** ([`EditorProcedimento.tsx`](../src/components/EditorProcedimento.tsx)),
 onde a tela avisa qual campo é cobrado em toda conversa e qual não é.
 

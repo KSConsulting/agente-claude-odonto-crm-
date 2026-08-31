@@ -11,6 +11,9 @@ import Leads from './pages/Leads'
 import Clientes from './pages/Clientes'
 import LeadDetail from './pages/LeadDetail'
 import Configuracoes from './pages/Configuracoes'
+import Procedimentos from './pages/Procedimentos'
+import SecretariaIA from './pages/SecretariaIA'
+import TokenApi from './pages/TokenApi'
 
 export default function App() {
   return (
@@ -25,6 +28,9 @@ export default function App() {
             <Route path="/conversas" element={<Conversas />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/profissionais" element={<Profissionais />} />
+            <Route path="/procedimentos" element={<Procedimentos />} />
+            <Route path="/secretaria-ia" element={<SecretariaIA />} />
+            <Route path="/token-api" element={<TokenApi />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/leads/:id" element={<LeadDetail />} />

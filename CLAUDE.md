@@ -160,8 +160,6 @@ src/
 │   ├── NovoAgendamentoModal.tsx  criar consulta; cria o paciente se não existir
 │   ├── CampoTelefone.tsx       seletor de país + contagem de dígitos
 │   ├── TabClinica.tsx          aba "Clínica" de Configurações
-│   ├── TabTokenApi.tsx         aba "Token e API" de Configurações
-│   ├── TabAgenteIA.tsx         aba "Agente de IA" de Configurações
 │   ├── EditorProcedimento.tsx  modal de edição de um procedimento
 │   ├── ModalPortal.tsx         leva o modal para o <body> (ver Convenções)
 │   ├── ListaConversas.tsx      coluna esquerda de /conversas
@@ -178,7 +176,10 @@ src/
     ├── Leads.tsx               invólucro: <PessoasPage mode="leads" />
     ├── Clientes.tsx            invólucro: <PessoasPage mode="clientes" />
     ├── LeadDetail.tsx          ficha do lead + consultas + anotações
-    └── Configuracoes.tsx       perfil, clínica, horários, procedimentos, tokens
+    ├── Procedimentos.tsx       o catálogo da clínica
+    ├── SecretariaIA.tsx        o Agente de IA: modelo, prompt, liga/desliga
+    ├── TokenApi.tsx            chaves de acesso e o contrato da API
+    └── Configuracoes.tsx       perfil, clínica e horários
 ```
 
 ### A agenda não é uma entidade
@@ -241,9 +242,33 @@ componente quebra o Fast Refresh (o ESLint acusa isso).
 /clientes           Pacientes (Clientes)   │ e de Layout (Sidebar)
 /leads/:id          Detalhe da pessoa      │
 /profissionais      Profissionais          │
+/procedimentos      Procedimentos          │
+/secretaria-ia      Secretária de IA       │
+/token-api          Token e API            │
 /configuracoes      Configurações          ┘
 *                   redireciona para /
 ```
+
+### O que é barra lateral e o que é menu do usuário
+
+A navegação está dividida por **quem usa e com que frequência**:
+
+| Lugar | O que fica lá |
+|---|---|
+| **Barra lateral** | O dia a dia da recepção: Dashboard, CRM, Conversas, Agenda, Leads, Clientes, Profissionais, Procedimentos, Configurações |
+| **Menu do nome** (rodapé) | O sistema: **Secretária de IA**, **Token e API**, Sair |
+
+As três primeiras eram abas de Configurações. Saíram de lá por motivos
+diferentes:
+
+- **Procedimentos** virou página porque não é configuração — é conteúdo da
+  clínica, mexido na mesma frequência que Profissionais, e é o texto que a
+  Secretária de IA fala com o paciente. Fica logo depois de Profissionais.
+- **Secretária de IA** e **Token e API** foram para o menu do nome porque são
+  ajustes do sistema, não da clínica: quem liga o agente ou cria uma chave de
+  API não é quem atende o telefone. Enterrar as duas numa aba de Configurações
+  escondia demais; deixar na barra lateral atrapalharia quem passa o dia na
+  Agenda.
 
 > `/leads/:id` atende **tanto leads quanto pacientes** — é a mesma entidade. O
 > botão "voltar" da tela de detalhe decide o destino pelo status, para não jogar
@@ -487,11 +512,11 @@ Problemas reais que já existiam e ainda não foram tratados. Não são regress�
 ### ESLint acusa 10 erros
 
 - **5x — `ErrorMsg` declarado dentro do render** em
-  [`Configuracoes.tsx:180`](src/pages/Configuracoes.tsx#L180). Não é só estilo:
+  [`Configuracoes.tsx:192`](src/pages/Configuracoes.tsx#L192). Não é só estilo:
   componentes criados durante o render são recriados a cada renderização e
   **perdem o estado**. É um bug esperando acontecer. A correção é mover a
   declaração para fora do componente.
-- **5x — uso de `any`** em `CRM.tsx`, `Configuracoes.tsx` e `Dashboard.tsx`,
+- **5x — uso de `any`** em `CRM.tsx`, `Dashboard.tsx` e `Procedimentos.tsx`,
   além de uma variável não utilizada (`_e` em `CRM.tsx:123`).
 
 ### Bundle de 2.2 MB (812 KB gzip)
@@ -652,9 +677,9 @@ monta a frase.
 Mudou uma, mude a outra — se divergirem, o agente oferece horário que a recepção
 vê como ocupado.
 
-### Os tokens saem de Configurações → Token e API
+### Os tokens saem do menu do usuário → Token e API
 
-A aba é [`TabTokenApi.tsx`](src/components/TabTokenApi.tsx), com a geração e o
+A página é [`TokenApi.tsx`](src/pages/TokenApi.tsx), com a geração e o
 catálogo de endpoints em [`src/lib/apiTokens.ts`](src/lib/apiTokens.ts). Ela
 cria, revoga, mostra status e último acesso, e traz a documentação dos sete
 endpoints com os cURLs prontos para colar em qualquer cliente HTTP.

@@ -111,7 +111,7 @@ Saem **sempre em UTC**, no ISO completo que o PostgREST usa para `timestamptz`:
 
 ## 2. Autenticação
 
-Cabeçalho próprio, com token gerado em **Configurações → Token e API**:
+Cabeçalho próprio, com token gerado no **menu do usuário → Token e API**:
 
 ```
 X-Api-Key: odk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -514,9 +514,9 @@ teve acesso e quando não desaparecer.
 token, não a cada chamada — senão cada consulta de disponibilidade viraria
 também uma escrita.
 
-### Tela: Configurações → Token e API
+### Tela: menu do usuário → Token e API
 
-Implementada em [`TabTokenApi.tsx`](src/components/TabTokenApi.tsx), com a
+Implementada em [`TokenApi.tsx`](src/pages/TokenApi.tsx), com a
 geração e o catálogo de endpoints em
 [`src/lib/apiTokens.ts`](src/lib/apiTokens.ts).
 

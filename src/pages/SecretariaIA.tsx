@@ -3,7 +3,7 @@ import {
   Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, RotateCcw, FileText,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import CampoTelefone from './CampoTelefone'
+import CampoTelefone from '../components/CampoTelefone'
 import { formatarParaExibicao } from '../lib/telefones'
 import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
 import type { ConfiguracoesAgente, ModeloAgente } from '../types'
@@ -76,7 +76,7 @@ function Erro({ texto }: { texto: string }) {
   )
 }
 
-export default function TabAgenteIA() {
+export default function SecretariaIA() {
   const [cfg, setCfg] = useState<ConfiguracoesAgente | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -186,7 +186,13 @@ export default function TabAgenteIA() {
   const usandoOficial = !cfg.prompt
 
   return (
-    <div>
+    <div style={{ padding: '32px 36px', maxWidth: 900, margin: '0 auto' }}>
+
+      <div className="fade-in-1" style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>Secretária de IA</h1>
+        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>Ligar, desligar, escolher o modelo e ajustar o que ela sabe dizer.</p>
+      </div>
+
       {/* ---------------- Estado ---------------- */}
       <div style={{ ...cartao, borderColor: ativo ? '#A7D8C0' : '#DCE6EA' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>

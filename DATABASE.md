@@ -573,7 +573,7 @@ linhas duplicadas fariam todas menos a primeira serem ignoradas em silêncio.
 
 Catálogo de procedimentos oferecidos.
 
-**Usada em:** `Configuracoes.tsx` e o endpoint `GET /procedimentos` da API do
+**Usada em:** `Procedimentos.tsx` e o endpoint `GET /procedimentos` da API do
 Agente de IA — que devolve **só o nome**, sem `id` nem descrição.
 
 | Coluna | Tipo | Nulo | Default |
@@ -755,7 +755,7 @@ disponibilidade da API.
 Chaves de acesso da API do Agente de IA. Contrato completo em
 [`API_AGENTE.md`](API_AGENTE.md).
 
-**Usada em:** `TabTokenApi.tsx` (Configurações → Token e API), que cria e revoga;
+**Usada em:** `TokenApi.tsx` (menu do usuário → Token e API), que cria e revoga;
 e pela Edge Function, via `api_token_valido()`, a cada chamada.
 
 | Coluna | Tipo | Nulo | Default | Observação |

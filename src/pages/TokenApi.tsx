@@ -3,7 +3,7 @@ import { Plus, X, Check, Copy, Ban, KeyRound } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { ApiToken } from '../types'
 import { ENDPOINTS, BASE_API, gerarToken, hashToken, prefixoDe, montarCurl } from '../lib/apiTokens'
-import ConfirmDeleteModal from './ConfirmDeleteModal'
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 
 /**
  * Aba "Token e API" de Configurações: as chaves de acesso do Agente de IA e a
@@ -47,7 +47,7 @@ function formatarData(iso: string | null): string {
   })
 }
 
-export default function TabTokenApi() {
+export default function TokenApi() {
   const [tokens, setTokens] = useState<ApiToken[]>([])
   const [criadores, setCriadores] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -153,7 +153,13 @@ export default function TabTokenApi() {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6B818C' }}>Carregando...</div>
 
   return (
-    <div>
+    <div style={{ padding: '32px 36px', maxWidth: 900, margin: '0 auto' }}>
+
+      <div className="fade-in-1" style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>Token e API</h1>
+        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>As chaves de acesso da agenda para sistemas de fora, e o contrato dos sete endpoints.</p>
+      </div>
+
       {/* ═══════════════ TOKENS ═══════════════ */}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>

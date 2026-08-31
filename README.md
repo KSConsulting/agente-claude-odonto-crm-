@@ -189,7 +189,7 @@ E já deixa cadastrados o horário comercial padrão e os **20 procedimentos** d
 clínica — todos editáveis depois pela tela de Configurações. Profissionais não
 vêm de exemplo: cadastre os seus na tela **Profissionais**, e a agenda de cada
 um nasce junto. Tokens também começam vazios: crie o primeiro em
-**Configurações → Token e API**, senão a API responde 401 para quem chamar.
+no **menu do usuário → Token e API**, senão a API responde 401 para quem chamar.
 
 ### 4. Configurar as variáveis de ambiente
 
@@ -292,7 +292,7 @@ existe, e só cai no `index.html` quando não existe.
 1. Entrar com um usuário e chegar no Dashboard
 2. Abrir `/agenda` **digitando na barra de endereço** — é o teste do rewrite
 3. Dar F5 dentro de uma ficha de paciente
-4. Configurações → Token e API: a URL dos cURLs tem que apontar para o seu
+4. Menu do usuário → Token e API: a URL dos cURLs tem que apontar para o seu
    projeto do Supabase, e não para `undefined`
 
 > A Edge Function da API **não** vai para a Vercel — ela roda no Supabase e
@@ -566,9 +566,10 @@ O fluxo completo está na seção 8 do [`DATABASE.md`](DATABASE.md).
 odonto-clinica/
 ├── src/
 │   ├── components/       Sidebar, Layout, rota protegida, pessoas, calendário,
-│   │                     aba Token e API
-│   ├── pages/            Login, Dashboard, CRM, Agenda, Profissionais, Leads,
-│   │                     Clientes, Ficha, Configurações
+│   │                     modais e as colunas da tela Conversas
+│   ├── pages/            Login, Dashboard, CRM, Conversas, Agenda, Profissionais,
+│   │                     Procedimentos, Leads, Clientes, Ficha, Secretária de IA,
+│   │                     Token e API, Configurações
 │   ├── lib/              Supabase, regra Lead × Paciente, cores, agenda,
 │   │                     telefones e tokens da API
 │   ├── types/            tipos espelhando o schema do banco
