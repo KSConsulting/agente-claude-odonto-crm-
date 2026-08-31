@@ -229,6 +229,16 @@ Três decisões que ficaram de pé:
 -   **Assumir pausa uma conversa, não o agente.** Ela continua atendendo todo
     mundo; só naquele número fica calada. Quem desliga o agente inteiro é a aba
     de Configurações.
+-   **O painel da direita abre e fecha**, e a escolha fica gravada no navegador.
+    Ele mostra a ficha que a Letícia vai preenchendo: nome, interesse, resumo e
+    as consultas. **O nome só aparece depois que a pessoa disser como se chama**
+    — até lá o painel explica isso, em vez de mostrar um campo vazio que parece
+    defeito.
+-   **A foto do perfil vem da Evolution, e não é guardada.** A URL é do CDN do
+    WhatsApp e expira; e a foto é da pessoa, não da clínica. Falta na maioria
+    dos casos, por privacidade — aí fica a inicial. Passa pela rota `GET /foto`
+    da função porque a chave da Evolution é de servidor: no navegador, ela iria
+    para o bundle, e quem tem essa chave manda mensagem por aquele WhatsApp.
 
 ### Etapa 5 — Aba "Agente de IA"
 
@@ -257,6 +267,8 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `supabase/migrations/0013_conversas_lista.sql` | 4 | A view `conversas_lista`: última mensagem, não lidas e quem assumiu |
 | `src/components/ListaConversas.tsx` | 4 | Coluna esquerda: busca, prévia, não lidas, quem assumiu |
 | `src/components/JanelaConversa.tsx` | 4 | Coluna direita: balões, cabeçalho e caixa de digitar |
+| `src/components/PainelLead.tsx` | 4 | Coluna extra: ficha da pessoa, consultas e a foto do WhatsApp |
+| `src/lib/statusLead.ts` | 4 | Cores e rótulos de status, para código novo não fazer a quinta cópia |
 | `src/components/TabAgenteIA.tsx` | 5 | Aba de Configurações: modelo, prompt, liga/desliga |
 | `src/components/EditorProcedimento.tsx` | 5 | Modal de edição do procedimento: as duas descrições, com as réguas |
 | `src/components/ModalPortal.tsx` | 5 | Leva o modal para o `<body>` — ver Convenções no [`CLAUDE.md`](../CLAUDE.md) |
@@ -565,6 +577,14 @@ Precisa de um **Personal Access Token** do Supabase
 npm run agente:secrets   # sobe as chaves de agente-ia/.env.agente.local
 npm run agente:deploy    # regera o prompt e publica a função
 ```
+
+> **Deploy com 401 `Unauthorized` quer dizer token, não código.** O CLI usa a
+> sessão do `supabase login`, que expira; o token do arquivo não entra sozinho.
+> Exporte antes:
+>
+> ```bash
+> export SUPABASE_ACCESS_TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .supabase-token.local | cut -d= -f2-)
+> ```
 
 Depois, apontar o webhook da Evolution para a função, com o segredo no
 cabeçalho (`POST {EVOLUTION_API_URL}/webhook/set/{instancia}`):

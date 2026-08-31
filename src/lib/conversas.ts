@@ -1,5 +1,13 @@
 import { supabase } from './supabase'
-import type { ConversaResumo, MensagemWhatsapp, TipoMensagem, AutorMensagem } from '../types'
+import type {
+  ConversaResumo, MensagemWhatsapp, TipoMensagem, AutorMensagem,
+  LeadClinica, Consulta, Profissional,
+} from '../types'
+
+/** Consulta com o dentista já resolvido pelo join. */
+export interface ConsultaComProfissional extends Consulta {
+  profissional: Pick<Profissional, 'nome' | 'sobrenome' | 'cor'> | null
+}
 
 /**
  * Tudo que a tela Conversas faz com o banco e com a Edge Function.
@@ -176,4 +184,57 @@ export function quandoCurto(iso: string): string {
   if (d.toDateString() === ontem.toDateString()) return 'Ontem'
 
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
+/**
+ * Os dados completos do lead, para o painel lateral.
+ *
+ * A view `conversas_lista` traz só o que a lista da esquerda precisa. O painel
+ * quer mais: interesse, resumo, quando chegou, anotações.
+ */
+export async function carregarLead(leadId: string): Promise<LeadClinica | null> {
+  const { data } = await supabase
+    .from('crm_clinica')
+    .select('*')
+    .eq('id', leadId)
+    .maybeSingle()
+
+  return (data as LeadClinica) ?? null
+}
+
+/** As consultas da pessoa, da mais recente para a mais antiga. */
+export async function carregarConsultas(leadId: string): Promise<ConsultaComProfissional[]> {
+  const { data } = await supabase
+    .from('consultas')
+    .select('*, profissional:profissionais(nome, sobrenome, cor)')
+    .eq('lead_id', leadId)
+    .order('data_consulta', { ascending: false })
+
+  return (data ?? []) as ConsultaComProfissional[]
+}
+
+/**
+ * A foto de perfil do WhatsApp.
+ *
+ * Passa pela Edge Function porque a chave da Evolution é de servidor: pedir a
+ * foto direto do navegador exigiria mandá-la para o bundle, e quem tem essa
+ * chave manda mensagem por aquele WhatsApp.
+ *
+ * `null` é resposta comum e esperada — muita gente esconde a foto.
+ */
+export async function fotoDoPerfil(whatsapp: string): Promise<string | null> {
+  try {
+    const { data: sessao } = await supabase.auth.getSession()
+    const token = sessao.session?.access_token
+    if (!token) return null
+
+    const r = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp/foto?whatsapp=${whatsapp}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    const dados = await r.json()
+    return dados?.url ?? null
+  } catch {
+    return null
+  }
 }

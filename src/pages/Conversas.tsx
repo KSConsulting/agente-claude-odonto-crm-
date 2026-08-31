@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ListaConversas from '../components/ListaConversas'
 import JanelaConversa from '../components/JanelaConversa'
+import PainelLead from '../components/PainelLead'
 import {
   listarConversas, carregarMensagens, enviarMensagem,
   assumirConversa, devolverConversa, marcarComoLidas,
@@ -32,6 +33,20 @@ export default function Conversas() {
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
   const [usuarioId, setUsuarioId] = useState<string | null>(null)
+
+  // Aberto ou fechado é preferência de quem usa, e sobrevive ao F5. Se falhar
+  // (navegador anônimo, site data bloqueado), abre — que é o padrão útil.
+  const [painelAberto, setPainelAberto] = useState(() => {
+    try { return localStorage.getItem('conversas.painel') !== 'fechado' } catch { return true }
+  })
+
+  function alternarPainel() {
+    setPainelAberto((antes) => {
+      const agora = !antes
+      try { localStorage.setItem('conversas.painel', agora ? 'aberto' : 'fechado') } catch { /* segue */ }
+      return agora
+    })
+  }
 
   // O callback do Realtime é criado uma vez e enxergaria para sempre o valor
   // inicial de `selecionada`. O ref é o que o mantém em dia.
@@ -157,7 +172,14 @@ export default function Conversas() {
         onEnviar={aoEnviar}
         onAssumir={aoAssumir}
         onDevolver={aoDevolver}
+        painelAberto={painelAberto}
+        onAlternarPainel={alternarPainel}
       />
+      {painelAberto && aberta && (
+        // A `key` força a remontagem ao trocar de conversa: sem ela, o painel
+        // reaproveitaria o estado anterior e mostraria a foto de quem já saiu.
+        <PainelLead key={aberta.lead_id} leadId={aberta.lead_id} onFechar={alternarPainel} />
+      )}
     </div>
   )
 }

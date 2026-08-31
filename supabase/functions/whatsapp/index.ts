@@ -3,9 +3,11 @@
  *
  * Documentação: agente-ia/README.md
  *
- * DUAS ROTAS:
- *   POST /whatsapp          webhook da Evolution (autenticado por WEBHOOK_SEGREDO)
- *   POST /whatsapp/enviar   envio manual do atendente (autenticado pela sessão)
+ * AS ROTAS:
+ *   POST /whatsapp                 webhook da Evolution (WEBHOOK_SEGREDO)
+ *   POST /whatsapp/enviar          envio manual do atendente (sessão)
+ *   GET  /whatsapp/prompt-oficial  o prompt publicado, para a tela comparar (sessão)
+ *   GET  /whatsapp/foto            foto de perfil de um número (sessão)
  *
  * PUBLICADA COM `--no-verify-jwt`, igual à `agenda/`: quem chama é a Evolution,
  * que não tem sessão do Supabase. A autenticação é nossa. Reimplantar no padrão
@@ -21,7 +23,7 @@ import { conversar, transcrever, type MensagemLLM, type Parte } from '../_shared
 import { montarPrompt } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
-import { digitando, enviarTexto, baixarMidia, numeroDoJid } from '../_shared/evolution.ts'
+import { digitando, enviarTexto, baixarMidia, numeroDoJid, fotoDoPerfil } from '../_shared/evolution.ts'
 
 const SEGREDO = Deno.env.get('WEBHOOK_SEGREDO') ?? ''
 const URL_SUPABASE = Deno.env.get('SUPABASE_URL')!
@@ -75,6 +77,7 @@ Deno.serve(async (req) => {
   try {
     if (req.method === 'POST' && rota === '/enviar') return await rotaEnviar(req)
     if (req.method === 'GET' && rota === '/prompt-oficial') return await rotaPromptOficial(req)
+    if (req.method === 'GET' && rota === '/foto') return await rotaFoto(req)
     if (req.method === 'POST' && (rota === '' || rota === '/')) return await rotaWebhook(req)
     return json({ ok: false, motivo: 'rota_desconhecida' }, 404)
   } catch (e) {
@@ -309,6 +312,26 @@ async function rotaPromptOficial(req: Request): Promise<Response> {
   const usuario = await usuarioDaSessao(req)
   if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
   return json({ ok: true, prompt: PROMPT_OFICIAL })
+}
+
+/**
+ * A foto de perfil de um número, para a tela Conversas.
+ *
+ * PRECISA PASSAR PELA FUNÇÃO. A chave da Evolution é de servidor: pedir a foto
+ * direto do navegador exigiria mandar a chave para o bundle, e quem tem essa
+ * chave manda mensagem por aquele WhatsApp.
+ *
+ * Responde 200 com `url: null` quando não há foto — a maioria dos casos, porque
+ * muita gente esconde a foto. Isso não é erro, e a tela mostra a inicial.
+ */
+async function rotaFoto(req: Request): Promise<Response> {
+  const usuario = await usuarioDaSessao(req)
+  if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
+
+  const numero = (new URL(req.url).searchParams.get('whatsapp') ?? '').replace(/\D/g, '')
+  if (!numero) return json({ ok: false, motivo: 'sem_numero' }, 400)
+
+  return json({ ok: true, url: await fotoDoPerfil(numero) })
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Send, UserCheck, Undo2, Bot, ExternalLink, MessagesSquare, FileText } from 'lucide-react'
+import {
+  Send, UserCheck, Undo2, Bot, ExternalLink, MessagesSquare, FileText,
+  PanelRightOpen, PanelRightClose,
+} from 'lucide-react'
 import { formatarParaExibicao } from '../lib/telefones'
 import { urlDaMidia, hora, diaPorExtenso, nomeDoAutor } from '../lib/conversas'
 import type { ConversaResumo, MensagemWhatsapp, AutorMensagem } from '../types'
@@ -138,10 +141,13 @@ interface Props {
   onEnviar: (texto: string) => void
   onAssumir: () => void
   onDevolver: () => void
+  painelAberto: boolean
+  onAlternarPainel: () => void
 }
 
 export default function JanelaConversa({
   conversa, mensagens, carregando, enviando, erro, onEnviar, onAssumir, onDevolver,
+  painelAberto, onAlternarPainel,
 }: Props) {
   const [texto, setTexto] = useState('')
   const fim = useRef<HTMLDivElement | null>(null)
@@ -236,6 +242,16 @@ export default function JanelaConversa({
             <UserCheck size={13} /> Assumir conversa
           </button>
         )}
+
+        <button onClick={onAlternarPainel}
+          title={painelAberto ? 'Esconder os dados da pessoa' : 'Ver os dados da pessoa'}
+          style={{
+            display: 'flex', alignItems: 'center', padding: 8, borderRadius: 9,
+            border: '1px solid #DCE6EA', background: painelAberto ? '#EAF3F6' : '#fff',
+            cursor: 'pointer', color: painelAberto ? '#1E6E8C' : '#6B818C', flexShrink: 0,
+          }}>
+          {painelAberto ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+        </button>
       </div>
 
       {/* Quem está atendendo */}

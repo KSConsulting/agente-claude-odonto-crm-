@@ -73,3 +73,25 @@ export async function baixarMidia(
 export function numeroDoJid(jid: string): string {
   return (jid ?? '').split('@')[0].split(':')[0].replace(/\D/g, '')
 }
+
+/**
+ * A foto de perfil do WhatsApp da pessoa.
+ *
+ * NÃO GUARDAMOS ESSA FOTO. A URL que a Evolution devolve é do CDN do WhatsApp
+ * e expira; e a foto é da pessoa, não da clínica — copiar para o nosso Storage
+ * seria guardar retrato de paciente sem ninguém ter pedido.
+ *
+ * Devolve `null` com frequência, e isso é normal: muita gente esconde a foto
+ * nas configurações de privacidade. Quem chama precisa ter um plano B.
+ */
+export async function fotoDoPerfil(numero: string): Promise<string | null> {
+  try {
+    const r = await chamar<{ profilePictureUrl?: string | null }>(
+      'chat/fetchProfilePictureUrl',
+      { number: numero },
+    )
+    return r?.profilePictureUrl ?? null
+  } catch {
+    return null
+  }
+}

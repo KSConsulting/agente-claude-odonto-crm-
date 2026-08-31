@@ -145,6 +145,7 @@ src/
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 │   ├── conversas.ts            ler, enviar, assumir e devolver conversa
+│   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
@@ -164,6 +165,7 @@ src/
 │   ├── ModalPortal.tsx         leva o modal para o <body> (ver Convenções)
 │   ├── ListaConversas.tsx      coluna esquerda de /conversas
 │   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
+│   ├── PainelLead.tsx          coluna extra: ficha da pessoa, com abrir/esconder
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -466,8 +468,19 @@ splitting.
 
 ### Duplicação das cores de status
 
-O mesmo mapa está repetido em quatro arquivos. Deveria ser um módulo único
-compartilhado.
+[`src/lib/statusLead.ts`](src/lib/statusLead.ts) é a fonte, e **código novo
+importa de lá**. As quatro cópias antigas continuam de pé:
+
+| Arquivo | Formato | Por que ainda não migrou |
+|---|---|---|
+| `LeadDetail.tsx` | `{bg, color, pulse}` | Idêntico ao módulo — migração mecânica |
+| `PessoasPage.tsx` | `{bg, color, pulse}` | Idêntico ao módulo — migração mecânica |
+| `Dashboard.tsx` | `{bg, text, dot}` + rótulos **curtos** | "Agendada" em vez de "Consulta Agendada", porque o rótulo longo estoura o gráfico |
+| `CRM.tsx` | array | Também define a **ordem das colunas** do Kanban |
+
+Os dois primeiros trocam por um `import`. Os dois últimos exigem decidir o que
+fazer com os rótulos curtos e com a ordem do Kanban — e isso é tarefa própria,
+não efeito colateral de outra.
 
 ### Arquivos mortos
 
