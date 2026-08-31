@@ -83,7 +83,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **doze arquivos, nesta ordem**:
+A migração é aplicada em **treze arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -94,7 +94,8 @@ profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0009_profissionais_view.sql` (a view de profissionais e a `jornada_texto()`),
 `0010_agente_conversas.sql` (as conversas do WhatsApp e as configurações do
 agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
-`0012_procedimentos_texto_enxuto.sql` (os textos longos, reescritos curtos).
+`0012_procedimentos_texto_enxuto.sql` (os textos longos, reescritos curtos) e
+`0013_conversas_lista.sql` (a view que sustenta a tela Conversas).
 
 Os pontos que mais causam erro:
 
@@ -143,6 +144,7 @@ src/
 │   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
+│   ├── conversas.ts            ler, enviar, assumir e devolver conversa
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
@@ -160,11 +162,14 @@ src/
 │   ├── TabAgenteIA.tsx         aba "Agente de IA" de Configurações
 │   ├── EditorProcedimento.tsx  modal de edição de um procedimento
 │   ├── ModalPortal.tsx         leva o modal para o <body> (ver Convenções)
+│   ├── ListaConversas.tsx      coluna esquerda de /conversas
+│   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
     ├── Dashboard.tsx           métricas, gráficos, próximas consultas
     ├── CRM.tsx                 Kanban do funil (drag and drop)
+    ├── Conversas.tsx           o WhatsApp da clínica, em duas colunas
     ├── Agenda.tsx              calendário de todas as agendas + filtros
     ├── Profissionais.tsx       dentistas: nome, cor e jornada
     ├── Leads.tsx               invólucro: <PessoasPage mode="leads" />
@@ -227,6 +232,7 @@ componente quebra o Fast Refresh (o ESLint acusa isso).
 /login              público
 /                   Dashboard              ┐
 /crm                CRM (Kanban)           │
+/conversas          Conversas (WhatsApp)   │
 /agenda             Agenda (calendário)    │
 /leads              Contatos (Leads)       │ dentro de ProtectedRoute
 /clientes           Pacientes (Clientes)   │ e de Layout (Sidebar)

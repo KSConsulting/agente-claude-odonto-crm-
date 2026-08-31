@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList } from 'lucide-react'
+import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList, MessagesSquare } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
 import { formatarParaExibicao } from '../lib/telefones'
@@ -362,6 +362,13 @@ export default function LeadDetail() {
               )}
             </div>
           </div>
+
+          {lead.whatsapp_lead && (
+            <button onClick={() => navigate(`/conversas?lead=${lead.id}`)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 15px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1E6E8C', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap' }}>
+              <MessagesSquare size={14} /> Ver conversa
+            </button>
+          )}
         </div>
       </div>
 

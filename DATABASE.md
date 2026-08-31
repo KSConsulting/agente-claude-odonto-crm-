@@ -65,6 +65,9 @@ ordem**:
 12. `supabase/migrations/0012_procedimentos_texto_enxuto.sql` — os mesmos 20
     textos, reescritos mais curtos (~430 caracteres) e sem travessão. Só
     conteúdo; nada de schema. Ver [4.6](#46-servicos_clinica).
+13. `supabase/migrations/0013_conversas_lista.sql` — a view
+    `conversas_lista`, que sustenta a coluna da esquerda da tela Conversas.
+    Ver [4.18](#418-conversas_lista-view-migração-0013).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -190,6 +193,7 @@ erDiagram
 | `informacoes_clinica_agente` | **view** | Os dados da clínica em frases prontas, uma por linha, para o Agente de IA (ver 4.12) |
 | `procedimentos_clinica_agente` | **view** | Os procedimentos ativos, um por linha, para o Agente de IA (ver 4.13) |
 | `profissionais_clinica_agente` | **view** | Os dentistas ativos e a jornada de cada um, um por linha, para o Agente de IA (ver 4.14) |
+| `conversas_lista` | **view** | Uma linha por conversa do WhatsApp, para a tela Conversas (ver 4.18) |
 | `horario_comercial` | tabela | Grade de atendimento, 1 linha por dia |
 | `servicos_clinica` | tabela | Catálogo de procedimentos |
 
@@ -1032,6 +1036,68 @@ Três colunas novas em `crm_clinica_dados`: `agente_pausado`, `assumido_por` e
 
 ---
 
+### 4.18. `conversas_lista` (view, migração `0013`)
+
+A coluna da esquerda da tela **Conversas**: uma linha por pessoa que já trocou
+mensagem, com a última frase, quantas estão sem ler e quem assumiu.
+
+**Usada por:** [`src/lib/conversas.ts`](src/lib/conversas.ts) e, por ela,
+[`ListaConversas.tsx`](src/components/ListaConversas.tsx). O Agente de IA
+**não** lê esta view — ela é de tela, não de conversa.
+
+| Coluna | Vem de |
+|---|---|
+| `lead_id`, `nome_lead`, `whatsapp_lead`, `status` | `crm_clinica_dados` |
+| `agente_pausado`, `assumido_por`, `assumido_em` | `crm_clinica_dados` |
+| `assumido_por_nome` | join com `usuarios` |
+| `ultimo_conteudo`, `ultimo_tipo`, `ultimo_autor`, `ultima_em` | a última linha de `mensagens_whatsapp` |
+| `nao_lidas` | contagem em `mensagens_whatsapp`, só `autor = 'paciente'` |
+
+#### Por que é view, e não consulta na tela
+
+O que a lista precisa é **a última mensagem de cada conversa** — um
+`distinct on`, que o PostgREST não sabe pedir. Sem a view, a tela teria duas
+saídas ruins: uma consulta por conversa (N+1 a cada atualização, e a lista
+atualiza a cada mensagem que chega) ou baixar todas as mensagens de todo mundo
+para descartar 95% no navegador.
+
+Ela é calculada na leitura, como `crm_clinica` e as três views do agente. O
+estado "desatualizada" não existe.
+
+#### Três detalhes que a definem
+
+1. **`join lateral` sem `left`, de propósito.** Quem nunca trocou mensagem não é
+   uma conversa, e não aparece na lista. Um lead cadastrado na mão pela recepção
+   fica de fora até alguém escrever.
+2. **`security_invoker = true`**, pelo mesmo motivo de `crm_clinica`. Sem isso a
+   view rodaria com os poderes de quem a criou, e a `anon key` — que é pública,
+   vai no bundle do site — leria as conversas de todos os pacientes sem sessão.
+3. **Sem `order by` embutido.** A ordem natural é `order=ultima_em.desc`, e quem
+   consulta é que pede: `order by` dentro de view é ignorado por qualquer
+   consulta que ordene por cima, e dá a falsa impressão de estar garantido.
+
+#### Desempenho
+
+Os três índices que ela usa já vieram da `0010`, e não por acaso:
+
+| Índice | Serve a |
+|---|---|
+| `mensagens_whatsapp_conversa_idx` (`lead_id, criada_em`) | O `limit 1` da última mensagem |
+| `mensagens_whatsapp_nao_lidas_idx` (parcial) | A contagem de não lidas |
+| `mensagens_whatsapp_recentes_idx` (`criada_em desc`) | A ordenação da lista |
+
+> ⚠️ **Realtime não assina view.** A tela assina as TABELAS
+> `mensagens_whatsapp` e `crm_clinica_dados`, e **relê** esta view quando algo
+> chega. Assinar a view não dá erro: simplesmente nunca dispara — a mesma
+> armadilha de `crm_clinica` (seção 8.6).
+
+> **Por que reler em vez de remendar com o payload.** O evento traz a linha da
+> tabela; a lista precisa da última mensagem, do contador de não lidas e do nome
+> de quem assumiu — três coisas calculadas na view. É a mesma decisão da Agenda,
+> que recarrega o período em vez de aplicar o payload.
+
+---
+
 ## 5. Status do funil
 
 `crm_clinica_dados.status` aceita exatamente estes 9 valores, garantidos por
@@ -1493,7 +1559,7 @@ Lista do que quebra este banco de formas não óbvias:
 Depois de rodar a migração, confira se está tudo de pé:
 
 ```sql
--- Objetos criados (esperado: 12 tabelas + 4 views)
+-- Objetos criados (esperado: 12 tabelas + 5 views)
 select table_name, table_type from information_schema.tables
 where table_schema = 'public' order by table_name;
 

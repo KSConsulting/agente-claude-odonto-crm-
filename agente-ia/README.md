@@ -4,7 +4,7 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 
 **Esta pasta é o ponto de partida de tudo que diz respeito a ela.**
 
-> ### ⚠️ ESTADO: EM CONSTRUÇÃO — 4 de 6 etapas · **a Letícia já atende**
+> ### ⚠️ ESTADO: EM CONSTRUÇÃO — 5 de 6 etapas · **a Letícia já atende**
 >
 > **A tabela de etapas, logo abaixo, é a única fonte confiável do que já
 > existe.** O que está em etapa não concluída **não existe no repositório nem
@@ -14,9 +14,11 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 > números cadastrados. Ligar, desligar, trocar o modelo e editar o prompt já são
 > pela tela: **Configurações → Agente de IA**.
 >
-> O que ainda NÃO existe: a tela **Conversas** (etapa 4). Hoje as mensagens são
-> gravadas e ficam visíveis só por SQL — e **"assumir conversa" não tem botão**,
-> embora a coluna `agente_pausado` já funcione.
+> A tela **Conversas** existe em `/conversas`: a equipe lê o que a Letícia
+> respondeu, assume a conversa quando precisa e responde pelo mesmo WhatsApp.
+
+> Falta a **etapa 6** — a revisão final de ponta a ponta. E o agendamento
+> nunca foi exercitado numa conversa de verdade.
 >
 > Conforme cada etapa for entregue, marque-a e reescreva a seção correspondente
 > no tempo presente. Quando as seis estiverem prontas, apague este aviso: o
@@ -80,7 +82,7 @@ com revisão e histórico.
 | 1 | Prompt reescrito — [`prompt.md`](prompt.md) | ✅ |
 | 2 | Banco de dados — [`0010_agente_conversas.sql`](../supabase/migrations/0010_agente_conversas.sql) | ✅ |
 | 3 | O cérebro — [`whatsapp/index.ts`](../supabase/functions/whatsapp/index.ts) | ✅ **no ar** |
-| 4 | Página Conversas (`/conversas`) | ⬜ |
+| 4 | Página Conversas — [`Conversas.tsx`](../src/pages/Conversas.tsx) | ✅ **no ar** |
 | 5 | Aba "Agente de IA" em Configurações — [`TabAgenteIA.tsx`](../src/components/TabAgenteIA.tsx) | ✅ **no ar** |
 | 6 | Documentação e verificação | ⬜ |
 
@@ -97,12 +99,14 @@ reais dos dentistas, marca a consulta na agenda de verdade e vai preenchendo a
 ficha do lead conforme a conversa acontece. Quando a equipe quiser assumir, é um
 botão.
 
-**A fundação já existia, e o cérebro já está no ar.** As funções SQL de
-disponibilidade e as views que descrevem a clínica em frases prontas foram
-construídas esperando este agente; a Edge Function que conversa com o paciente e
-chama essas funções está publicada e respondendo. O que falta é a **tela de
-conversas** — hoje a equipe não tem por onde ler o que a Letícia falou, nem
-botão para assumir.
+**Está de pé.** As funções SQL de disponibilidade e as views que descrevem a
+clínica em frases prontas foram construídas esperando este agente; a Edge
+Function que conversa com o paciente e chama essas funções está publicada e
+respondendo; e a equipe tem onde ler tudo isso, em `/conversas`.
+
+O que falta é uso de verdade: o agendamento ponta a ponta nunca foi exercitado
+numa conversa real, e os textos dos procedimentos são rascunho até um dentista
+revisar.
 
 ### Onde cada peça roda
 
@@ -211,10 +215,20 @@ A função `whatsapp/`, ao lado da `agenda/` que já está no ar. No fim desta e
 já dá para conversar com a Letícia pelo WhatsApp de verdade.
 **Depende das chaves e da Evolution no ar.**
 
-### Etapa 4 — Página Conversas
+### Etapa 4 — Página Conversas ✅
 
-Rota `/conversas`, item novo na Sidebar, layout de WhatsApp, tempo real, botões
-de assumir e devolver.
+Rota `/conversas`, duas colunas, tempo real, e o botão de assumir.
+
+Três decisões que ficaram de pé:
+
+-   **A caixa de resposta só abre com a conversa assumida.** Sem isso o
+    atendente escreveria junto com a Letícia, e o paciente receberia duas
+    versões da mesma resposta, de duas pessoas que não sabem uma da outra.
+-   **Três cores de balão** — paciente, Letícia e atendente. Dá para ver de
+    relance onde uma pessoa entrou no atendimento.
+-   **Assumir pausa uma conversa, não o agente.** Ela continua atendendo todo
+    mundo; só naquele número fica calada. Quem desliga o agente inteiro é a aba
+    de Configurações.
 
 ### Etapa 5 — Aba "Agente de IA"
 
@@ -240,6 +254,7 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `supabase/functions/_shared/evolution.ts` | 3 | Envia mensagem, "digitando…", baixa áudio e foto |
 | `supabase/functions/_shared/prompt.ts` | 3 | Monta o prompt: identidade + dados da clínica + data de hoje + histórico |
 | `src/pages/Conversas.tsx` | 4 | A página, em duas colunas |
+| `supabase/migrations/0013_conversas_lista.sql` | 4 | A view `conversas_lista`: última mensagem, não lidas e quem assumiu |
 | `src/components/ListaConversas.tsx` | 4 | Coluna esquerda: busca, prévia, não lidas, quem assumiu |
 | `src/components/JanelaConversa.tsx` | 4 | Coluna direita: balões, cabeçalho e caixa de digitar |
 | `src/components/TabAgenteIA.tsx` | 5 | Aba de Configurações: modelo, prompt, liga/desliga |

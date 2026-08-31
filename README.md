@@ -154,7 +154,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **doze arquivos, nesta ordem** — cada um depende do anterior:
+São **treze arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -168,13 +168,14 @@ São **doze arquivos, nesta ordem** — cada um depende do anterior:
 10. [`supabase/migrations/0010_agente_conversas.sql`](supabase/migrations/0010_agente_conversas.sql)
 11. [`supabase/migrations/0011_procedimentos_detalhados.sql`](supabase/migrations/0011_procedimentos_detalhados.sql)
 12. [`supabase/migrations/0012_procedimentos_texto_enxuto.sql`](supabase/migrations/0012_procedimentos_texto_enxuto.sql)
+13. [`supabase/migrations/0013_conversas_lista.sql`](supabase/migrations/0013_conversas_lista.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
 Ao final você terá:
 
 ```
-12 tabelas + 4 views     estrutura de dados
+12 tabelas + 5 views     estrutura de dados
 21 índices               desempenho e integridade (um deles impede
                          duas pessoas com o mesmo WhatsApp)
 21 políticas de RLS      controle de acesso (13 no banco + 8 no Storage)
@@ -318,6 +319,7 @@ Doze tabelas e quatro views no schema `public`:
 | `api_tokens` | Chaves de acesso da API, guardadas hasheadas |
 | `mensagens_whatsapp` | Cada mensagem trocada no WhatsApp — a memória do Agente de IA |
 | `configuracoes_agente` | Linha única: modelo, prompt, liga/desliga e modo teste do agente |
+| `conversas_lista` | **View** — uma linha por conversa do WhatsApp, para a tela Conversas |
 | `informacoes_clinica_agente` | **View** — dados da clínica em frases prontas, para o Agente de IA |
 | `procedimentos_clinica_agente` | **View** — procedimentos ativos em frases prontas, para o Agente de IA |
 | `profissionais_clinica_agente` | **View** — dentistas ativos e a jornada de cada um, para o Agente de IA |

@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import CRM from './pages/CRM'
+import Conversas from './pages/Conversas'
 import Agenda from './pages/Agenda'
 import Profissionais from './pages/Profissionais'
 import Leads from './pages/Leads'
@@ -21,6 +22,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/crm" element={<CRM />} />
+            <Route path="/conversas" element={<Conversas />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/profissionais" element={<Profissionais />} />
             <Route path="/leads" element={<Leads />} />

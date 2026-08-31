@@ -264,3 +264,28 @@ export interface ConfiguracoesAgente {
   created_at: string
   updated_at: string
 }
+
+/**
+ * Uma linha da view `conversas_lista` (migração 0013) — o que a coluna da
+ * esquerda da tela Conversas mostra de cada pessoa.
+ *
+ * **Somente leitura:** é calculada na leitura, a partir de `crm_clinica_dados`
+ * e `mensagens_whatsapp`. Para mudar algo aqui, escreva na tabela de origem.
+ */
+export interface ConversaResumo {
+  lead_id: string
+  nome_lead: string | null
+  whatsapp_lead: string | null
+  status: LeadStatus
+  agente_pausado: boolean
+  assumido_por: string | null
+  assumido_em: string | null
+  /** Nome de quem assumiu, já resolvido pelo join com `usuarios`. */
+  assumido_por_nome: string | null
+  ultimo_conteudo: string | null
+  ultimo_tipo: TipoMensagem
+  ultimo_autor: AutorMensagem
+  ultima_em: string
+  /** Só conta mensagem do paciente. É a bolinha azul da lista. */
+  nao_lidas: number
+}
