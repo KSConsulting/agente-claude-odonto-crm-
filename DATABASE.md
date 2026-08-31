@@ -54,6 +54,17 @@ ordem**:
 9. `supabase/migrations/0009_profissionais_view.sql` — a view
    `profissionais_clinica_agente`, com a jornada de cada dentista, e a função
    `jornada_texto()`, que unifica a montagem da frase de horário.
+10. `supabase/migrations/0010_agente_conversas.sql` — as conversas do WhatsApp:
+    a tabela `mensagens_whatsapp`, 3 colunas de "assumir conversa" em
+    `crm_clinica_dados` (com a **recriação da view** `crm_clinica`), a tabela
+    `configuracoes_agente` de linha única, a função `agente_deve_responder()`,
+    1 trigger, as políticas de RLS, o Realtime e o bucket `midias-whatsapp`.
+    Detalhes na [seção 4.17](#417-mensagens_whatsapp--configuracoes_agente-migração-0010).
+11. `supabase/migrations/0011_procedimentos_detalhados.sql` — a coluna
+    `descricao_longa` em `servicos_clinica` e os 20 textos.
+12. `supabase/migrations/0012_procedimentos_texto_enxuto.sql` — os mesmos 20
+    textos, reescritos mais curtos (~430 caracteres) e sem travessão. Só
+    conteúdo; nada de schema. Ver [4.6](#46-servicos_clinica).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -174,7 +185,8 @@ erDiagram
 | `profissional_bloqueios` | tabela | Férias, feriado, almoço |
 | `usuarios` | tabela | Perfil da equipe, espelha `auth.users` |
 | `configuracoes_clinica` | tabela | Identidade, endereço e fuso da clínica (linha única) |
-| `n8n_chat_histories` | tabela | Memória de conversa do agente. **Criada pelo n8n**, não pelas migrações (ver 4.16) |
+| `mensagens_whatsapp` | tabela | Cada mensagem trocada no WhatsApp. É a memória do Agente de IA **e** a fonte da tela de conversas (ver 4.17) |
+| `configuracoes_agente` | tabela | Linha única: modelo, prompt, liga/desliga e modo teste do agente (ver 4.17) |
 | `informacoes_clinica_agente` | **view** | Os dados da clínica em frases prontas, uma por linha, para o Agente de IA (ver 4.12) |
 | `procedimentos_clinica_agente` | **view** | Os procedimentos ativos, um por linha, para o Agente de IA (ver 4.13) |
 | `profissionais_clinica_agente` | **view** | Os dentistas ativos e a jornada de cada um, um por linha, para o Agente de IA (ver 4.14) |
@@ -281,20 +293,31 @@ WhatsApp, ou um paciente cadastrado manualmente.
 | `data_agendamento` | `timestamptz` | sim | — | **Quando a consulta acontece** |
 | `data_marcacao_agendamento` | `timestamptz` | sim | — | **Quando o lead marcou** |
 | `id_agendamento` | `text` | sim | — | ID no sistema de agenda externo |
-| **Integração Chatwoot** ||||
-| `id_conta_chatwoot` | `text` | sim | — | |
-| `id_conversa_chatwoot` | `text` | sim | — | Indexado — chave da automação |
-| `id_lead_chatwoot` | `text` | sim | — | |
-| `inbox_id_chatwoot` | `text` | sim | — | |
+| **Integração Chatwoot — sem uso** ||||
+| `id_conta_chatwoot` | `text` | sim | — | ⚠️ ninguém escreve |
+| `id_conversa_chatwoot` | `text` | sim | — | ⚠️ ninguém escreve. Indexado |
+| `id_lead_chatwoot` | `text` | sim | — | ⚠️ ninguém escreve |
+| `inbox_id_chatwoot` | `text` | sim | — | ⚠️ ninguém escreve |
 | **Financeiro** ||||
 | `valor_pago_acumulado` | `numeric(10,2)` | sim | `0` | Total já pago pelo paciente |
 | `created_at` | `timestamptz` | não | `now()` | |
+| **Atendimento humano** (`0010`) ||||
+| `agente_pausado` | `boolean` | não | `false` | Ligado, o agente grava e **não responde** nesta conversa |
+| `assumido_por` | `uuid` | sim | — | Quem assumiu (`usuarios.id`) |
+| `assumido_em` | `timestamptz` | sim | — | Quando assumiu |
+
+> **As quatro colunas `*_chatwoot` estão zeradas em 100% das linhas** e não têm
+> quem as escreva: elas são do desenho antigo, com Chatwoot e n8n, que foi
+> abandonado (seção 8). Ficaram porque removê-las exigiria dropar e recriar a
+> view `crm_clinica` (4.17), e coluna nula não custa nada. **Não construa nada
+> em cima delas** — inclusive o índice de `id_conversa_chatwoot`, que hoje não
+> serve a ninguém.
 
 #### ⚠️ `whatsapp_lead`: formato canônico e unicidade
 
 O número é gravado **só com dígitos, incluindo o código do país, sem `+`,
-espaço ou traço**: `5511987654321`. É o formato que o n8n já usava ao abrir o
-lead da conversa; a partir da migração `0003` o sistema grava igual.
+espaço ou traço**: `5511987654321`. É o formato em que a Evolution entrega o
+número no webhook, e desde a migração `0003` o sistema grava igual.
 
 Duas peças garantem isso, ambas no banco:
 
@@ -312,7 +335,8 @@ pessoa de novo — o mesmo bug, por outro caminho.
 O trigger **não inventa código de país**. Um número sem DDI continua sem DDI:
 adivinhar o país pelo tamanho acertaria no Brasil e erraria em silêncio no resto.
 Quem garante o DDI é quem escreve — a tela, pelo seletor de país
-([`src/lib/telefones.ts`](src/lib/telefones.ts)), e o n8n, que já manda inteiro.
+([`src/lib/telefones.ts`](src/lib/telefones.ts)), e o Agente de IA, que copia o
+número do JID da Evolution, onde ele já vem completo.
 
 Violação devolve **`23505`**. As telas traduzem para "esse número já é de
 Fulano" e oferecem abrir ou usar o contato existente.
@@ -327,7 +351,7 @@ Fulano" e oferecem abrir ou usar o contato existente.
 
 | Índice | Coluna | Para quê |
 |---|---|---|
-| `crm_clinica_conversa_cw_idx` | `id_conversa_chatwoot` | **Crítico para a automação** — é por aqui que o n8n encontra o lead da conversa que chegou |
+| `crm_clinica_conversa_cw_idx` | `id_conversa_chatwoot` | ⚠️ **Sem uso.** Era como o n8n achava o lead da conversa; hoje a busca é por `whatsapp_lead` |
 | `crm_clinica_created_at_idx` | `created_at DESC` | Listagem em `Leads.tsx` |
 | `crm_clinica_status_idx` | `status` | Colunas do Kanban |
 | `crm_clinica_inicio_idx` | `inicio_atendimento` | Métricas do Dashboard |
@@ -553,6 +577,7 @@ Agente de IA — que devolve **só o nome**, sem `id` nem descrição.
 | `id` | `uuid` | não | `gen_random_uuid()` |
 | `nome` | `text` | não | — |
 | `descricao` | `text` | não | `''` |
+| `descricao_longa` | `text` | sim | — |
 | `ativo` | `boolean` | não | `true` |
 | `created_at` | `timestamptz` | não | `now()` |
 
@@ -588,9 +613,40 @@ abaixo, só os nomes, na ordem em que a tela de Configurações os lista.
 > WhatsApp. Por isso os nomes também são os do paciente ("Limpeza e Profilaxia",
 > não "profilaxia dentária supragengival").
 
+#### As duas descrições não são a mesma coisa em tamanhos diferentes
+
+Elas têm **destinos diferentes**, e confundi-las custa dinheiro em toda
+conversa:
+
+| Coluna | Vai para onde | Quando é lida |
+|---|---|---|
+| `descricao` | **Dentro do prompt** do agente, via `procedimentos_clinica_agente` | Em **toda** mensagem, junto com a dos outros 19 |
+| `descricao_longa` | **Fora do prompt.** A ferramenta `detalhes_do_procedimento` busca direto na tabela | Só quando o paciente pergunta **daquele** procedimento |
+
+Os 20 textos longos somam ~8.600 caracteres. Se estivessem no prompt, seriam
+cobrados inclusive de quem só mandou "oi" — para carregar 19 textos que aquela
+conversa nunca vai usar. Fora dele, o prompt continua em **1.961 caracteres**,
+exatamente o mesmo de antes da coluna existir.
+
+Daí as duas réguas, ambas avisadas na tela de edição:
+
+- **`descricao` até ~120 caracteres.** É o catálogo: serve para o agente saber
+  que o procedimento existe, não para explicá-lo.
+- **`descricao_longa` em torno de 430, teto sugerido de 600.** Não é limite
+  técnico. A Letícia responde em até 50 palavras; acima disso ela para de
+  escolher o que dizer e passa a **resumir por conta própria** — e resumo
+  automático é onde nasce a frase que nenhum dentista escreveu.
+
+> **Sem travessão (`—`) nos textos longos.** O modelo copia a pontuação do que
+> lê, e travessão em mensagem de WhatsApp entrega texto de máquina.
+
+> ⚠️ **Os 20 textos longos são rascunho** e precisam da revisão de um dentista
+> da clínica. Prazos, número de sessões e condutas variam por caso — e agora
+> isso é dito a paciente.
+
 > **A tabela não guarda duração.** Ao marcar, o agente usa 60 minutos por
-> padrão para qualquer procedimento, a menos que o n8n mande `duracao_minutos`
-> na chamada. Uma carga imediata, que na prática ocupa o dobro disso, precisa
+> padrão para qualquer procedimento, a menos que quem chama mande
+> `duracao_minutos`. Uma carga imediata, que na prática ocupa o dobro disso, precisa
 > vir com a duração explícita — senão a agenda reserva menos tempo do que o
 > atendimento consome. Uma coluna `duracao_padrao_minutos` resolveria isso de
 > vez; ficou de fora por decisão, não por esquecimento.
@@ -701,7 +757,7 @@ e pela Edge Function, via `api_token_valido()`, a cada chamada.
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
 | `id` | `uuid` | não | `gen_random_uuid()` | PK |
-| `nome` | `text` | não | — | Como a equipe identifica ("n8n produção") |
+| `nome` | `text` | não | — | Como a equipe identifica ("integração da recepção") |
 | `prefixo` | `text` | não | — | Início visível (`odk_7f3a…`), para distinguir na lista |
 | `hash` | `text` | não | — | **SHA-256 do token. UNIQUE** |
 | `ativo` | `boolean` | não | `true` | Revogar é `false` |
@@ -750,7 +806,7 @@ poderia plantar um schema com objetos de mesmo nome.
 ### 4.12. `informacoes_clinica_agente` (view)
 
 Os dados da clínica em frases prontas, **uma coluna, uma informação por linha**.
-É o que o Agente de IA consulta pelo n8n quando precisa falar do endereço, do
+É o que o Agente de IA consulta quando precisa falar do endereço, do
 Instagram ou do site com um paciente.
 
 | Coluna | Tipo |
@@ -798,7 +854,7 @@ frase na leitura seguinte — ninguém digita horário duas vezes.
 selecionada. A saída sai sempre na mesma sequência.
 
 **Acesso:** `security_invoker = true`, então vale o RLS de
-`configuracoes_clinica`. Na prática: a `service_role` do n8n lê, a equipe logada
+`configuracoes_clinica`. Na prática: a `service_role` da Edge Function lê, a equipe logada
 lê, e quem não tem sessão não lê nada. **O agente lê a view direto, sem passar
 pela API** — ele já entra no banco com a `service_role` para gravar os leads em
 `crm_clinica`, e uma leitura a mais pela mesma conexão não acrescenta superfície.
@@ -843,7 +899,7 @@ alfabética jogaria os Alinhadores para a frente e a Avaliação para o meio.
 > consumidores diferentes: a API existe desde antes, e o agente agora lê a view.
 
 **Só os ativos.** Desligar o procedimento em Configurações tira ele da boca do
-agente, sem ninguém mexer no n8n.
+agente, sem ninguém mexer no código.
 
 ```sql
 select procedimento from public.procedimentos_clinica_agente;
@@ -915,75 +971,64 @@ Nenhum dia ativo devolve `NULL`, o `||` propaga e a linha some da view.
 
 ---
 
-### 4.16. `n8n_chat_histories`
+### 4.16. `n8n_chat_histories` — não existe
 
-**A memória de conversa do Agente de IA** — cada mensagem trocada com um lead no
-WhatsApp, na ordem em que aconteceu. É o que permite ao agente lembrar do que já
-foi dito na mesma conversa, em vez de recomeçar a cada mensagem.
+**Esta tabela não está no banco.** Conferido:
+`select to_regclass('public.n8n_chat_histories')` devolve `null`.
 
-> **Não está em `supabase/migrations/`, e não é esquecimento.** Esta tabela é
-> criada **pelo próprio n8n**, pelo nó de memória de conversa (Postgres Chat
-> Memory), na primeira mensagem que o agente recebe na vida. Ela aparece
-> sozinha, com este formato, e o schema é do n8n — não nosso. Escrever uma
-> migração para ela só criaria a chance de as duas definições divergirem.
+Ela vem do desenho antigo, em que a conversa seria orquestrada pelo **n8n** e a
+memória ficaria no nó Postgres Chat Memory, que cria a própria tabela na
+primeira mensagem que recebe na vida. Esse caminho foi abandonado antes de rodar
+uma mensagem sequer: o agente virou código deste repositório (seção 8), e a
+memória dele é `mensagens_whatsapp` (4.17).
 
-**Usada por:** n8n, e só ele. Nenhuma tela do sistema lê esta tabela.
+A seção continua aqui, e vazia de propósito — o nome aparece em commits antigos,
+em documentação anterior e nas quatro colunas `*_chatwoot` de
+`crm_clinica_dados` (4.1), que também nunca foram preenchidas. **Quem topar com
+a referência precisa achar a resposta em algum lugar**, e a resposta é: não
+existe, não vai existir, procure em `mensagens_whatsapp`.
 
-| Coluna | Tipo | Nulo | Default |
-|---|---|:---:|---|
-| `id` | `integer` | não | `nextval(...)` — sequência |
-| `session_id` | `varchar` | não | — |
-| `message` | `jsonb` | não | — |
+> **Se você está migrando um banco que TEM essa tabela**, ela não pertence a este
+> schema. Nada aqui a lê ou escreve, nenhuma migração a cria, e nenhuma tela a
+> mostra.
 
-**Índice:** só a PK em `id`.
+---
 
-`session_id` é **o WhatsApp do lead no formato canônico** (`5511987654321`), o
-mesmo valor de `crm_clinica_dados.whatsapp_lead`. É assim que se liga uma
-conversa à ficha:
+### 4.17. `mensagens_whatsapp` · `configuracoes_agente` (migração `0010`)
 
-```sql
-select h.message
-  from public.n8n_chat_histories h
-  join public.crm_clinica_dados d on d.whatsapp_lead = h.session_id
- where d.id = '...'
- order by h.id;
-```
+Criadas para o Agente de IA próprio — a Letícia — que substitui o fluxo do n8n.
 
-> **Não existe chave estrangeira entre as duas.** A ligação é por convenção, e a
-> tabela é do n8n. Consequência prática: apagar um lead **não** apaga o histórico
-> de conversa dele — que continua ali, órfão, indexado pelo número.
+**📘 A documentação completa está em
+[`agente-ia/README.md`](agente-ia/README.md), seção 6.** Aqui fica só o
+resumo, para quem estiver lendo o schema de cima a baixo.
 
-`message` é o formato do LangChain: `type` (`human` ou `ai`), `content` com o
-texto, mais `additional_kwargs`, `response_metadata` e `tool_calls`.
+| Objeto | O que é |
+|---|---|
+| `mensagens_whatsapp` | Cada mensagem trocada. É a memória do agente **e** a fonte da tela Conversas — a mesma, de propósito |
+| `configuracoes_agente` | Uma linha: modelo, prompt em uso, liga/desliga e o modo teste |
+| `agente_deve_responder(text)` | A regra do modo teste, num lugar só |
+| `mensagens_whatsapp_atualiza_lead` | Trigger que mantém `ultima_mensagem` — **só conta mensagem do paciente** |
+| Bucket `midias-whatsapp` | **Privado**, diferente de `avatars` e `logos` (seção 7) |
 
-```json
-{ "type": "ai", "content": "Oi, tudo bem? Eu sou a Alice, secretária da clínica.", "tool_calls": [], "additional_kwargs": {} }
-```
+Três colunas novas em `crm_clinica_dados`: `agente_pausado`, `assumido_por` e
+`assumido_em` — o botão "Assumir conversa".
 
-> **Esta tabela não tem RLS, e isso é uma decisão registrada.** Toda tabela em
-> `public` é exposta pelo PostgREST, e a `anon key` é pública por natureza — vai
-> no bundle do site. Na prática, **as conversas e os telefones são legíveis por
-> quem tiver essa chave**, sem sessão. Verificado por requisição real: `200 OK`
-> com o conteúdo das mensagens.
+> ⚠️ **A view `crm_clinica` foi dropada e recriada nessa migração.** Ela é
+> `select d.*`, e o Postgres **congela** essa expansão no momento da criação:
+> coluna nova na tabela não aparece na view sozinha. `create or replace view`
+> também não resolve — as colunas novas entrariam antes de
+> `minutos_ultima_mensagem`, mudando a posição de uma coluna existente, o que o
+> Postgres recusa.
 >
-> Se um dia isso for fechar, é uma linha, e **não muda nada para o n8n** — ele
-> fala com o banco como `service_role` ou como dono da tabela, e os dois ignoram
-> RLS. Não é preciso criar nenhuma política, porque nenhuma tela lê daqui:
->
-> ```sql
-> alter table public.n8n_chat_histories enable row level security;
-> ```
-
-**Volume.** A tabela cresce por mensagem, não por lead — uma conversa comum
-passa das dezenas de linhas. Quando incomodar, **um índice em `session_id`** é a
-primeira coisa a fazer: hoje só existe a PK em `id`, e toda busca por conversa
-varre a tabela inteira.
+> **Quem acrescentar coluna em `crm_clinica_dados` daqui para frente precisa
+> dropar e recriar a view junto**, e refazer o `grant`. Ver `0010`, seção 2.
 
 > ⚠️ **`horario_comercial` é o horário da clínica; `profissional_horarios` é o
 > que a agenda realmente oferece.** Os dois podem divergir: anunciar até as
 > 18:00 sem nenhum dentista depois das 17:00 faz o agente prometer horário que a
-> consulta de disponibilidade recusa em seguida. Agora que as duas frases
-> existem lado a lado, a divergência ao menos fica visível.
+> consulta de disponibilidade recusa em seguida. A Letícia lê o primeiro para
+> conversar e o segundo para marcar — e não tem como perceber sozinha que os
+> dois discordam.
 
 ---
 
@@ -1063,7 +1108,7 @@ passa pelo React. Escreveu consulta, o funil acompanha — venha de onde vier.
 **Premissa: sistema interno.** Todo usuário autenticado é da equipe e enxerga
 tudo. Quem não estiver logado não enxerga nada.
 
-RLS está **ativo nas 10 tabelas**. São 11 políticas:
+RLS está **ativo nas 12 tabelas**. São 13 políticas:
 
 | Tabela | Política | Operação | Regra |
 |---|---|---|---|
@@ -1077,13 +1122,16 @@ RLS está **ativo nas 10 tabelas**. São 11 políticas:
 | `servicos_clinica` | `servicos_all` | ALL | `authenticated` — acesso total |
 | `usuarios` | `usuarios_select` | SELECT | `authenticated` — vê todos os perfis |
 | `api_tokens` | `api_tokens_all` | ALL | `authenticated` — acesso total |
+| `mensagens_whatsapp` | `mensagens_whatsapp_all` | ALL | `authenticated` — acesso total |
+| `configuracoes_agente` | `configuracoes_agente_all` | ALL | `authenticated` — acesso total |
 | `usuarios` | `usuarios_update_own` | UPDATE | **só o próprio** (`auth.uid() = id`) |
 
-Mais 6 políticas em `storage.objects` (seção 7).
+Mais 8 políticas em `storage.objects` (seção 7).
 
-> A Edge Function usa a `service_role key`, que ignora o RLS — ela é servidor, não
-> sessão de usuário. O que limita o agente não é o RLS, é a superfície da API:
-> sete operações e nada mais.
+> **As duas Edge Functions usam a `service_role key`, que ignora o RLS** — são
+> servidor, não sessão de usuário. O que limita cada uma não é o RLS:
+> a `agenda/` é limitada pela superfície dos sete endpoints; a `whatsapp/`,
+> pela lista fechada da seção 8.1, que é disciplina de código.
 
 A função `sincronizar_agendamento_lead` (seção 5) **não** usa `security definer`:
 roda com as permissões de quem chamou, que já tem acesso total pelas políticas.
@@ -1103,12 +1151,14 @@ de ter dados** do que depois.
 
 ## 7. Storage
 
-Dois buckets **públicos**, porque o código usa `getPublicUrl()` nos dois casos.
+Três buckets. Os dois primeiros são **públicos**, porque o código usa
+`getPublicUrl()` neles; o terceiro é **privado**, e a diferença não é detalhe.
 
-| Bucket | Caminho | Conteúdo |
-|---|---|---|
-| `avatars` | `{user_id}/avatar.{ext}` | Foto de perfil |
-| `logos` | `clinic/logo.{ext}` | Logo da clínica |
+| Bucket | Público? | Caminho | Conteúdo |
+|---|:---:|---|---|
+| `avatars` | sim | `{user_id}/avatar.{ext}` | Foto de perfil |
+| `logos` | sim | `clinic/logo.{ext}` | Logo da clínica |
+| `midias-whatsapp` | **não** | `{lead_id}/{mensagem_id}.{ext}` | O áudio e a foto que o paciente mandou |
 
 | Política | Bucket | Operação | Regra |
 |---|---|---|---|
@@ -1118,146 +1168,207 @@ Dois buckets **públicos**, porque o código usa `getPublicUrl()` nos dois casos
 | `logos_public_read` | logos | SELECT | público |
 | `logos_team_insert` | logos | INSERT | qualquer autenticado |
 | `logos_team_update` | logos | UPDATE | qualquer autenticado |
+| `midias_whatsapp_equipe_le` | midias-whatsapp | SELECT | qualquer autenticado |
+| `midias_whatsapp_equipe_grava` | midias-whatsapp | INSERT | qualquer autenticado |
 
-> INSERT **e** UPDATE são necessários nos dois buckets porque o upload usa
+> INSERT **e** UPDATE são necessários em `avatars` e `logos` porque o upload usa
 > `{ upsert: true }`. Só com INSERT, a segunda troca de foto falha.
+
+> ⚠️ **`midias-whatsapp` é privado de propósito, e precisa continuar assim.**
+> Ali ficam áudios e fotos que pacientes mandaram — foto de boca, inclusive. Um
+> bucket público entrega isso a quem descobrir a URL, sem login. Por isso a tela
+> abre esses arquivos por **signed URL**, e não por `getPublicUrl()`.
+
+> Quem grava é a Edge Function, com a `service_role key`, que não passa por
+> política nenhuma. As duas políticas acima existem para a **equipe logada** ver
+> a mídia na tela e anexar arquivo ao responder.
 
 ---
 
 ## 8. Integração com o Agente de IA
 
-O sistema pressupõe um agente conversando no WhatsApp via **Chatwoot**, com
-orquestração em **n8n**, gravando direto neste banco.
+O agente é a **Letícia**, e ela **mora dentro deste projeto**: a Edge Function
+[`supabase/functions/whatsapp/`](supabase/functions/whatsapp/). Quem entrega as
+mensagens é a **Evolution API** (WhatsApp não oficial, v2), que chama a função
+por webhook. Quem pensa é a OpenAI.
+
+```
+paciente ──▶ Evolution ──webhook──▶ Edge Function `whatsapp` ──▶ OpenAI
+                  ▲                        │        ▲               │
+                  └──── resposta ──────────┘        └── ferramentas ─┘
+                                           │
+                                           ▼
+                                    ESTE BANCO
+```
+
+Tudo o que ela é — prompt, ferramentas, modelo, decisões — está documentado em
+[`agente-ia/README.md`](agente-ia/README.md). Esta seção cobre só o que ela
+encosta **no banco**.
+
+> **O desenho antigo, com n8n e Chatwoot, foi abandonado.** Não é mais uma
+> automação externa apontada para cá: é código deste repositório. Três
+> consequências para quem lê o schema:
+>
+> - **`n8n_chat_histories` não existe** e não vai existir. A memória da conversa
+>   é `mensagens_whatsapp` ([4.17](#417-mensagens_whatsapp--configuracoes_agente-migração-0010)).
+>   Ver [4.16](#416-n8n_chat_histories--não-existe).
+> - **As quatro colunas `*_chatwoot`** de `crm_clinica_dados` continuam no
+>   schema e **ninguém escreve nelas** ([4.1](#41-crm_clinica_dados--crm_clinica)).
+> - **A chave de acesso não é colada em lugar nenhum.** O Supabase injeta a
+>   `service_role key` na Edge Function; ela não passa por configuração de
+>   ferramenta externa (8.2).
 
 ### 8.1. O que o agente toca no banco
 
-Esta é a lista fechada. **Ele grava em dois lugares: `crm_clinica`, com a ficha
-do lead, e `n8n_chat_histories`, com o histórico da conversa.** Tudo o mais que
-ele acessa direto é leitura; e tudo que mexe na agenda passa pela API, nunca por
-`INSERT` do n8n.
+Esta é a lista fechada. Nada fora dela é acessado pela função `whatsapp`.
 
 | Objeto | Tipo | Acesso | Para quê |
 |---|---|:---:|---|
-| `crm_clinica` | view sobre `crm_clinica_dados` | **lê e grava** | Registrar quem chegou pelo WhatsApp, atualizar `ultima_mensagem`, `resumo_conversa`, `status` e os carimbos de follow-up |
-| `n8n_chat_histories` | tabela (4.16) | **lê e grava** | A memória da conversa — cada mensagem trocada, para o agente lembrar do que já foi dito. Criada e mantida pelo próprio n8n |
-| `informacoes_clinica_agente` | view (4.12) | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Maps, Instagram e site — em frases prontas |
-| `procedimentos_clinica_agente` | view (4.13) | **só lê** | Os procedimentos ativos, um por linha, com a descrição |
+| `crm_clinica` | view sobre `crm_clinica_dados` | **lê e grava** | Cria o lead na primeira mensagem, avança `iniciou_conversa` → `conversando`, e grava `nome_lead`, `procedimento_interesse` e `resumo_conversa` pela ferramenta `atualizar_ficha` |
+| `mensagens_whatsapp` | tabela (4.17) | **lê e grava** | A memória da conversa: cada mensagem trocada, dos dois lados. Lê as últimas 30 para montar o histórico |
+| `consultas` | tabela (4.2) | **grava só por função SQL** | Marcar, remarcar e cancelar passam por `agenda_marcar`, `agenda_remarcar` e `agenda_cancelar` (4.11). A leitura é direta, e **só das consultas daquele lead** |
+| Storage `midias-whatsapp` | bucket privado (7) | **grava** | O áudio e a foto que o paciente mandou |
+| `informacoes_clinica_agente` | view (4.12) | **só lê** | Nome, endereço, bairro, cidade/UF, CEP, horário de atendimento, Maps, Instagram e site — em frases prontas |
+| `procedimentos_clinica_agente` | view (4.13) | **só lê** | Os procedimentos ativos, um por linha, com a descrição curta |
 | `profissionais_clinica_agente` | view (4.14) | **só lê** | Os dentistas ativos e a jornada de cada um |
+| `servicos_clinica` | tabela (4.6) | **só lê** | A `descricao_longa` de **um** procedimento, pela ferramenta `detalhes_do_procedimento` — nunca a tabela inteira |
+| `configuracoes_agente` | tabela (4.17) | **só lê** | Modelo, prompt em vigor, e o `agente_deve_responder()` que decide se aquele número é atendido |
+| `configuracoes_clinica` | tabela (4.4) | **só lê** | Só o `fuso_horario`, sem o qual toda data sai errada |
+
+**Fora do alcance dela:** `profissionais`, `profissional_horarios`,
+`profissional_bloqueios`, `horario_comercial`, `usuarios` e `api_tokens`. As
+tabelas de cadastro alimentam as views acima e as funções da agenda — e é por
+ali que a informação chega até ela, já filtrada e já legível.
 
 ```sql
+-- o que vai dentro do prompt, a cada mensagem
 select informacao   from public.informacoes_clinica_agente;
 select procedimento from public.procedimentos_clinica_agente;
 select profissional from public.profissionais_clinica_agente;
 ```
 
-**Nenhum outro objeto do banco é acessado pelo n8n.** `consultas`,
-`profissionais`, `profissional_horarios`, `profissional_bloqueios`,
-`servicos_clinica`, `configuracoes_clinica`, `horario_comercial`, `usuarios` e
-`api_tokens` ficam fora do alcance dele — as tabelas, inclusive as que alimentam
-as views acima; o que a agenda precisa chega pela API.
+> **As três views são para conversar, não para operar.** Nenhuma traz `id`. O
+> `profissional_id` que a agenda precisa é resolvido **pelo nome**, dentro do
+> código da ferramenta — uuid em prompt é convite para alucinação.
 
-> **As três views são para conversar, não para operar.** Nenhuma traz `id`. Para
-> marcar com um dentista específico, o `profissional_id` vem de
-> `GET /profissionais` da API — UUID no meio de frase falável só daria trabalho
-> de extrair de volta.
+> **`minutos_ultima_mensagem` e `ultima_mensagem` ninguém precisa gravar.** O
+> trigger de `mensagens_whatsapp` (4.17) carimba `ultima_mensagem`, e a view
+> calcula os minutos na leitura.
 
-> **Por que a agenda não entra nessa lista.** Marcar consulta não é gravar uma
-> linha: é conferir jornada, recusar conflito com o que já existe, escolher
-> profissional livre e, no caso de remarcar, mover tudo num passo atômico. Um
-> `INSERT` direto do n8n em `consultas` passaria por cima disso e criaria
-> agendamento sobreposto — a restrição do banco até barraria a sobreposição, mas
-> o fluxo receberia um `23P01` cru, sem nenhuma frase para dizer ao paciente.
-> Por isso: **agenda é sempre pela API** (seção 4.11 e `API_AGENTE.md`).
+> **Os follow-ups (`follow_up_1/2/3`) ainda não têm quem os escreva.** As
+> colunas existem desde a `0001` e o Dashboard já as lê; a rotina que carimba
+> depende de um agendador, que não foi construído.
 
-> **Por que as duas views são lidas direto, e não por endpoint.** O n8n já entra
-> no banco com a `service_role key` para gravar os leads. Ler duas views pela
-> conexão que já existe não acrescenta superfície nenhuma — e são dados sem
-> regra de negócio, que só precisam sair legíveis.
+### 8.2. A `service_role key` e o RLS
 
-### A automação precisa usar a `service_role key`
+As políticas de RLS liberam apenas o papel `authenticated` — sessões de usuário
+logado. **A Edge Function não tem sessão.**
 
-As políticas de RLS liberam apenas o papel `authenticated` — ou seja, sessões de
-usuário logado. **A automação não tem sessão.**
+O Supabase entrega a `service_role key` às Edge Functions por variável de
+ambiente (`SUPABASE_SERVICE_ROLE_KEY`), e é ela que
+[`_shared/db.ts`](supabase/functions/_shared/db.ts) usa em todo `fetch` ao
+PostgREST. Essa chave **passa por cima do RLS**: a disciplina de só encostar no
+que está na lista de 8.1 é do código, não do banco.
 
-Se o n8n tentar usar a `anon key`, as gravações **falham em silêncio**: o
-PostgREST devolve `200 OK` com zero linhas afetadas, e nenhum lead aparece no
-sistema. É o erro mais provável de quem estiver montando essa integração.
+Duas consequências:
 
-Use a `service_role key`, que ignora o RLS por natureza. Ela **nunca** pode ir
-para o frontend.
+- **A chave nunca vai para o frontend.** No navegador roda a `anon key`,
+  protegida por RLS. Se algum dia a `service_role` aparecer em `src/`, é
+  incidente de segurança, não descuido de estilo.
+- **Se alguém apontar outra automação para este banco**, ela precisa da mesma
+  chave. Com a `anon key`, as gravações **falham em silêncio**: `200 OK`, zero
+  linhas afetadas, nenhum lead no sistema.
 
-### Fluxo típico
+### 8.3. O caminho de uma mensagem
 
-1. Mensagem chega no Chatwoot → webhook para o n8n
-2. n8n busca o lead por `id_conversa_chatwoot` *(indexado)*
-3. Se não existe, insere em `crm_clinica` com os `id_*_chatwoot` preenchidos
-4. A cada mensagem, grava a linha em `n8n_chat_histories` (4.16) e atualiza
-   `ultima_mensagem = now()` e `resumo_conversa` na ficha
-5. Perguntado sobre endereço, horário ou o que a clínica faz, lê
-   `informacoes_clinica_agente` e `procedimentos_clinica_agente` (8.1)
-6. Ao agendar, **chama `POST /marcar` da API** — não insere em `consultas`. A
-   Edge Function é que grava, e o trigger da seção 5 cuida sozinho de
-   `data_agendamento`, `data_marcacao_agendamento` e do `status` do lead
-7. Nos follow-ups, carimba `follow_up_1/2/3` e ajusta o `status`
+1. A Evolution chama `POST /` da função, com o segredo em `x-webhook-segredo`
+2. A função descarta grupo, newsletter e status, e **grava a mensagem** em
+   `mensagens_whatsapp` — antes de qualquer coisa, para nada se perder
+3. Se o número ainda não tem ficha, cria o lead em `crm_clinica` com
+   `status = 'iniciou_conversa'`
+4. Áudio e foto vão para o bucket `midias-whatsapp`; o áudio ainda é
+   transcrito, e a transcrição volta para a coluna `conteudo`
+5. **Espera 8 segundos.** Se chegou mensagem nova nesse intervalo, esta execução
+   desiste — quem responde é a última. É o que faz a Letícia responder as três
+   mensagens picadas de uma vez, como gente
+6. `agente_deve_responder()` decide: agente ligado? conversa não assumida por
+   um atendente? número liberado no modo teste?
+7. Monta o prompt (as três views + a data de hoje) e as últimas 30 mensagens
+8. Chama o modelo, executa as ferramentas que ele pedir, e repete até ele
+   parar de pedir — no máximo 6 voltas
+9. A resposta é quebrada em 2 ou 3 mensagens, cada uma com "digitando…" antes
+10. Grava o que respondeu em `mensagens_whatsapp` e avança
+    `iniciou_conversa` → `conversando`
 
-> **`minutos_ultima_mensagem` não precisa de escrita.** Basta manter
-> `ultima_mensagem` em dia — a view calcula o resto sozinha.
+### 8.4. O que o agente NÃO faz
 
-### O que o agente NÃO deve fazer
+**Não insere em `consultas`.** Marcar consulta não é gravar uma linha: é
+conferir a jornada do dentista, recusar conflito com o que já existe, escolher
+quem está livre e, ao remarcar, mover tudo num passo atômico. Um `INSERT` direto
+pularia tudo isso e, ao bater na restrição de sobreposição, devolveria um
+`23P01` cru — sem nenhuma frase para dizer a quem está esperando no WhatsApp.
+Por isso as ferramentas chamam as funções da seção 4.11, e só elas.
 
-**Gravar o WhatsApp sem o código do país.** O formato canônico
-(`5511987654321`) é o que o n8n já usa — nada muda para a automação. Só não vale
-mandar o número local: ele entra, mas passa a ser um segundo registro do mesmo
-telefone, invisível para a busca e para a unicidade (seção 4.1).
-
-Se o insert do agente devolver **`23505`**, o lead daquele número já existe:
-busque por `whatsapp_lead` e siga com o que voltou, em vez de tentar de novo.
-
-**Gravar `data_agendamento` direto na ficha do lead.** Era assim antes de existir
-a Agenda, e o resultado agora seria uma consulta que aparece no CRM mas não no
+**Não grava `data_agendamento` na ficha do lead.** Era assim antes de a Agenda
+existir. Hoje o resultado seria uma consulta que aparece no CRM e não no
 calendário — duas telas contando histórias diferentes sobre o mesmo fato. A
-fonte da verdade do agendamento é a linha em `consultas`; `data_agendamento`
-virou reflexo, mantido pelo trigger.
+fonte da verdade é a linha em `consultas`; `data_agendamento` virou reflexo,
+mantido pelo trigger `consultas_sincroniza_lead`.
 
-**Inserir direto em `consultas`.** Existe a API para isso (8.1). Um `INSERT` do
-n8n pula a conferência de jornada, a escolha de profissional livre e a
-idempotência da `chave_externa` — e, quando bater na restrição de sobreposição,
-devolve um `23P01` cru, sem frase nenhuma para dizer ao paciente que está
-esperando resposta no WhatsApp.
+**Não grava WhatsApp sem o código do país.** O formato canônico é
+`5511987654321`, só dígitos. O número local entra, mas passa a ser um segundo
+registro do mesmo telefone, invisível para a busca e para a unicidade (4.1). Um
+`23505` na volta significa que o lead daquele número já existe: busque por
+`whatsapp_lead` e siga com o que voltou.
 
-**Escrever em qualquer outra tabela.** Procedimentos, profissionais, jornadas e
-horários são cadastro da clínica, feito pelas telas. O agente lê o que precisa
-pelas views de 8.1 e não tem por que gravar em nada além de `crm_clinica` e da
-própria memória de conversa.
+**Não escreve em cadastro.** Procedimentos, profissionais, jornadas e horários
+são da clínica, feitos pelas telas. Ela lê o que precisa pelas views de 8.1.
 
-### A API da agenda — implantada
+**Não decide sozinha se responde.** Quem decide é `agente_deve_responder()`, no
+banco. Enquanto o modo teste estiver ligado, ela grava e mostra na tela toda
+mensagem que chegar — e responde só aos números da lista.
 
-Sete endpoints na Edge Function `agenda`, autenticados por token próprio.
-Contrato e cURLs em [`API_AGENTE.md`](API_AGENTE.md); funções SQL na seção 4.11.
+### 8.5. A API da agenda continua existindo — para quem é de fora
 
-O que está no banco por causa dela:
+A Edge Function [`agenda/`](supabase/functions/agenda/) e seus sete endpoints
+não foram substituídos. Contrato e cURLs em [`API_AGENTE.md`](API_AGENTE.md).
+
+A diferença é o caminho, não a regra:
+
+| Quem | Como chega na agenda | Autenticação |
+|---|---|---|
+| A Letícia (função `whatsapp`) | Chama as funções SQL **direto**, por RPC no PostgREST | A `service_role key` que o Supabase injeta |
+| Qualquer integração externa | `POST /marcar`, `GET /disponibilidade`… na função `agenda` | Token próprio, criado em Configurações → Token e API |
+
+**As duas descem para as mesmas funções da 4.11.** A regra de jornada, a escolha
+de dentista livre e a trava de sobreposição vivem num lugar só — e é isso que
+mantém as duas portas honestas entre si. A `agenda/` acrescenta, para quem está
+de fora, o que a Letícia não precisa: conferência de token, tradução de recusa
+em frase pronta e HTTP.
+
+O que existe no banco por causa dessa história:
 
 | Peça | Por quê |
 |---|---|
 | `consultas_sem_sobreposicao` (4.2) | Recepção e agente escrevem ao mesmo tempo; só o banco fecha a janela |
-| `chave_externa` UNIQUE (4.2) | Retry de automação não pode virar consulta duplicada |
+| `chave_externa` UNIQUE (4.2) | Retry não pode virar consulta duplicada. A Letícia usa `wa_{lead}_{data_hora}` |
 | `profissional_bloqueios` (4.9) | Sem isso não existe "disponibilidade" confiável |
 | `configuracoes_clinica.fuso_horario` (4.4) | Servidor em UTC; sem fixar o fuso, a disponibilidade erra em 3 horas |
 | `origem` (4.2) | Sem isso é impossível medir ou auditar o que o agente marcou sozinho |
 
-Duas coisas que a implementação confirmou, e que quem for mexer precisa saber:
+Duas coisas que valem para as **duas** Edge Functions:
 
-- **A Edge Function não pode ter dependência externa.** O runtime sobe com
+- **Nenhuma delas pode ter dependência externa.** O runtime sobe com
   `--no-remote`; um `import` de `supabase-js` derruba a função inteira com
   `BOOT_ERROR` antes de rodar uma linha. Toda conversa com o banco é `fetch` no
-  PostgREST.
-- **A regra de disponibilidade em SQL espelha `src/lib/agenda.ts`.** Se
-  divergirem, o agente oferece horário que a recepção vê como ocupado. Mudou uma,
-  mude a outra.
+  PostgREST. Import relativo de `_shared/` funciona normalmente.
+- **A regra de disponibilidade em SQL espelha [`src/lib/agenda.ts`](src/lib/agenda.ts).**
+  Se divergirem, o agente oferece horário que a recepção vê como ocupado. Mudou
+  uma, mude a outra.
 
 ---
 
-## 8.5. Realtime — atualização automática da tela
+### 8.6. Realtime — atualização automática da tela
 
 O CRM e a tela de detalhe assinam `postgres_changes` para reagir sozinhos
 quando o Agente de IA mexe num lead: o card anda de coluna no Kanban sem
@@ -1327,7 +1438,7 @@ Lista do que quebra este banco de formas não óbvias:
 1. **Recriar qualquer view sem `security_invoker = true`** → o RLS deixa de valer.
    Vale para `crm_clinica` e para as três views do agente (4.12 a 4.14).
 2. **Assinar Realtime na view `crm_clinica`** → a inscrição é criada sem erro e
-   nunca dispara. Assine sempre `crm_clinica_dados` (seção 8.5).
+   nunca dispara. Assine sempre `crm_clinica_dados` (seção 8.6).
 3. **Tentar escrever em `minutos_ultima_mensagem`** → erro; é coluna calculada.
 4. **Automação usando a `anon key`** → gravações falham sem erro visível.
 5. **Alterar o `CHECK` de `status` sem atualizar `src/types/index.ts`**
@@ -1359,14 +1470,6 @@ Lista do que quebra este banco de formas não óbvias:
     que a clínica está enrolando. **Conferir sempre que mexer numa das duas**,
     comparando `jornada_texto(null)` com `jornada_texto(id)` de cada dentista
     (4.15).
-17. **Apagar um lead achando que apaga a conversa** → `n8n_chat_histories` não
-    tem chave estrangeira para `crm_clinica_dados` (4.16). A ficha some, o
-    histórico do WhatsApp fica, indexado pelo número.
-18. **`n8n_chat_histories` está sem RLS, por decisão registrada** (4.16). Toda
-    tabela em `public` é exposta pelo PostgREST, e a `anon key` é pública — as
-    conversas e os telefones são legíveis por quem tiver essa chave. Quem for
-    revisar segurança precisa saber que este estado é conhecido, e não um
-    descuido: o caminho, se um dia for fechar, está na 4.16.
 15. **Apagar um profissional com consultas** → bloqueado pelo `ON DELETE
     RESTRICT` (`23503`). Use `ativo = false`.
 16. **Gravar em `consultas.data_fim`** → é coluna derivada, sobrescrita pelo
@@ -1390,16 +1493,16 @@ Lista do que quebra este banco de formas não óbvias:
 Depois de rodar a migração, confira se está tudo de pé:
 
 ```sql
--- Objetos criados (esperado: 10 tabelas + 4 views)
+-- Objetos criados (esperado: 12 tabelas + 4 views)
 select table_name, table_type from information_schema.tables
 where table_schema = 'public' order by table_name;
 
--- Tabelas de `public` sem RLS (esperado: só `n8n_chat_histories`, ver 4.16)
+-- Tabelas de `public` sem RLS (esperado: NENHUMA linha)
 select relname from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
 
--- Políticas (esperado: 17 — 11 em public + 6 em storage)
+-- Políticas (esperado: 21 — 13 em public + 8 em storage)
 select schemaname, count(*) from pg_policies
 where schemaname in ('public','storage') group by schemaname;
 

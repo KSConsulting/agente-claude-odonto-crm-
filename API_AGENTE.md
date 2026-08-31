@@ -1,13 +1,23 @@
-# API da Agenda — para o Agente de IA
+# API da Agenda — para integração externa
 
-Especificação dos endpoints que o Agente de IA consome pelo **n8n, via nó HTTP**,
-para consultar disponibilidade, marcar, consultar, cancelar e remarcar consultas.
+Especificação dos sete endpoints HTTP que expõem a agenda da clínica: consultar
+disponibilidade, marcar, consultar, cancelar e remarcar consultas.
 
 > **Status: implantada e testada ponta a ponta.** Os catorze cenários deste
 > documento foram exercitados por HTTP contra o projeto real — conflito,
 > expediente, idempotência, conferência de dono, fuso e token revogado.
 
-- **Quem chama:** n8n (nó HTTP Request), dentro do fluxo que atende o WhatsApp
+> ### ⚠️ A Letícia não usa esta API
+>
+> O Agente de IA da clínica mora **dentro deste projeto** (a Edge Function
+> `whatsapp`) e chama as funções SQL da `0004` **direto, por RPC** — sem passar
+> por HTTP nem por token. Ver a seção 8 do [`DATABASE.md`](DATABASE.md).
+>
+> Esta API existe para **quem está de fora**: outro sistema da clínica, uma
+> automação, um parceiro. As duas portas descem para as mesmas funções SQL, e é
+> isso que impede uma de oferecer horário que a outra recusa.
+
+- **Quem chama:** qualquer cliente HTTP externo, com token
 - **Onde roda:** Supabase Edge Function `agenda`
   ([`supabase/functions/agenda/index.ts`](supabase/functions/agenda/index.ts))
 - **Regras de negócio:** funções SQL da migração
@@ -31,7 +41,7 @@ Por isso toda resposta traz:
 
 - **`mensagem`** — a frase pronta, em português, com nome de pessoa e de
   profissional dentro. O agente fala isso e acabou.
-- **os campos soltos que compõem a frase** — para o n8n usar programaticamente
+- **os campos soltos que compõem a frase** — para quem consome usar programaticamente
   (agendar lembrete, gravar log) ou para o agente reescrever com as próprias
   palavras, se você preferir controlar o texto pelo prompt.
 
@@ -53,13 +63,13 @@ HTTP 200**, com `ok: false`, um `motivo` em código e a `mensagem` falável.
 | Rota inexistente | 404 | `ok: false` + `motivo` + `mensagem` |
 | Falha inesperada | 500 | `ok: false` + `motivo` + `mensagem` |
 
-Isso mantém o fluxo do n8n simples: **só quebra o que é problema de configuração
+Isso mantém o fluxo de quem consome simples: **só quebra o que é problema de configuração
 ou bug.** Tudo que o paciente precisa ouvir chega como 200 e segue o caminho
 normal do fluxo.
 
 > **Campo faltando volta 200, não 400** — e é de propósito. Quando o agente não
 > extraiu a data da conversa, o certo é ele dizer *"faltou alguma informação
-> para eu concluir"* e perguntar de novo, não o fluxo do n8n morrer. O 400 fica
+> para eu concluir"* e perguntar de novo, não o fluxo de quem chama morrer. O 400 fica
 > reservado para o que é erro de quem programou o nó: corpo que não é JSON e
 > verbo HTTP trocado.
 
@@ -69,7 +79,7 @@ Os dois campos nunca se misturam, e **`mensagem` existe em toda resposta**,
 inclusive nas falhas técnicas:
 
 - **`motivo`** — código curto (`horario_ocupado`, `token_invalido`). Serve para o
-  n8n desviar o fluxo e para você entender o log. O paciente nunca vê.
+  quem consome desviar o fluxo e para você entender o log. O paciente nunca vê.
 - **`mensagem`** — o que pode ser dito em voz alta. Em 401 e 500 ela é
   deliberadamente vaga: *"Não consegui acessar a agenda agora. Só um instante."*
   Nada de "token inválido" chegando ao WhatsApp de ninguém.
@@ -92,7 +102,7 @@ Saem **sempre em UTC**, no ISO completo que o PostgREST usa para `timestamptz`:
 `2026-05-15T12:00:00+00:00` é 09:00 em São Paulo. Vale para `data_hora`,
 `horarios[]` e `proxima_data` — todos são `timestamptz` no banco.
 
-> **Se o n8n for formatar a hora sozinho, precisa converter.** Ler `data_hora`
+> **Se quem consome for formatar a hora sozinho, precisa converter.** Ler `data_hora`
 > e mostrar "12:00" para quem marcou às 09:00 é o erro fácil de cometer aqui. A
 > `mensagem` já vem convertida para o fuso da clínica e por extenso — é
 > exatamente para isso que ela existe.
@@ -127,7 +137,7 @@ clínica está com problema de configuração.
 
 Base: `https://SEU_REF.supabase.co/functions/v1/agenda`
 
-Os sete cURLs abaixo são para colar no **Import cURL** do nó HTTP do n8n, que
+Os sete cURLs abaixo são para colar no **Import cURL** de qualquer cliente HTTP, que
 monta o nó inteiro sozinho. Na tela de Tokens eles aparecem com a URL e o token
 reais já preenchidos.
 
@@ -312,11 +322,11 @@ curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/disponibilidade' \
 é o caso comum, o paciente sem preferência.
 
 O `whatsapp` é a identidade: o sistema procura por ele e, se não achar, **cria o
-contato** com o `nome` informado. É o mesmo comportamento que o fluxo do n8n já
+contato** com o `nome` informado. É o mesmo comportamento que o Agente de IA já
 tem hoje. O número deve vir no formato canônico (só dígitos com código do país,
 `5511987654321`) — o mesmo que a automação já grava.
 
-A `chave_externa` é o que impede consulta duplicada quando o n8n repete a
+A `chave_externa` é o que impede consulta duplicada quando quem chama repete a
 chamada por timeout. Mandando o mesmo valor, a segunda tentativa devolve o
 agendamento que já existe em vez de criar outro.
 
@@ -484,7 +494,7 @@ curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/remarcar' \
 | Coluna | Tipo | Observação |
 |---|---|---|
 | `id` | `uuid` | PK |
-| `nome` | `text` | Como a equipe identifica ("n8n produção") |
+| `nome` | `text` | Como a equipe identifica ("integração da recepção") |
 | `prefixo` | `text` | Primeiros caracteres visíveis (`odk_7f3a…`), para saber qual é qual |
 | `hash` | `text` | **SHA-256 do token.** O valor original não existe em lugar nenhum |
 | `ativo` | `boolean` | Revogar é `false`, não `DELETE` |

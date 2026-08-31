@@ -103,7 +103,7 @@ CSV**.
 - **Procedimentos** — catálogo de serviços oferecidos
 - **Senha** — troca com medidor de força
 - **Token e API** — chaves de acesso do Agente de IA e a documentação dos sete
-  endpoints, com os cURLs prontos para o nó HTTP do n8n
+  endpoints, com os cURLs prontos para colar em qualquer cliente HTTP
 
 ---
 
@@ -154,7 +154,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **nove arquivos, nesta ordem** — cada um depende do anterior:
+São **doze arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -165,27 +165,30 @@ São **nove arquivos, nesta ordem** — cada um depende do anterior:
 7. [`supabase/migrations/0007_horario_na_view.sql`](supabase/migrations/0007_horario_na_view.sql)
 8. [`supabase/migrations/0008_procedimentos_view.sql`](supabase/migrations/0008_procedimentos_view.sql)
 9. [`supabase/migrations/0009_profissionais_view.sql`](supabase/migrations/0009_profissionais_view.sql)
+10. [`supabase/migrations/0010_agente_conversas.sql`](supabase/migrations/0010_agente_conversas.sql)
+11. [`supabase/migrations/0011_procedimentos_detalhados.sql`](supabase/migrations/0011_procedimentos_detalhados.sql)
+12. [`supabase/migrations/0012_procedimentos_texto_enxuto.sql`](supabase/migrations/0012_procedimentos_texto_enxuto.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
 Ao final você terá:
 
 ```
-10 tabelas + 4 views     estrutura de dados
-17 índices               desempenho e integridade (um deles impede
+12 tabelas + 4 views     estrutura de dados
+21 índices               desempenho e integridade (um deles impede
                          duas pessoas com o mesmo WhatsApp)
-17 políticas de RLS      controle de acesso (11 no banco + 6 no Storage)
-2 buckets de Storage     fotos de perfil e logotipo
-13 funções + 7 triggers  automações internas e as regras da API
+21 políticas de RLS      controle de acesso (13 no banco + 8 no Storage)
+3 buckets de Storage     perfil, logotipo e as mídias do WhatsApp
+15 funções + 8 triggers  automações internas e as regras da agenda
 1 restrição de exclusão  impede duas consultas no mesmo horário
-2 tabelas no Realtime    atualização automática da tela
+3 tabelas no Realtime    atualização automática da tela
 ```
 
 E já deixa cadastrados o horário comercial padrão e os **20 procedimentos** da
 clínica — todos editáveis depois pela tela de Configurações. Profissionais não
 vêm de exemplo: cadastre os seus na tela **Profissionais**, e a agenda de cada
 um nasce junto. Tokens também começam vazios: crie o primeiro em
-**Configurações → Token e API**, senão a API responde 401 para o n8n.
+**Configurações → Token e API**, senão a API responde 401 para quem chamar.
 
 ### 4. Configurar as variáveis de ambiente
 
@@ -298,7 +301,7 @@ existe, e só cai no `index.html` quando não existe.
 
 ## Como o banco está organizado
 
-Dez tabelas e quatro views no schema `public`:
+Doze tabelas e quatro views no schema `public`:
 
 | Objeto | Papel |
 |---|---|
@@ -313,12 +316,11 @@ Dez tabelas e quatro views no schema `public`:
 | `horario_comercial` | Grade de atendimento da clínica |
 | `servicos_clinica` | Catálogo de procedimentos |
 | `api_tokens` | Chaves de acesso da API, guardadas hasheadas |
+| `mensagens_whatsapp` | Cada mensagem trocada no WhatsApp — a memória do Agente de IA |
+| `configuracoes_agente` | Linha única: modelo, prompt, liga/desliga e modo teste do agente |
 | `informacoes_clinica_agente` | **View** — dados da clínica em frases prontas, para o Agente de IA |
 | `procedimentos_clinica_agente` | **View** — procedimentos ativos em frases prontas, para o Agente de IA |
 | `profissionais_clinica_agente` | **View** — dentistas ativos e a jornada de cada um, para o Agente de IA |
-
-Mais uma tabela que **não vem das migrações**: `n8n_chat_histories`, a memória de
-conversa do agente, criada pelo próprio n8n na primeira mensagem que ele recebe.
 
 ### ⚠️ Não existe tabela de agenda — e é de propósito
 
@@ -329,7 +331,7 @@ fora de sincronia, porque são a mesma coisa.
 ### ⚠️ Um WhatsApp, uma pessoa
 
 O `whatsapp_lead` é gravado sempre no mesmo formato — só dígitos, com o código
-do país: `5511987654321`, exatamente como o n8n já mandava. Um índice único
+do país: `5511987654321`, exatamente como a Evolution entrega. Um índice único
 impede que duas pessoas fiquem com o mesmo número, e um gatilho tira a
 pontuação antes de gravar, para `+55 (11) 98765-4321` e `5511987654321` não
 virarem dois registros do mesmo telefone.
@@ -424,7 +426,7 @@ continua no histórico do Git. É preciso revogar a credencial e gerar outra.
 
 ### Controle de acesso
 
-O RLS está ativo nas 9 tabelas, com 10 políticas (mais 6 no Storage). O modelo
+O RLS está ativo nas 12 tabelas, com 13 políticas (mais 8 no Storage). O modelo
 atual é:
 
 - Quem **não** está autenticado não enxerga absolutamente nada
@@ -444,25 +446,33 @@ proteção de interface, não substitui as políticas do Supabase.
 
 ## Integração com o Agente de IA
 
-O sistema pressupõe um agente atendendo no WhatsApp via **Chatwoot**, orquestrado
-por **n8n**, gravando direto neste banco.
+O agente é a **Letícia**, e ela mora dentro deste repositório: a Edge Function
+`supabase/functions/whatsapp/`. Quem entrega as mensagens é a **Evolution API**
+(WhatsApp não oficial); quem pensa é a OpenAI.
 
-A tabela `crm_clinica_dados` já tem as colunas de integração
-(`id_conta_chatwoot`, `id_conversa_chatwoot`, `id_lead_chatwoot`,
-`inbox_id_chatwoot`) e os carimbos dos três follow-ups.
+**📘 Tudo sobre ela está em [`agente-ia/`](agente-ia/)** — comece pelo
+[`agente-ia/README.md`](agente-ia/README.md).
+
+> Um desenho anterior usava **Chatwoot** e **n8n**, e foi abandonado antes de
+> rodar. Sobraram no schema as colunas `*_chatwoot` de `crm_clinica_dados`, que
+> ninguém escreve.
 
 ### O que o agente lê e o que ele grava
 
-Esta é a lista fechada. **Ele grava em dois lugares:** a ficha do lead e a
-memória da própria conversa.
+Esta é a lista fechada.
 
 | Objeto | Acesso | Para quê |
 |---|:---:|---|
-| `crm_clinica` | **lê e grava** | Registrar quem chegou pelo WhatsApp e manter a conversa em dia — última mensagem, resumo, status no funil, follow-ups |
-| `n8n_chat_histories` | **lê e grava** | A memória da conversa: cada mensagem trocada, para o agente lembrar do que já foi dito |
+| `crm_clinica` | **lê e grava** | Cria o lead que chegou pelo WhatsApp, avança o status e preenche nome, procedimento de interesse e resumo |
+| `mensagens_whatsapp` | **lê e grava** | A memória da conversa: cada mensagem trocada, para lembrar do que já foi dito |
+| `consultas` | **grava só por função SQL** | Marcar, remarcar e cancelar. Lê direto, só as consultas daquele paciente |
+| bucket `midias-whatsapp` | **grava** | O áudio e a foto que o paciente mandou. É privado |
 | `informacoes_clinica_agente` | **só lê** | Endereço, bairro, cidade/UF, CEP, horário de atendimento, Google Maps, Instagram e site |
-| `procedimentos_clinica_agente` | **só lê** | Os procedimentos ativos, com a descrição de cada um |
+| `procedimentos_clinica_agente` | **só lê** | Os procedimentos ativos, com a descrição curta de cada um |
 | `profissionais_clinica_agente` | **só lê** | Os dentistas ativos e a jornada de cada um |
+| `servicos_clinica` | **só lê** | A explicação completa de **um** procedimento, quando o paciente pergunta |
+| `configuracoes_agente` | **só lê** | Modelo, prompt e a regra do modo teste |
+| `configuracoes_clinica` | **só lê** | Só o fuso horário |
 
 As três últimas são **views de coluna única**, com uma informação por linha, já
 escrita como frase — o agente lê e fala, sem montar texto:
@@ -486,23 +496,19 @@ Elas são **calculadas na leitura**, a partir de `configuracoes_clinica`,
 `profissional_horarios`. O que a equipe salva nas telas vale na conversa
 seguinte: não há nada para sincronizar, e não existe o estado "desatualizada".
 
-**Nenhum outro objeto do banco é acessado pelo n8n** — nem mesmo as tabelas que
-alimentam essas views. `consultas`, `profissionais`, jornadas, bloqueios,
-`usuarios` e `api_tokens` ficam fora do alcance dele.
+**Nenhum outro objeto do banco é acessado pelo agente** — nem mesmo as tabelas
+que alimentam essas views. `profissionais`, jornadas, bloqueios, `usuarios` e
+`api_tokens` ficam fora do alcance dele.
 
-> **`n8n_chat_histories` não vem das migrações.** O nó de memória de conversa do
-> n8n cria essa tabela sozinho, na primeira mensagem que o agente recebe. O
-> schema é dele; o sistema não lê dessa tabela em nenhuma tela. Detalhes,
-> incluindo o estado de RLS, na seção 4.16 do [`DATABASE.md`](DATABASE.md).
+> As views são para **conversar**, não para operar: nenhuma traz `id`. Quando o
+> paciente pede um dentista pelo nome, é o código da ferramenta que resolve o
+> `profissional_id` — uuid em prompt é convite para alucinação.
 
-> As views são para **conversar**, não para operar: nenhuma traz `id`. Para
-> marcar com um dentista específico, o `profissional_id` vem de
-> `GET /profissionais` da API.
-
-### Agenda é sempre pela API, nunca por `INSERT`
+### Agenda é sempre por função SQL, nunca por `INSERT`
 
 O agente **não** insere em `consultas` e **não** grava `data_agendamento` na
-ficha do lead. Ele chama `POST /marcar`, e a Edge Function é que grava.
+ficha do lead. Ele chama `agenda_marcar`, `agenda_remarcar` e `agenda_cancelar`,
+que são as mesmas funções por trás da API.
 
 Marcar consulta não é gravar uma linha: é conferir a jornada do dentista,
 recusar conflito com o que já existe, escolher um profissional livre quando o
@@ -515,31 +521,40 @@ O resto (data na ficha, status no funil) um trigger do banco mantém sozinho.
 
 ### A API da agenda
 
-Sete endpoints para o agente consultar disponibilidade, marcar, consultar,
-cancelar e remarcar, além de listar profissionais e procedimentos. Rodam numa
-Edge Function do Supabase e são chamados pelo n8n via nó HTTP.
+Sete endpoints para consultar disponibilidade, marcar, consultar, cancelar e
+remarcar, além de listar profissionais e procedimentos. Rodam numa Edge Function
+do Supabase, autenticados por token.
+
+**A Letícia não usa esses endpoints** — ela roda no mesmo projeto e chama as
+funções SQL direto. A API existe para integração externa: outro sistema da
+clínica, uma automação, um parceiro. As duas portas descem para as mesmas
+funções, e é isso que impede uma de oferecer horário que a outra recusa.
 
 Cada resposta traz uma **frase pronta para o paciente ouvir** — quem consome vai
 falar no WhatsApp, não renderizar uma tela. Recusa de negócio ("esse horário está
-ocupado") volta com HTTP 200 e a frase correspondente, então o fluxo do n8n só
-quebra em bug ou configuração errada.
+ocupado") volta com HTTP 200 e a frase correspondente, então o fluxo de quem
+consome só quebra em bug ou configuração errada.
 
 O acesso é por **token próprio**, guardado hasheado, e não pela `service_role
 key`: a camada que fala com o agente é a que mais recebe texto de estranho.
 
-O contrato completo, com cURL de cada endpoint pronto para o **Import cURL** do
-n8n, está em [`API_AGENTE.md`](API_AGENTE.md).
+O contrato completo, com cURL de cada endpoint pronto para o **Import cURL**,
+está em [`API_AGENTE.md`](API_AGENTE.md).
 
-### ⚠️ A automação precisa da chave `service_role`
+### ⚠️ Automação sem sessão precisa da chave `service_role`
 
 As políticas de RLS liberam apenas o papel `authenticated`, que corresponde a uma
-sessão de usuário logado. **A automação não tem sessão.**
+sessão de usuário logado. **Servidor não tem sessão.**
 
-Se o n8n usar a chave `anon`, as gravações **falham em silêncio**: a API devolve
-`200 OK` com zero linhas afetadas e nenhum lead aparece no sistema. É o erro mais
-comum de quem monta essa integração.
+As Edge Functions recebem a `service_role key` do próprio Supabase, então isso já
+está resolvido para a Letícia. Vale para qualquer outra automação que alguém
+aponte para o banco: com a chave `anon`, as gravações **falham em silêncio** —
+`200 OK`, zero linhas afetadas, nenhum lead no sistema.
 
-O fluxo esperado está descrito na seção 8 do [`DATABASE.md`](DATABASE.md).
+Essa chave **nunca** vai para o navegador. No frontend roda a `anon key`,
+protegida por RLS.
+
+O fluxo completo está na seção 8 do [`DATABASE.md`](DATABASE.md).
 
 ---
 
@@ -702,7 +717,7 @@ where pubname = 'supabase_realtime';
 | Arquivo | Conteúdo |
 |---|---|
 | [`DATABASE.md`](DATABASE.md) | Referência completa do banco: todas as colunas, RLS, Storage, Realtime, armadilhas e consultas de verificação |
-| [`API_AGENTE.md`](API_AGENTE.md) | Contrato da API que o Agente de IA consome pelo n8n: os sete endpoints, com cURL pronto, e o desenho dos tokens de acesso |
+| [`API_AGENTE.md`](API_AGENTE.md) | Contrato da API da agenda para integração externa: os sete endpoints, com cURL pronto, e o desenho dos tokens de acesso |
 | [`CLAUDE.md`](CLAUDE.md) | Convenções de código, design system, rotas e débito técnico conhecido |
 | [`supabase/migrations/`](supabase/migrations/) | O SQL que recria o banco do zero |
 

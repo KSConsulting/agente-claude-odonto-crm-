@@ -35,8 +35,25 @@ npm run lint      # ESLint
 npm run preview   # pré-visualizar o build
 ```
 
+E os do Agente de IA (ver [`agente-ia/README.md`](agente-ia/README.md)):
+
+```bash
+npm run prompt          # agente-ia/prompt.md → _shared/prompt-oficial.ts
+npm run agente:secrets  # sobe as chaves de agente-ia/.env.agente.local
+npm run agente:deploy   # regera o prompt e publica a função whatsapp
+```
+
+> `agente:deploy` usa `--no-verify-jwt` de propósito: quem chama o webhook é a
+> Evolution, que não tem sessão do Supabase. A autenticação é o
+> `WEBHOOK_SEGREDO`, conferido dentro da função. Publicar no padrão derruba o
+> webhook com um 401 que nem chega no nosso código — mesmo motivo da `agenda/`.
+
 Não existe suíte de testes. Ao mexer em algo, valide com `npm run build`
 (que roda o TypeScript) e `npm run lint`.
+
+**O `tsc` do projeto não cobre `supabase/functions/`** (o `tsconfig.app.json`
+inclui só `src`). O código das Edge Functions é validado pelo bundler no
+deploy — erro ali só aparece na hora de publicar.
 
 ---
 
@@ -66,15 +83,18 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **nove arquivos, nesta ordem**:
+A migração é aplicada em **doze arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
 `0005_catalogo_procedimentos.sql` (os 20 procedimentos da clínica),
 `0006_informacoes_clinica.sql` (endereço da clínica e a view do agente),
 `0007_horario_na_view.sql` (o horário de atendimento nessa view),
-`0008_procedimentos_view.sql` (a view de procedimentos) e
-`0009_profissionais_view.sql` (a view de profissionais e a `jornada_texto()`).
+`0008_procedimentos_view.sql` (a view de procedimentos),
+`0009_profissionais_view.sql` (a view de profissionais e a `jornada_texto()`),
+`0010_agente_conversas.sql` (as conversas do WhatsApp e as configurações do
+agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
+`0012_procedimentos_texto_enxuto.sql` (os textos longos, reescritos curtos).
 
 Os pontos que mais causam erro:
 
@@ -85,9 +105,10 @@ Os pontos que mais causam erro:
 2. **Os valores de `status` vivem em dois lugares:** o `CHECK` no banco e os
    tipos `LeadStatus` / `ConsultaStatus` em [`src/types/index.ts`](src/types/index.ts).
    Alterou um, altere o outro — nada sincroniza isso automaticamente.
-3. **A automação (n8n/Chatwoot) precisa da `service_role key`.** As políticas de
-   RLS só liberam `authenticated`. Com a `anon key`, as gravações falham em
-   silêncio (`200 OK`, zero linhas).
+3. **As Edge Functions escrevem com a `service_role key`.** As políticas de RLS
+   só liberam `authenticated`, e função não tem sessão. O Supabase injeta essa
+   chave sozinho; ela **nunca** entra em `src/`. Qualquer integração que use a
+   `anon key` falha em silêncio (`200 OK`, zero linhas).
 4. **Realtime assina a TABELA, não a view.** Leitura e escrita usam
    `crm_clinica`; as assinaturas de `postgres_changes` usam
    `crm_clinica_dados`. O Postgres só replica tabelas — assinar a view não dá
@@ -102,7 +123,7 @@ Os pontos que mais causam erro:
 7. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
    do país (`5511987654321`). Nunca grave formatado — um trigger tira a
    pontuação, mas ninguém adivinha o DDI que faltar. Repetido devolve `23505`.
-   O formato é o mesmo que o n8n já usa; a regra dos países vive em
+   É o formato em que a Evolution entrega; a regra dos países vive em
    [`src/lib/telefones.ts`](src/lib/telefones.ts).
 
 ---
@@ -136,6 +157,9 @@ src/
 │   ├── CampoTelefone.tsx       seletor de país + contagem de dígitos
 │   ├── TabClinica.tsx          aba "Clínica" de Configurações
 │   ├── TabTokenApi.tsx         aba "Token e API" de Configurações
+│   ├── TabAgenteIA.tsx         aba "Agente de IA" de Configurações
+│   ├── EditorProcedimento.tsx  modal de edição de um procedimento
+│   ├── ModalPortal.tsx         leva o modal para o <body> (ver Convenções)
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -239,6 +263,23 @@ escalonam a entrada dos blocos da página — mais classes de media query
 declaradas localmente no próprio componente.
 
 **Siga o padrão inline.** Misturar Tailwind agora deixaria a base inconsistente.
+
+### Modal vive dentro de `ModalPortal`
+
+`position: fixed` promete "em relação à janela" — e quebra a promessa se
+**qualquer** ancestral tiver `transform`. As classes `fade-in-*` do
+[`index.css`](src/index.css) animam com `translateY` e `forwards`, o que deixa
+`transform: translateY(0)` gravado no elemento para sempre. Não é `none`, então
+vira o novo referencial.
+
+Em Configurações isso aparecia: o conteúdo da aba mora dentro de um `fade-in-3`
+alto, e o modal se centralizava no meio **daquele bloco** — surgindo lá embaixo,
+metade fora da tela.
+
+[`ModalPortal.tsx`](src/components/ModalPortal.tsx) resolve na raiz, jogando o
+modal direto no `<body>`. **Todo modal novo nasce dentro dele.** Os modais
+antigos das outras páginas escapam por acidente — são irmãos dos blocos
+animados, não filhos —, mas basta alguém aninhar um para o sintoma voltar.
 
 ### Outras convenções
 
@@ -377,6 +418,8 @@ commit.
 | Dependência, script do `package.json` | `CLAUDE.md` (Stack / Comandos) |
 | Correção de algo listado em Débito técnico | Remova o item de `CLAUDE.md` |
 | Variável de ambiente | `CLAUDE.md` + `DATABASE.md` (seção 1.3) |
+| Prompt do Agente de IA | [`agente-ia/prompt.md`](agente-ia/prompt.md) — e confira se a seção 8 do README da pasta ainda descreve ele |
+| Ferramentas, modelo ou etapas do Agente de IA | [`agente-ia/README.md`](agente-ia/README.md) (a seção correspondente **e** a tabela de estado) |
 
 Ao mudar o banco, **prefira verificar contra o banco real** (consultas da seção
 10 do `DATABASE.md`) em vez de assumir que o SQL escrito foi o que rodou.
@@ -432,45 +475,60 @@ Nenhum deles quebra nada — mas confundem quem procura onde algo está definido
 
 ## Integração com o Agente de IA
 
-A tabela `crm_clinica_dados` guarda os identificadores do **Chatwoot**
-(`id_conta_chatwoot`, `id_conversa_chatwoot`, `id_lead_chatwoot`,
-`inbox_id_chatwoot`) e os carimbos de follow-up (`follow_up_1/2/3`).
+**📘 Tudo sobre o agente do WhatsApp vive em [`agente-ia/`](agente-ia/)** —
+comece pelo [`agente-ia/README.md`](agente-ia/README.md): quem ele é, como
+funciona, as decisões tomadas, o estado de cada etapa e **o mapa de onde fica
+cada arquivo**. Leia antes de mexer em qualquer coisa ligada a ele.
 
-**O que ele toca no banco — lista fechada.** Grava em um lugar só:
+A pasta guarda o **conteúdo** (o prompt em `prompt.md`, os exemplos, as
+chaves). O **código** fica onde as ferramentas obrigam — `supabase/functions/`
+e `src/` — e está todo listado no mapa daquele README.
+
+> ⚠️ **A tabela de estado daquele README diz o que já foi construído.** O que
+> estiver em etapa não concluída não existe — não procure o arquivo.
+
+**Ela não usa n8n nem Chatwoot.** Esse era o desenho antigo, abandonado antes de
+rodar. Hoje a Letícia é a Edge Function
+[`supabase/functions/whatsapp/`](supabase/functions/whatsapp/), chamada por
+webhook pela **Evolution API v2**. Duas heranças ficaram no schema, ambas
+mortas: as colunas `*_chatwoot` de `crm_clinica_dados` e a tabela
+`n8n_chat_histories`, que **nunca chegou a existir** neste banco.
+
+**O que ela toca no banco — lista fechada:**
 
 | Objeto | Acesso |
 |---|:---:|
-| `crm_clinica` | **lê e grava** — os leads do WhatsApp |
-| `n8n_chat_histories` | **lê e grava** — a memória da conversa. Criada pelo próprio n8n, não pelas migrações |
+| `crm_clinica` | **lê e grava** — cria o lead, avança o status e preenche a ficha |
+| `mensagens_whatsapp` | **lê e grava** — a memória da conversa, e a fonte da futura tela Conversas |
+| `consultas` | **grava só pelas funções SQL** `agenda_marcar` / `agenda_remarcar` / `agenda_cancelar`. Lê direto, só as do próprio lead |
+| bucket `midias-whatsapp` | **grava** — o áudio e a foto que o paciente mandou. Privado |
 | `informacoes_clinica_agente` | **só lê** — dados da clínica em frases prontas |
 | `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
 | `profissionais_clinica_agente` | **só lê** — dentistas ativos e a jornada de cada um |
+| `servicos_clinica` | **só lê** — a `descricao_longa` de **um** procedimento, pela ferramenta `detalhes_do_procedimento` |
+| `configuracoes_agente` | **só lê** — modelo, prompt e a regra do modo teste |
+| `configuracoes_clinica` | **só lê** — só o `fuso_horario` |
 
-Nada mais. Agenda é sempre pela API — `consultas` é escrita pela Edge Function,
-nunca por `INSERT` do n8n. Detalhes na **seção 8.1 do
-[`DATABASE.md`](DATABASE.md)**, junto com o motivo pelo qual a automação precisa
-da `service_role key`.
-
-> **`n8n_chat_histories` não está em `supabase/migrations/`, e não é
-> esquecimento.** O nó de memória de conversa do n8n cria a tabela sozinho, na
-> primeira mensagem que o agente recebe; o schema é dele. Escrever uma migração
-> para ela só criaria a chance de as duas definições divergirem. Ela também é a
-> única tabela de `public` sem RLS — estado conhecido e registrado na **seção
-> 4.16 do `DATABASE.md`**, com o caminho para fechar, se um dia for o caso.
+Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.
 
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.
 
-### Ao agendar, o agente chama a API — não escreve no banco
+### Ao agendar, o agente chama função SQL — nunca `INSERT`
 
 Antes da Agenda existir, o agente gravava `data_agendamento` direto na ficha do
 lead. **Isso não vale mais.** A consulta vira linha em `consultas`, com
 `profissional_id`, `duracao_minutos`, `origem = 'agente_ia'` e `chave_externa` —
-mas quem grava é a Edge Function, chamada por `POST /marcar`, e não o n8n.
+e quem grava é `agenda_marcar`, chamada pela ferramenta.
 
 `INSERT` direto pula a conferência de jornada, a escolha de profissional livre e
 a idempotência da `chave_externa`; ao bater na restrição de sobreposição, devolve
 um `23P01` cru, sem frase para dizer a quem está esperando no WhatsApp.
+
+> **Duas portas, uma regra.** A Letícia chama as funções SQL **direto**, por RPC,
+> porque roda dentro do mesmo projeto. Quem está de fora usa os sete endpoints da
+> função `agenda/`, com token. As duas descem para as mesmas funções da migração
+> `0004` — é isso que impede as duas de divergirem.
 
 `data_agendamento` continua existindo, mas virou reflexo — quem o mantém é o
 trigger `consultas_sincroniza_lead`.
@@ -479,8 +537,11 @@ trigger `consultas_sincroniza_lead`.
 
 **Contrato e cURLs em [`API_AGENTE.md`](API_AGENTE.md)** — sete endpoints
 (profissionais, procedimentos, disponibilidade, marcar, consultas, cancelar,
-remarcar), chamados pelo **n8n via nó HTTP**, autenticados por token próprio e
-não pela `service_role key`.
+remarcar), para **integração externa**, autenticados por token próprio e não
+pela `service_role key`.
+
+> **A Letícia não usa esses endpoints.** Ela mora no mesmo projeto e chama as
+> funções SQL direto. A API existe para quem está de fora.
 
 Quatro coisas para não descobrir do jeito difícil:
 
@@ -491,7 +552,7 @@ Quatro coisas para não descobrir do jeito difícil:
    é o nosso token, não a `anon key`. Reimplantar no padrão derruba os sete
    endpoints de uma vez, com um 401 que nem chega no nosso código.
 3. **Recusa de negócio volta com HTTP 200** (`ok: false` + `motivo` +
-   `mensagem`). "Horário ocupado" é resposta, não erro — com 4xx o nó do n8n
+   `mensagem`). "Horário ocupado" é resposta, não erro — com 4xx, quem consome
    quebraria o fluxo justamente na hora de dar a notícia.
 4. **Toda resposta traz frase pronta**, inclusive 401 e 500, onde ela é neutra.
    Quem consome vai falar com um paciente; sem frase, o agente improvisa.
@@ -510,7 +571,7 @@ vê como ocupado.
 A aba é [`TabTokenApi.tsx`](src/components/TabTokenApi.tsx), com a geração e o
 catálogo de endpoints em [`src/lib/apiTokens.ts`](src/lib/apiTokens.ts). Ela
 cria, revoga, mostra status e último acesso, e traz a documentação dos sete
-endpoints com os cURLs prontos para o Import cURL do n8n.
+endpoints com os cURLs prontos para colar em qualquer cliente HTTP.
 
 **O `hashToken()` da tela e o `sha256()` da Edge Function precisam ser o mesmo
 cálculo** — SHA-256 em hexadecimal minúsculo. É o único ponto de encontro entre
@@ -525,9 +586,9 @@ preenchidos logo depois da criação.
 
 `informacoes_clinica_agente` é uma view de **coluna única**, com uma informação
 por linha, já escrita como frase — endereço, bairro, cidade/UF, CEP, horário de
-atendimento, Maps, Instagram e site. O n8n lê com a mesma `service_role key` que
-já usa para gravar os leads em `crm_clinica`; não há endpoint para isso, de
-propósito.
+atendimento, Maps, Instagram e site. A Edge Function lê com a mesma
+`service_role key` que já usa para gravar os leads em `crm_clinica`; não há
+endpoint para isso, de propósito.
 
 A linha `Atendimento:` **não é campo digitado**: sai de `horario_comercial` pela
 função `jornada_texto(null)`, que agrupa dias seguidos com o mesmo horário
