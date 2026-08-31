@@ -50,6 +50,7 @@ function ouNulo(texto: string): string | null {
 }
 
 interface Formulario {
+  nome_clinica: string
   endereco: string
   bairro: string
   cidade: string
@@ -61,6 +62,7 @@ interface Formulario {
 }
 
 const VAZIO: Formulario = {
+  nome_clinica: '',
   endereco: '', bairro: '', cidade: '', estado: '', cep: '',
   google_maps_url: '', instagram_url: '', site_url: '',
 }
@@ -85,6 +87,7 @@ export default function TabClinica() {
       if (c) {
         setClinica(c)
         setForm({
+          nome_clinica: c.nome_clinica ?? '',
           endereco: c.endereco ?? '',
           bairro: c.bairro ?? '',
           cidade: c.cidade ?? '',
@@ -134,6 +137,7 @@ export default function TabClinica() {
     setErro('')
 
     const dados = {
+      nome_clinica: ouNulo(form.nome_clinica),
       endereco: ouNulo(form.endereco),
       bairro: ouNulo(form.bairro),
       cidade: ouNulo(form.cidade),
@@ -153,6 +157,9 @@ export default function TabClinica() {
 
     setClinica(data as ConfiguracoesClinica)
     await recarregarPrevia()
+    // A Sidebar mostra o nome da clínica e recarrega a linha inteira ao ouvir
+    // isto — senão o nome novo só apareceria no próximo F5.
+    window.dispatchEvent(new Event('clinica-atualizada'))
     setSalvo(true)
     setTimeout(() => setSalvo(false), 2000)
   }
@@ -173,6 +180,16 @@ export default function TabClinica() {
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={rotuloStyle}>Nome da clínica</label>
+            <input value={form.nome_clinica} onChange={(e) => set('nome_clinica', e.target.value)}
+              placeholder="Ex: Sorriso Pleno"
+              style={inputStyle} onFocus={foco} onBlur={desfoco} />
+            <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 5, lineHeight: 1.5 }}>
+              Aparece na barra lateral do sistema e é como a Letícia se apresenta ao paciente.
+            </div>
+          </div>
+
           <div>
             <label style={rotuloStyle}>Endereço <span style={opcionalStyle}>(rua, número e complemento)</span></label>
             <input value={form.endereco} onChange={(e) => set('endereco', e.target.value)}

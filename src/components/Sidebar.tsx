@@ -47,13 +47,14 @@ export default function Sidebar() {
     }
     loadData()
 
-    // Refresh logo when Settings page signals an update
-    const onLogoUpdate = () => {
+    // Recarrega os dados da clínica quando Configurações avisa que mudou
+    // (nome ou logo — a consulta traz a linha inteira).
+    const onClinicaAtualizada = () => {
       supabase.from('configuracoes_clinica').select('*').limit(1).single()
         .then(({ data }) => { if (data) setClinica(data) })
     }
-    window.addEventListener('clinica-logo-updated', onLogoUpdate)
-    return () => window.removeEventListener('clinica-logo-updated', onLogoUpdate)
+    window.addEventListener('clinica-atualizada', onClinicaAtualizada)
+    return () => window.removeEventListener('clinica-atualizada', onClinicaAtualizada)
   }, [])
 
   const handleLogout = async () => {
