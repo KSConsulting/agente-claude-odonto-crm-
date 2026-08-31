@@ -288,4 +288,14 @@ export interface ConversaResumo {
   ultima_em: string
   /** Só conta mensagem do paciente. É a bolinha azul da lista. */
   nao_lidas: number
+  /**
+   * A consulta ativa mais próxima do lead. Nula = sem consulta marcada.
+   *
+   * ⚠️ É ESTA COLUNA que responde "agendou?", **não** o `status`. O trigger
+   * `consultas_sincroniza_lead` preserva `consulta_realizada` e
+   * `paciente_recorrente` quando alguém marca de novo — então um paciente que
+   * volta e marca NÃO fica em `consulta_agendada`. Ver `temConsultaMarcada()`
+   * em `src/lib/conversas.ts` e a migração 0014.
+   */
+  data_agendamento: string | null
 }

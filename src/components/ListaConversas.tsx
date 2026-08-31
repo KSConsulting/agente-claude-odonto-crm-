@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Search, UserCheck, MessageSquareDashed } from 'lucide-react'
+import { Search, UserCheck, MessageSquareDashed, CalendarCheck, CalendarX } from 'lucide-react'
 import { formatarParaExibicao } from '../lib/telefones'
-import { previaDaMensagem, quandoCurto } from '../lib/conversas'
+import { previaDaMensagem, quandoCurto, temConsultaMarcada, quandoAgendada } from '../lib/conversas'
 import { AGENTE_TITULO, AGENTE_POR_EXTENSO } from '../lib/agente'
 import type { ConversaResumo } from '../types'
 
@@ -9,12 +9,26 @@ import type { ConversaResumo } from '../types'
  * A coluna da esquerda: quem falou com a clínica, em ordem de quem falou por
  * último.
  *
- * A lista vem pronta da view `conversas_lista` (migração 0013) — última
- * mensagem, não lidas e quem assumiu já resolvidos no banco. Aqui só se
- * desenha e se filtra.
+ * A lista vem pronta da view `conversas_lista` (migrações 0013 e 0014) —
+ * última mensagem, não lidas, quem assumiu e a consulta marcada já resolvidos
+ * no banco. Aqui só se desenha e se filtra.
  */
 
 const FONTE = "'Plus Jakarta Sans', sans-serif"
+
+/**
+ * Os filtros da lista. São três, e não um por status do funil, porque a
+ * pergunta de quem está na tela Conversas não é "em que etapa este lead está?"
+ * — isso é o CRM. Aqui a pergunta é **"de quem eu preciso cuidar agora?"**:
+ * quem esperou resposta (não lidas) e quem já converteu (agendadas).
+ */
+type Filtro = 'todas' | 'agendadas' | 'nao_lidas'
+
+const ROTULO_FILTRO: Record<Filtro, string> = {
+  todas: 'Todas',
+  agendadas: 'Agendadas',
+  nao_lidas: 'Não lidas',
+}
 
 interface Props {
   conversas: ConversaResumo[]
@@ -25,14 +39,37 @@ interface Props {
 
 export default function ListaConversas({ conversas, selecionada, onSelecionar, carregando }: Props) {
   const [busca, setBusca] = useState('')
+  const [filtro, setFiltro] = useState<Filtro>('todas')
+
+  const passaNoFiltro = (c: ConversaResumo) =>
+    filtro === 'todas' ? true
+      : filtro === 'agendadas' ? temConsultaMarcada(c)
+      : c.nao_lidas > 0
 
   const termo = busca.trim().toLowerCase()
-  const filtradas = termo
-    ? conversas.filter((c) =>
-        (c.nome_lead ?? '').toLowerCase().includes(termo) ||
-        (c.whatsapp_lead ?? '').includes(termo.replace(/\D/g, '')) ||
-        (c.ultimo_conteudo ?? '').toLowerCase().includes(termo))
-    : conversas
+  const passaNaBusca = (c: ConversaResumo) =>
+    !termo ||
+    (c.nome_lead ?? '').toLowerCase().includes(termo) ||
+    (c.whatsapp_lead ?? '').includes(termo.replace(/\D/g, '')) ||
+    (c.ultimo_conteudo ?? '').toLowerCase().includes(termo)
+
+  const filtradas = conversas.filter((c) => passaNoFiltro(c) && passaNaBusca(c))
+
+  // Os números das abas contam a lista INTEIRA, não o resultado da busca: eles
+  // dizem quanto existe, e um contador que muda ao digitar não serve para isso.
+  const totais: Record<Filtro, number> = {
+    todas: conversas.length,
+    agendadas: conversas.filter(temConsultaMarcada).length,
+    nao_lidas: conversas.filter((c) => c.nao_lidas > 0).length,
+  }
+
+  const vazioTexto = termo
+    ? 'Tente outro nome ou número.'
+    : filtro === 'agendadas'
+      ? 'Ninguém com consulta marcada por aqui ainda. Quando a Letícia marcar, a etiqueta verde aparece na conversa.'
+      : filtro === 'nao_lidas'
+        ? 'Nada esperando resposta. Tudo lido.'
+        : 'Assim que alguém mandar mensagem no WhatsApp da clínica, a conversa aparece aqui.'
 
   return (
     <div style={{
@@ -40,8 +77,8 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
       display: 'flex', flexDirection: 'column', height: '100%',
     }}>
 
-      {/* Cabeçalho e busca */}
-      <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid #EDF2F4', flexShrink: 0 }}>
+      {/* Cabeçalho, busca e filtros */}
+      <div style={{ padding: '18px 18px 12px', borderBottom: '1px solid #EDF2F4', flexShrink: 0 }}>
         <h1 style={{ fontSize: 18, fontWeight: 800, color: '#16232B', margin: '0 0 3px' }}>
           Conversas
         </h1>
@@ -65,6 +102,37 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
             onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}
           />
         </div>
+
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {(Object.keys(ROTULO_FILTRO) as Filtro[]).map((f) => {
+            const ativo = filtro === f
+            return (
+              <button
+                key={f}
+                onClick={() => setFiltro(f)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '4px 9px', borderRadius: 20, cursor: 'pointer',
+                  fontSize: 11.5, fontWeight: 600, fontFamily: FONTE,
+                  border: `1px solid ${ativo ? '#1E6E8C' : '#DCE6EA'}`,
+                  background: ativo ? '#1E6E8C' : '#fff',
+                  color: ativo ? '#fff' : '#6B818C',
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+                onMouseEnter={(e) => { if (!ativo) e.currentTarget.style.background = '#F7FAFB' }}
+                onMouseLeave={(e) => { if (!ativo) e.currentTarget.style.background = '#fff' }}
+              >
+                {ROTULO_FILTRO[f]}
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700,
+                  color: ativo ? '#BBDDE8' : '#9AAEB6',
+                }}>
+                  {totais[f]}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* A lista */}
@@ -79,12 +147,10 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
           <div style={{ padding: '40px 26px', textAlign: 'center' }}>
             <MessageSquareDashed size={26} color="#B6C6CD" style={{ marginBottom: 10 }} />
             <div style={{ fontSize: 13, fontWeight: 600, color: '#16232B', marginBottom: 4 }}>
-              {termo ? 'Nada encontrado' : 'Nenhuma conversa ainda'}
+              {termo ? 'Nada encontrado' : filtro === 'todas' ? 'Nenhuma conversa ainda' : 'Nada por aqui'}
             </div>
             <div style={{ fontSize: 11.5, color: '#6B818C', lineHeight: 1.55 }}>
-              {termo
-                ? 'Tente outro nome ou número.'
-                : 'Assim que alguém mandar mensagem no WhatsApp da clínica, a conversa aparece aqui.'}
+              {vazioTexto}
             </div>
           </div>
         )}
@@ -93,6 +159,11 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
           const ativa = c.lead_id === selecionada
           const nome = c.nome_lead?.trim() || formatarParaExibicao(c.whatsapp_lead) || 'Sem nome'
           const naoLidas = ativa ? 0 : c.nao_lidas
+          const agendada = temConsultaMarcada(c)
+          // Só é "cancelada" quando NÃO sobrou consulta ativa — o trigger
+          // mantém o lead em agendada enquanto restar alguma sessão do
+          // tratamento. Por isso as duas etiquetas nunca aparecem juntas.
+          const cancelada = !agendada && c.status === 'consulta_cancelada'
 
           return (
             <button
@@ -157,14 +228,42 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
                   )}
                 </div>
 
-                {c.agente_pausado && (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6,
-                    background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6,
-                    padding: '2px 6px', fontSize: 10, fontWeight: 600, color: '#92400E',
-                  }}>
-                    <UserCheck size={10} />
-                    {c.assumido_por_nome ? `Com ${c.assumido_por_nome.split(' ')[0]}` : 'Assumida'}
+                {/* As etiquetas. Numa linha só, que quebra se precisar. */}
+                {(agendada || cancelada || c.agente_pausado) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+
+                    {agendada && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: '#E8F8EF', border: '1px solid #B7E7CB', borderRadius: 6,
+                        padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#1A7A48',
+                      }}>
+                        <CalendarCheck size={10} />
+                        Agendada · {quandoAgendada(c.data_agendamento!)}
+                      </span>
+                    )}
+
+                    {cancelada && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6,
+                        padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#DC2626',
+                      }}>
+                        <CalendarX size={10} />
+                        Cancelada
+                      </span>
+                    )}
+
+                    {c.agente_pausado && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6,
+                        padding: '2px 6px', fontSize: 10, fontWeight: 600, color: '#92400E',
+                      }}>
+                        <UserCheck size={10} />
+                        {c.assumido_por_nome ? `Com ${c.assumido_por_nome.split(' ')[0]}` : 'Assumida'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

@@ -67,7 +67,11 @@ ordem**:
     conteúdo; nada de schema. Ver [4.6](#46-servicos_clinica).
 13. `supabase/migrations/0013_conversas_lista.sql` — a view
     `conversas_lista`, que sustenta a coluna da esquerda da tela Conversas.
-    Ver [4.18](#418-conversas_lista-view-migração-0013).
+    Ver [4.18](#418-conversas_lista-view-migrações-0013-e-0014).
+14. `supabase/migrations/0014_conversas_agendamento.sql` — acrescenta
+    `data_agendamento` a essa view, para a etiqueta "Agendada" e o filtro da
+    lista. Só `create or replace view`; nada de tabela. Ver
+    [4.18](#418-conversas_lista-view-migrações-0013-e-0014).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -1036,10 +1040,11 @@ Três colunas novas em `crm_clinica_dados`: `agente_pausado`, `assumido_por` e
 
 ---
 
-### 4.18. `conversas_lista` (view, migração `0013`)
+### 4.18. `conversas_lista` (view, migrações `0013` e `0014`)
 
 A coluna da esquerda da tela **Conversas**: uma linha por pessoa que já trocou
-mensagem, com a última frase, quantas estão sem ler e quem assumiu.
+mensagem, com a última frase, quantas estão sem ler, quem assumiu e a consulta
+marcada.
 
 **Usada por:** [`src/lib/conversas.ts`](src/lib/conversas.ts) e, por ela,
 [`ListaConversas.tsx`](src/components/ListaConversas.tsx). O Agente de IA
@@ -1052,6 +1057,7 @@ mensagem, com a última frase, quantas estão sem ler e quem assumiu.
 | `assumido_por_nome` | join com `usuarios` |
 | `ultimo_conteudo`, `ultimo_tipo`, `ultimo_autor`, `ultima_em` | a última linha de `mensagens_whatsapp` |
 | `nao_lidas` | contagem em `mensagens_whatsapp`, só `autor = 'paciente'` |
+| `data_agendamento` | `crm_clinica_dados` — a consulta ativa mais próxima (`0014`) |
 
 #### Por que é view, e não consulta na tela
 
@@ -1063,6 +1069,43 @@ para descartar 95% no navegador.
 
 Ela é calculada na leitura, como `crm_clinica` e as três views do agente. O
 estado "desatualizada" não existe.
+
+#### "Quem agendou?" se pergunta a `data_agendamento`, nunca ao `status`
+
+É a armadilha desta view, e ela erra **em silêncio**.
+
+A leitura óbvia de "esta pessoa marcou consulta" seria
+`status = 'consulta_agendada'`. Mas o trigger `consultas_sincroniza_lead`
+(seção 4.7) **preserva** `consulta_realizada` e `paciente_recorrente` quando
+alguém marca de novo — de propósito, porque é por esses dois status que
+[`src/lib/pessoas.ts`](src/lib/pessoas.ts) separa `/leads` de `/clientes`, e
+rebaixá-los jogaria um paciente de volta na lista de contatos a cada retorno.
+
+**Consequência: um paciente que volta e marca continua em
+`paciente_recorrente`.** Filtrar por status perderia exatamente quem mais volta
+numa clínica de odontologia — tratamento de várias sessões, retorno,
+manutenção.
+
+`data_agendamento` não tem esse problema: o mesmo trigger a recalcula para
+**qualquer** status, como `min(data_consulta)` das consultas ativas, e a zera
+quando não sobra nenhuma. É a única coluna da ficha que responde à pergunta.
+
+A regra vive em `temConsultaMarcada()`, em
+[`src/lib/conversas.ts`](src/lib/conversas.ts) — não repita a comparação solta
+na tela.
+
+```sql
+-- Os que um filtro por status perderia. Toda linha aqui é um erro evitado:
+select nome_lead, status, data_agendamento
+  from public.crm_clinica_dados
+ where data_agendamento is not null
+   and status <> 'consulta_agendada';
+```
+
+> A coluna entrou **no fim** da lista, e não ao lado de `status`, onde leria
+> melhor. `create or replace view` no Postgres só aceita colunas novas no fim;
+> reordenar exigiria `drop view`, que derrubaria os grants e deixaria a tela sem
+> lista no meio do caminho.
 
 #### Três detalhes que a definem
 

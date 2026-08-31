@@ -187,6 +187,56 @@ export function quandoCurto(iso: string): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   A etiqueta "Agendada"
+   ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Esta pessoa tem consulta marcada?
+ *
+ * ⚠️ NÃO PERGUNTE ISSO AO `status`. A resposta óbvia seria
+ * `status === 'consulta_agendada'`, e ela erra **em silêncio**: o trigger
+ * `consultas_sincroniza_lead` preserva de propósito `consulta_realizada` e
+ * `paciente_recorrente` quando o lead marca de novo — porque é por esses dois
+ * status que `pessoas.ts` separa /leads de /clientes, e rebaixá-los jogaria um
+ * paciente de volta na lista de contatos a cada retorno.
+ *
+ * Ou seja: **um paciente que volta e marca continua em `paciente_recorrente`.**
+ * Filtrar por status perderia exatamente quem mais volta numa clínica de
+ * odontologia — tratamento de várias sessões, retorno, manutenção.
+ *
+ * `data_agendamento` é recalculada pelo mesmo trigger para qualquer status,
+ * como a consulta ativa mais próxima, e zerada quando não sobra nenhuma.
+ */
+export function temConsultaMarcada(c: ConversaResumo): boolean {
+  return !!c.data_agendamento
+}
+
+/**
+ * `hoje, 14h` · `amanhã, 9h30` · `3 set, 14h` — o quando da etiqueta.
+ *
+ * O dia vem antes da hora porque em uma lista o que se procura é o dia; e a
+ * hora aparece sem os `:00` porque "14h" é como se fala ao telefone.
+ */
+export function quandoAgendada(iso: string): string {
+  const d = new Date(iso)
+  const hoje = new Date()
+  const amanha = new Date()
+  amanha.setDate(hoje.getDate() + 1)
+
+  const mesmoDia = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+
+  const min = d.getMinutes()
+  const relogio = min === 0 ? `${d.getHours()}h` : `${d.getHours()}h${String(min).padStart(2, '0')}`
+
+  if (mesmoDia(d, hoje)) return `hoje, ${relogio}`
+  if (mesmoDia(d, amanha)) return `amanhã, ${relogio}`
+
+  const dia = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '')
+  return `${dia}, ${relogio}`
+}
+
 /**
  * Os dados completos do lead, para o painel lateral.
  *

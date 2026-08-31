@@ -83,7 +83,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **treze arquivos, nesta ordem**:
+A migração é aplicada em **catorze arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -95,7 +95,9 @@ profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0010_agente_conversas.sql` (as conversas do WhatsApp e as configurações do
 agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
 `0012_procedimentos_texto_enxuto.sql` (os textos longos, reescritos curtos) e
-`0013_conversas_lista.sql` (a view que sustenta a tela Conversas).
+`0013_conversas_lista.sql` (a view que sustenta a tela Conversas) e
+`0014_conversas_agendamento.sql` (o `data_agendamento` nessa view, para a
+etiqueta "Agendada").
 
 Os pontos que mais causam erro:
 
@@ -121,7 +123,14 @@ Os pontos que mais causam erro:
    que impede duas consultas ativas se sobrepondo na mesma agenda. Ela devolve
    `23P01`, e a interface precisa traduzir isso — repetir a chamada dá o mesmo
    erro.
-7. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
+7. **"Agendou?" não se pergunta ao `status`.** O trigger preserva
+   `consulta_realizada` e `paciente_recorrente` quando alguém marca de novo —
+   então **um paciente que volta e marca NÃO fica em `consulta_agendada`**.
+   Quem responde é `data_agendamento`, recalculada para qualquer status. A
+   regra mora em `temConsultaMarcada()`, em
+   [`src/lib/conversas.ts`](src/lib/conversas.ts). Filtrar por status erra em
+   silêncio, e erra justo com quem mais volta.
+8. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
    do país (`5511987654321`). Nunca grave formatado — um trigger tira a
    pontuação, mas ninguém adivinha o DDI que faltar. Repetido devolve `23505`.
    É o formato em que a Evolution entrega; a regra dos países vive em
@@ -144,7 +153,7 @@ src/
 │   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
-│   ├── conversas.ts            ler, enviar, assumir e devolver conversa
+│   ├── conversas.ts            ler, enviar, assumir, devolver; e a etiqueta "Agendada"
 │   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
 │   ├── agente.ts               como o Agente de IA se chama NA TELA (ver Design system)
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
