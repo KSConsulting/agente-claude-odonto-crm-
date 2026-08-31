@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   User, Clock, Stethoscope, Upload, Save, Plus, Pencil, MapPin,
-  Trash2, ChevronDown, ChevronUp, X, Check, KeyRound, Eye, EyeOff,
+  Trash2, ChevronDown, ChevronUp, X, Check, KeyRound, Eye, EyeOff, Bot,
 } from 'lucide-react'
 import zxcvbn from 'zxcvbn'
 import { supabase } from '../lib/supabase'
@@ -9,6 +9,8 @@ import type { Usuario, ConfiguracoesClinica, HorarioComercial, ServicoClinica } 
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import TabTokenApi from '../components/TabTokenApi'
 import TabClinica from '../components/TabClinica'
+import TabAgenteIA from '../components/TabAgenteIA'
+import EditorProcedimento from '../components/EditorProcedimento'
 
 /* ──────────────────────────────────────────────
    Upload validation constants
@@ -33,13 +35,14 @@ const STRENGTH_COLORS = ['#DC2626', '#F97316', '#D97706', '#1A7A48', '#1A7A48']
 ────────────────────────────────────────────── */
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
 
-type TabKey = 'perfil' | 'clinica' | 'horarios' | 'procedimentos' | 'tokens'
+type TabKey = 'perfil' | 'clinica' | 'horarios' | 'procedimentos' | 'agente' | 'tokens'
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'perfil',         label: 'Perfil',                  icon: User },
   { key: 'clinica',        label: 'Clínica',                  icon: MapPin },
   { key: 'horarios',       label: 'Horários de Funcionamento', icon: Clock },
   { key: 'procedimentos',  label: 'Procedimentos',            icon: Stethoscope },
+  { key: 'agente',         label: 'Agente de IA',             icon: Bot },
   { key: 'tokens',         label: 'Token e API',              icon: KeyRound },
 ]
 
@@ -153,7 +156,7 @@ function TabPerfil({ userId }: { userId: string }) {
         google_maps_url: null, instagram_url: null, site_url: null,
         created_at: '', updated_at: '',
       })
-      window.dispatchEvent(new Event('clinica-logo-updated'))
+      window.dispatchEvent(new Event('clinica-atualizada'))
     }
     setUploadingLogo(false); e.target.value = ''
   }
@@ -428,14 +431,14 @@ function TabHorarios() {
 interface ProcedimentoRowState {
   data: ServicoClinica
   expanded: boolean
-  editing: boolean
-  editNome: string
-  editDescricao: string
   saving: boolean
   saved: boolean
 }
 
 function TabProcedimentos() {
+  // A edição agora abre um editor próprio: a descrição completa não cabe num
+  // campo de duas linhas espremido dentro do card.
+  const [editando, setEditando] = useState<ServicoClinica | null>(null)
   const [items, setItems] = useState<ProcedimentoRowState[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
@@ -448,7 +451,7 @@ function TabProcedimentos() {
 
   useEffect(() => {
     supabase.from('servicos_clinica').select('*').order('created_at').then(({ data }) => {
-      setItems((data ?? []).map((d) => ({ data: d as ServicoClinica, expanded: false, editing: false, editNome: d.nome, editDescricao: d.descricao, saving: false, saved: false })))
+      setItems((data ?? []).map((d) => ({ data: d as ServicoClinica, expanded: false, saving: false, saved: false })))
       setLoading(false)
     })
   }, [])
@@ -457,7 +460,6 @@ function TabProcedimentos() {
     setItems((prev) => prev.map((item) => item.data.id === id ? { ...item, ...patch } : item))
 
   const [toggleError, setToggleError] = useState<string | null>(null)
-  const [editError, setEditError] = useState<Record<string, string>>({})
   const [deleteError, setDeleteError] = useState('')
 
   const handleToggleAtivo = async (item: ProcedimentoRowState) => {
@@ -469,20 +471,6 @@ function TabProcedimentos() {
       updateItem(item.data.id, { data: { ...item.data, ativo: item.data.ativo } })
       setToggleError('Erro ao atualizar status. Tente novamente.')
     }
-  }
-
-  const handleSaveEdit = async (item: ProcedimentoRowState) => {
-    if (!item.editNome.trim() || !item.editDescricao.trim()) return
-    updateItem(item.data.id, { saving: true })
-    setEditError((prev) => ({ ...prev, [item.data.id]: '' }))
-    const { error } = await supabase.from('servicos_clinica').update({ nome: item.editNome.trim(), descricao: item.editDescricao.trim() }).eq('id', item.data.id)
-    if (error) {
-      updateItem(item.data.id, { saving: false })
-      setEditError((prev) => ({ ...prev, [item.data.id]: 'Erro ao salvar. Tente novamente.' }))
-      return
-    }
-    updateItem(item.data.id, { saving: false, saved: true, editing: false, data: { ...item.data, nome: item.editNome.trim(), descricao: item.editDescricao.trim() } })
-    setTimeout(() => updateItem(item.data.id, { saved: false }), 2000)
   }
 
   const handleDelete = async () => {
@@ -503,7 +491,7 @@ function TabProcedimentos() {
     const { data, error } = await supabase.from('servicos_clinica').insert({ nome: newNome.trim(), descricao: newDescricao.trim(), ativo: true }).select().single()
     setSavingNew(false)
     if (error) { setNewError('Erro ao salvar.'); return }
-    setItems((prev) => [...prev, { data: data as ServicoClinica, expanded: false, editing: false, editNome: (data as ServicoClinica).nome, editDescricao: (data as ServicoClinica).descricao, saving: false, saved: false, confirmDelete: false }])
+    setItems((prev) => [...prev, { data: data as ServicoClinica, expanded: false, saving: false, saved: false }])
     setNewNome(''); setNewDescricao(''); setShowNew(false)
   }
 
@@ -572,18 +560,7 @@ function TabProcedimentos() {
               </button>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                {item.editing ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <input value={item.editNome} onChange={(e) => updateItem(item.data.id, { editNome: e.target.value })}
-                      style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #1E6E8C', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
-                    <textarea value={item.editDescricao} onChange={(e) => updateItem(item.data.id, { editDescricao: e.target.value })} rows={2}
-                      style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #1E6E8C', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
-                    {editError[item.data.id] && (
-                      <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '6px 10px', fontSize: 12.5, color: '#DC2626' }}>{editError[item.data.id]}</div>
-                    )}
-                  </div>
-                ) : (
-                  <>
+                <>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: '#16232B' }}>{item.data.nome}</div>
                     <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 3, overflow: 'hidden', display: item.expanded ? 'block' : '-webkit-box', WebkitLineClamp: item.expanded ? undefined : 2, WebkitBoxOrient: 'vertical' as any }}>
                       {item.data.descricao}
@@ -594,26 +571,13 @@ function TabProcedimentos() {
                         {item.expanded ? <><ChevronUp size={12} /> Ver menos</> : <><ChevronDown size={12} /> Ver mais</>}
                       </button>
                     )}
-                  </>
-                )}
+                </>
               </div>
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                {item.editing ? (
-                  <>
-                    <button onClick={() => updateItem(item.data.id, { editing: false, editNome: item.data.nome, editDescricao: item.data.descricao })}
-                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      Cancelar
-                    </button>
-                    <button onClick={() => handleSaveEdit(item)} disabled={item.saving}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: 'none', background: item.saved ? '#1A7A48' : '#1E6E8C', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      {item.saved ? <Check size={13} /> : <Save size={13} />} {item.saving ? 'Salvando...' : item.saved ? 'Salvo!' : 'Salvar'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => updateItem(item.data.id, { editing: true })}
+                <>
+                    <button onClick={() => setEditando(item.data)}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       <Pencil size={13} /> Editar
                     </button>
@@ -621,13 +585,20 @@ function TabProcedimentos() {
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#DC2626', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       <Trash2 size={13} /> Excluir
                     </button>
-                  </>
-                )}
+                </>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {editando && (
+        <EditorProcedimento
+          procedimento={editando}
+          onSalvo={(novo) => updateItem(novo.id, { data: novo })}
+          onFechar={() => setEditando(null)}
+        />
+      )}
 
       {deleteTarget && (
         <ConfirmDeleteModal
@@ -680,6 +651,7 @@ export default function Configuracoes() {
         {activeTab === 'clinica' && <TabClinica />}
         {activeTab === 'horarios' && <TabHorarios />}
         {activeTab === 'procedimentos' && <TabProcedimentos />}
+        {activeTab === 'agente' && <TabAgenteIA />}
         {activeTab === 'tokens' && <TabTokenApi />}
       </div>
 
