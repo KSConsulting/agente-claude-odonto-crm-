@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   X, Phone, CalendarDays, Clock, Stethoscope, FileText,
@@ -9,6 +9,7 @@ import { STATUS_LEAD, ROTULO_LEAD, STATUS_CONSULTA, ROTULO_CONSULTA } from '../l
 import { carregarLead, carregarConsultas, fotoDoPerfil, type ConsultaComProfissional } from '../lib/conversas'
 import { AGENTE_NOME, AGENTE_TITULO } from '../lib/agente'
 import type { LeadClinica } from '../types'
+import AvisoBaixaConsulta from './AvisoBaixaConsulta'
 
 /**
  * O painel da direita: quem é a pessoa do outro lado da conversa.
@@ -78,6 +79,15 @@ export default function PainelLead({ leadId, onFechar }: Props) {
       .catch(() => { if (vivo) setCarregando(false) })
 
     return () => { vivo = false }
+  }, [leadId])
+
+  // Depois de uma baixa a ficha muda inteira: o status vira Paciente, a
+  // consulta muda de cor e `data_agendamento` some. Reler é mais barato que
+  // remendar cinco pedaços de estado na mão.
+  const recarregarFicha = useCallback(() => {
+    Promise.all([carregarLead(leadId), carregarConsultas(leadId)])
+      .then(([l, c]) => { setLead(l); setConsultas(c) })
+      .catch(() => { /* o próprio aviso mostra o erro dele */ })
   }, [leadId])
 
   const temNome = !!lead?.nome_lead?.trim()
@@ -163,6 +173,12 @@ export default function PainelLead({ leadId, onFechar }: Props) {
                 {ROTULO_LEAD[lead.status]}
               </span>
             )}
+          </div>
+
+          {/* Consulta desta pessoa esperando confirmação. Some sozinho
+              quando não há nenhuma. */}
+          <div style={{ padding: '0 18px' }}>
+            <AvisoBaixaConsulta leadId={leadId} compacto onBaixa={recarregarFicha} />
           </div>
 
           {/* Contato */}

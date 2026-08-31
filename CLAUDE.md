@@ -83,7 +83,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **catorze arquivos, nesta ordem**:
+A migração é aplicada em **quinze arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -97,7 +97,8 @@ agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
 `0012_procedimentos_texto_enxuto.sql` (os textos longos, reescritos curtos) e
 `0013_conversas_lista.sql` (a view que sustenta a tela Conversas) e
 `0014_conversas_agendamento.sql` (o `data_agendamento` nessa view, para a
-etiqueta "Agendada").
+etiqueta "Agendada") e `0015_baixa_da_consulta.sql` (o status `faltou` e o
+trigger que promove o lead a Paciente).
 
 Os pontos que mais causam erro:
 
@@ -123,14 +124,19 @@ Os pontos que mais causam erro:
    que impede duas consultas ativas se sobrepondo na mesma agenda. Ela devolve
    `23P01`, e a interface precisa traduzir isso — repetir a chamada dá o mesmo
    erro.
-7. **"Agendou?" não se pergunta ao `status`.** O trigger preserva
+7. **Ninguém vira Paciente sem a baixa da consulta.** `pessoas.ts` separa
+   `/leads` de `/clientes` por `consulta_realizada` / `paciente_recorrente`, e
+   **a única porta automática para eles é a consulta virar `realizada`** — o
+   trigger promove (e passa a `paciente_recorrente` na 2ª). Quem escreve isso é
+   a Agenda ou o `AvisoBaixaConsulta`; a tela nunca escreve o funil na mão.
+8. **"Agendou?" não se pergunta ao `status`.** O trigger preserva
    `consulta_realizada` e `paciente_recorrente` quando alguém marca de novo —
    então **um paciente que volta e marca NÃO fica em `consulta_agendada`**.
    Quem responde é `data_agendamento`, recalculada para qualquer status. A
    regra mora em `temConsultaMarcada()`, em
    [`src/lib/conversas.ts`](src/lib/conversas.ts). Filtrar por status erra em
    silêncio, e erra justo com quem mais volta.
-8. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
+9. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
    do país (`5511987654321`). Nunca grave formatado — um trigger tira a
    pontuação, mas ninguém adivinha o DDI que faltar. Repetido devolve `23505`.
    É o formato em que a Evolution entrega; a regra dos países vive em
@@ -154,6 +160,7 @@ src/
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 │   ├── conversas.ts            ler, enviar, assumir, devolver; e a etiqueta "Agendada"
+│   ├── baixaConsulta.ts        compareceu ou faltou: a baixa que fecha o funil
 │   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
 │   ├── agente.ts               como o Agente de IA se chama NA TELA (ver Design system)
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
@@ -174,6 +181,7 @@ src/
 │   ├── ListaConversas.tsx      coluna esquerda de /conversas
 │   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
 │   ├── PainelLead.tsx          coluna extra: ficha da pessoa, com abrir/esconder
+│   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)

@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList, Me
 import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
 import { formatarParaExibicao } from '../lib/telefones'
+import { STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
 import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -31,12 +32,6 @@ const STATUS_STYLE: Record<LeadStatus, { bg: string; color: string; pulse?: bool
   follow_up_3_feito:  { bg: '#FFFBEB', color: '#D97706' },
   consulta_realizada: { bg: '#14532D', color: '#fff' },
   paciente_recorrente:{ bg: '#F3E8FF', color: '#7C3AED' },
-}
-
-const CONSULTA_STYLE: Record<ConsultaStatus, { bg: string; color: string }> = {
-  agendada:  { bg: '#E8F8EF', color: '#1A7A48' },
-  realizada: { bg: '#14532D', color: '#fff' },
-  cancelada: { bg: '#FEF2F2', color: '#DC2626' },
 }
 
 /* ──────────────────────────────────────────────
@@ -405,7 +400,7 @@ export default function LeadDetail() {
                 </thead>
                 <tbody>
                   {consultas.map((c, idx) => {
-                    const cs = CONSULTA_STYLE[c.status]
+                    const cs = STATUS_CONSULTA[c.status]
                     const prof = profissionais.find((p) => p.id === c.profissional_id)
                     return (
                       <tr key={c.id} style={{ borderBottom: '1px solid #EDF2F4', background: idx % 2 === 0 ? '#fff' : '#F7FAFB' }}>
@@ -424,7 +419,7 @@ export default function LeadDetail() {
                         </td>
                         <td style={{ padding: '11px 12px' }}>
                           <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 600, background: cs.bg, color: cs.color, whiteSpace: 'nowrap' }}>
-                            {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                            {ROTULO_CONSULTA[c.status]}
                           </span>
                         </td>
                         <td style={{ padding: '11px 12px', color: '#6B818C' }}>{fmtCurrency(c.valor_pago)}</td>

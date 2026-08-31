@@ -76,22 +76,25 @@ export default function AgendaMes({ referencia, consultas, profissionaisPorId, o
                 {visiveis.map((c) => {
                   const prof = c.profissional_id ? profissionaisPorId.get(c.profissional_id) : undefined
                   const cor = prof?.cor ?? COR_SEM_PROFISSIONAL.hex
-                  const cancelada = c.status === 'cancelada'
+                  // Falta e cancelamento se desenham igual: as duas dizem "não aconteceu".
+                  // A diferença entre elas é dado, e vive no status da consulta — não no
+                  // bloco do calendário, onde viraria mais uma cor para decorar.
+                  const naoAconteceu = c.status === 'cancelada' || c.status === 'faltou'
                   return (
                     <button key={c.id}
                       onClick={(e) => { e.stopPropagation(); onClickConsulta(c) }}
                       title={`${c.lead?.nome_lead ?? 'Sem nome'} · ${c.procedimento}`}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 5, width: '100%',
-                        background: cancelada ? 'transparent' : fundoSuave(cor),
+                        background: naoAconteceu ? 'transparent' : fundoSuave(cor),
                         border: 'none', borderRadius: 5, padding: '3px 6px', cursor: 'pointer',
                         fontFamily: "'Plus Jakarta Sans', sans-serif", textAlign: 'left',
-                        opacity: cancelada ? 0.55 : 1, minWidth: 0,
+                        opacity: naoAconteceu ? 0.55 : 1, minWidth: 0,
                       }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: cor, flexShrink: 0 }} />
                       <span style={{
                         fontSize: 11, fontWeight: 600, color: '#16232B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        textDecoration: cancelada ? 'line-through' : 'none',
+                        textDecoration: naoAconteceu ? 'line-through' : 'none',
                       }}>
                         {inicioDaConsulta(c).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}{' '}
                         {c.lead?.nome_lead ?? 'Sem nome'}

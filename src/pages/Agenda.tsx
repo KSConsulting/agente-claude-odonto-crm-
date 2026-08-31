@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, X, Clock, User, BriefcaseMedical, ArrowRight, Ban,
+  Check, UserX,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import {
   diasDaSemana, fimDaConsulta, gradeDoMes, inicioDaConsulta, limitesDaGrade, rotuloDoPeriodo, somarDias,
 } from '../lib/agenda'
 import { COR_SEM_PROFISSIONAL } from '../lib/cores'
+import { STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
+import { darBaixa } from '../lib/baixaConsulta'
 import { formatarParaExibicao } from '../lib/telefones'
 import AgendaSemana from '../components/AgendaSemana'
 import AgendaMes from '../components/AgendaMes'
@@ -45,10 +48,42 @@ function DetalheConsulta({
   const navigate = useNavigate()
   const [cancelando, setCancelando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const [dandoBaixa, setDandoBaixa] = useState(false)
   const [erro, setErro] = useState('')
 
   const inicio = inicioDaConsulta(consulta)
   const cor = profissional?.cor ?? COR_SEM_PROFISSIONAL.hex
+
+  /**
+   * A consulta já terminou? É o que troca "Cancelar" por "Compareceu / Faltou".
+   *
+   * Compara o FIM, não o começo: às 14h05 de uma consulta das 14h às 15h o
+   * paciente está na cadeira, e perguntar se ele veio não faz sentido ainda.
+   */
+  // `Date.now()` solto no corpo do render é impuro, e o ESLint acusa com
+  // razão: o valor mudaria a cada re-render. Aqui a hora é fotografada
+  // quando o modal abre — que é exatamente o que se quer, já que o modal de
+  // uma consulta vive alguns segundos.
+  const [agora] = useState(() => Date.now())
+  const jaAconteceu = fimDaConsulta(consulta).getTime() < agora
+
+  /**
+   * Compareceu ou faltou. Quem move o funil é o trigger
+   * `consultas_sincroniza_lead` no banco — daqui só sai o status da consulta.
+   */
+  const handleBaixa = async (compareceu: boolean) => {
+    setDandoBaixa(true); setErro('')
+    try {
+      await darBaixa(consulta.id, compareceu)
+    } catch {
+      setDandoBaixa(false)
+      setErro('Não consegui salvar. Tente de novo.')
+      return
+    }
+    setDandoBaixa(false)
+    onCancelada({ ...consulta, status: compareceu ? 'realizada' : 'faltou' })
+    onFechar()
+  }
 
   const handleCancelar = async () => {
     setCancelando(true); setErro('')
@@ -97,10 +132,13 @@ function DetalheConsulta({
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              {/* Vem de `statusLead.ts`, e não de ternários aqui: com a
+                  chegada de `faltou` (0015) um encadeamento local cairia no
+                  `else` e pintaria a falta de verde. */}
               <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 600, marginLeft: 23,
-                background: consulta.status === 'cancelada' ? '#FEF2F2' : consulta.status === 'realizada' ? '#14532D' : '#E8F8EF',
-                color: consulta.status === 'cancelada' ? '#DC2626' : consulta.status === 'realizada' ? '#fff' : '#1A7A48' }}>
-                {consulta.status.charAt(0).toUpperCase() + consulta.status.slice(1)}
+                background: STATUS_CONSULTA[consulta.status].bg,
+                color: STATUS_CONSULTA[consulta.status].color }}>
+                {ROTULO_CONSULTA[consulta.status]}
               </span>
               {consulta.origem === 'agente_ia' && (
                 <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 600, background: '#EAF3F6', color: '#1E6E8C' }}>
@@ -126,7 +164,21 @@ function DetalheConsulta({
                 Ver ficha <ArrowRight size={14} />
               </button>
             )}
-            {consulta.status === 'agendada' && (
+            {/* Já passou da hora: a pergunta deixa de ser "cancelar?" e passa a
+                ser "a pessoa veio?". É a baixa que promove o lead a Paciente. */}
+            {consulta.status === 'agendada' && jaAconteceu && (
+              <>
+                <button onClick={() => handleBaixa(true)} disabled={dandoBaixa}
+                  style={{ flex: 1, minWidth: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 9, border: 'none', background: '#1A7A48', color: '#fff', cursor: dandoBaixa ? 'wait' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <Check size={14} /> Compareceu
+                </button>
+                <button onClick={() => handleBaixa(false)} disabled={dandoBaixa}
+                  style={{ flex: 1, minWidth: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', color: '#6B818C', cursor: dandoBaixa ? 'wait' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <UserX size={14} /> Faltou
+                </button>
+              </>
+            )}
+            {consulta.status === 'agendada' && !jaAconteceu && (
               confirmando ? (
                 <button onClick={handleCancelar} disabled={cancelando}
                   style={{ flex: 1, minWidth: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 9, border: 'none', background: '#DC2626', color: '#fff', cursor: cancelando ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>

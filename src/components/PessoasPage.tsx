@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Download, FileText, ChevronDown, Users, UserCheck, UserPlus, X, ArrowRight } from 'lucide-react'
 import jsPDF from 'jspdf'
@@ -8,6 +8,7 @@ import { isPaciente } from '../lib/pessoas'
 import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
 import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
 import CampoTelefone from './CampoTelefone'
+import AvisoBaixaConsulta from './AvisoBaixaConsulta'
 import type { LeadClinica, LeadStatus } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -366,10 +367,15 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
   const [search, setSearch] = useState('')
   const [showNewLead, setShowNewLead] = useState(false)
 
-  useEffect(() => {
+  // Extraído para poder ser chamado de novo depois de uma baixa de consulta:
+  // confirmar que a pessoa compareceu MUDA ELA DE TELA (vira Paciente), e a
+  // lista precisa refletir isso na hora.
+  const recarregarPessoas = useCallback(() =>
     supabase.from('crm_clinica').select('*').order('created_at', { ascending: false })
-      .then(({ data }) => { setAllLeads(data ?? []); setLoading(false) })
-  }, [])
+      .then(({ data }) => { setAllLeads(data ?? []); setLoading(false) }),
+  [])
+
+  useEffect(() => { recarregarPessoas() }, [recarregarPessoas])
 
   const handleNewLeadSaved = (lead: LeadClinica) => {
     setAllLeads((prev) => [lead, ...prev])
@@ -502,6 +508,12 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
         >
           <UserPlus size={16} /> {cfg.botaoNovo}
         </button>
+      </div>
+
+      {/* Consultas que já aconteceram e ninguém confirmou. Some sozinho
+          quando não há nenhuma. */}
+      <div className="fade-in-2">
+        <AvisoBaixaConsulta onBaixa={recarregarPessoas} />
       </div>
 
       {/* Period filter */}

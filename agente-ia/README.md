@@ -410,7 +410,7 @@ O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
 | `cancelar_consulta` | "preciso desmarcar" | Sim |
 | `ver_minhas_consultas` | Antes de remarcar ou cancelar, e no "que dia mesmo é a minha?" | Sim |
 | `detalhes_do_procedimento` | "como funciona o clareamento?", "tenho medo de doer" | Sim — lê `descricao_longa` de `servicos_clinica` |
-| `historico_do_paciente` | "da última vez", "o que eu fiz mesmo?" | Sim — as consultas realizadas e canceladas |
+| `historico_do_paciente` | "da última vez", "o que eu fiz mesmo?" | Sim — as consultas realizadas, canceladas e as faltas (`faltou`, migração 0015) |
 | `atualizar_ficha` | Quando descobre nome, procedimento de interesse, ou o funil avança | Escrita direta no CRM |
 
 > ⚠️ **O agente nunca escreve consulta direto no banco.** Sempre pelas funções

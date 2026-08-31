@@ -72,6 +72,10 @@ ordem**:
     `data_agendamento` a essa view, para a etiqueta "Agendada" e o filtro da
     lista. Só `create or replace view`; nada de tabela. Ver
     [4.18](#418-conversas_lista-view-migrações-0013-e-0014).
+15. `supabase/migrations/0015_baixa_da_consulta.sql` — o status `faltou` em
+    `consultas` e o trigger que **promove o lead a Paciente** quando a consulta
+    vira `realizada`. Fecha o funil, que até aqui não fechava. Ver
+    [seção 5](#5-status-do-funil).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -1163,7 +1167,29 @@ Os três índices que ela usa já vieram da `0010`, e não por acaso:
 > todo o resto aparece em Leads. A regra fica em `src/lib/pessoas.ts` — ao
 > adicionar um status novo, decida a qual dos dois lados ele pertence.
 
-`consultas.status` aceita: `agendada`, `realizada`, `cancelada`.
+`consultas.status` aceita **4** valores (`faltou` entrou na migração `0015`):
+
+| Valor | Significado | Bloqueia horário? |
+|---|---|:---:|
+| `agendada` | Marcada e ainda de pé *(default)* | **sim** |
+| `realizada` | O paciente compareceu | não |
+| `cancelada` | Desmarcada, com aviso | não |
+| `faltou` | Não compareceu e não avisou | não |
+
+> **`faltou` não é `cancelada`, e a distinção é o motivo de ele existir.** Quem
+> liga desmarcando e quem simplesmente não aparece pedem telefonemas
+> diferentes, e taxa de falta é métrica de clínica. Jogados na mesma linha, os
+> dois viram um número que não responde nada.
+>
+> No **funil**, porém, os dois caem no mesmo lugar (`consulta_cancelada`): as
+> duas situações significam "não tem consulta marcada e precisa reagendar". O
+> motivo mora na consulta, que é onde ele pertence.
+
+Só `agendada` participa da restrição de exclusão `consultas_sem_sobreposicao` —
+consulta que não aconteceu não segura horário na agenda.
+
+> **`realizada` é a única porta automática para `/clientes`.** Ver a tabela do
+> trigger, logo abaixo.
 
 ### O funil acompanha a agenda sozinho
 
@@ -1175,10 +1201,21 @@ acontece na agenda:
 |---|---|
 | INSERT com `status = 'agendada'` | `data_agendamento` = a consulta ativa mais próxima do lead; `data_marcacao_agendamento` = agora; `status` → `consulta_agendada` |
 | UPDATE de `data_consulta` (remarcação) | `data_agendamento` é recalculada. **`data_marcacao_agendamento` não muda** |
-| UPDATE para `status = 'cancelada'`, **restando outra consulta ativa** | `data_agendamento` passa para a próxima. **O `status` não muda** |
-| UPDATE para `status = 'cancelada'`, **era a última** | `data_agendamento` = nulo; `status` → `consulta_cancelada` |
+| UPDATE para `status = 'cancelada'` ou `'faltou'`, **restando outra consulta ativa** | `data_agendamento` passa para a próxima. **O `status` não muda** |
+| UPDATE para `status = 'cancelada'` ou `'faltou'`, **era a última** | `data_agendamento` = nulo; `status` → `consulta_cancelada` |
+| UPDATE para `status = 'realizada'`, **1ª do lead** | `data_agendamento` recalculada; `status` → `consulta_realizada` — **a pessoa vira Paciente aqui** |
+| UPDATE para `status = 'realizada'`, **2ª ou mais** | `status` → `paciente_recorrente` |
 
-Três decisões embutidas aí:
+> ⚠️ **Os dois últimos entraram na `0015`, e antes deles NADA promovia ninguém a
+> Paciente.** O trigger só reagia a `agendada` e `cancelada`, e — pior — nenhuma
+> tela marcava consulta como realizada: a Agenda só sabia cancelar. O paciente
+> era atendido e ficava em "Consulta Agendada" para sempre.
+
+**Recorrente é contado, não digitado.** O trigger faz `count(*)` das consultas
+`realizada` do lead na hora, em vez de deduzir do status anterior: assim a regra
+é idempotente e se corrige sozinha se alguém editar uma consulta antiga na mão.
+
+Quatro decisões embutidas aí:
 
 1. **Remarcar não é marcar de novo.** Se `data_marcacao_agendamento` fosse
    reescrita a cada remarcação, o Dashboard contaria a mesma consulta duas vezes
@@ -1192,14 +1229,23 @@ Três decisões embutidas aí:
    **recalcula** `data_agendamento` a partir das consultas ativas que restam
    (`min(data_consulta)`), em vez de deduzir da linha que disparou a operação — e
    só muda o funil para `consulta_cancelada` quando não sobra nenhuma.
+4. **Quem escreve a baixa é a tela; quem move o funil é o trigger.** A Agenda e
+   o aviso de pendências gravam só `consultas.status`. A promoção a Paciente é
+   consequência, e é consequência **atômica**: duas telas escrevendo o funil na
+   mão divergiriam na primeira falha de rede.
 
 Está num trigger, e não no React, porque a API do Agente de IA (seção 8) não
 passa pelo React. Escreveu consulta, o funil acompanha — venha de onde vier.
 
-> **`status = 'realizada'` é deliberadamente ignorado pelo trigger.** Marcar
-> comparecimento continua sendo ato manual, feito na ficha do paciente junto com
-> o `valor_pago`. Automatizar o salto de funil a partir do calendário produziria
-> mudanças de status que ninguém pediu.
+> **`status = 'realizada'` era deliberadamente ignorado pelo trigger — até a
+> `0015`.** A ideia era que marcar comparecimento fosse ato manual na ficha,
+> junto com o `valor_pago`. Na prática ninguém fazia: nenhuma tela sequer
+> oferecia o botão, e o resultado foi que **ninguém nunca virava Paciente**.
+>
+> Hoje a baixa é explícita — a recepção responde "compareceu" ou "faltou", e o
+> trigger tira a conclusão. Continua não havendo salto automático a partir do
+> calendário: alguém precisa confirmar. O que mudou é que agora existe onde
+> confirmar, e um aviso que cobra.
 
 > **Ao alterar qualquer um destes valores, mude nos dois lugares:** o `CHECK` no
 > banco **e** os tipos `LeadStatus` / `ConsultaStatus` em

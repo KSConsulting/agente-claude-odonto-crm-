@@ -53,10 +53,15 @@ export const STATUS_CONSULTA: Record<ConsultaStatus, EstiloStatus> = {
   agendada:  { bg: '#E8F8EF', color: '#1A7A48' },
   realizada: { bg: '#14532D', color: '#FFFFFF' },
   cancelada: { bg: '#FEF2F2', color: '#DC2626' },
+  // Falta é âmbar, não vermelha: o vermelho já é cancelamento, e as duas
+  // precisam se separar de longe — é a distinção que a 0015 existe para
+  // preservar.
+  faltou:    { bg: '#FFFBEB', color: '#B45309' },
 }
 
 export const ROTULO_CONSULTA: Record<ConsultaStatus, string> = {
   agendada:  'Agendada',
   realizada: 'Realizada',
   cancelada: 'Cancelada',
+  faltou:    'Faltou',
 }

@@ -148,7 +148,10 @@ export default function AgendaSemana({
                 const cor = prof?.cor ?? COR_SEM_PROFISSIONAL.hex
                 const topo = (minutosDoDia(inicio) - minutoInicial) * pxPorMinuto
                 const altura = Math.max(20, c.duracao_minutos * pxPorMinuto - 2)
-                const cancelada = c.status === 'cancelada'
+                // Falta e cancelamento se desenham igual: as duas dizem "não aconteceu".
+                // A diferença entre elas é dado, e vive no status da consulta — não no
+                // bloco do calendário, onde viraria mais uma cor para decorar.
+                const naoAconteceu = c.status === 'cancelada' || c.status === 'faltou'
 
                 return (
                   <button key={c.id}
@@ -160,7 +163,7 @@ export default function AgendaSemana({
                       height: altura,
                       left: `calc(${(coluna / colunas) * 100}% + 2px)`,
                       width: `calc(${100 / colunas}% - 4px)`,
-                      background: cancelada ? '#fff' : cor,
+                      background: naoAconteceu ? '#fff' : cor,
                       border: `1px solid ${cor}`,
                       borderLeft: `3px solid ${cor}`,
                       borderRadius: 6,
@@ -168,12 +171,12 @@ export default function AgendaSemana({
                       textAlign: 'left',
                       overflow: 'hidden',
                       cursor: 'pointer',
-                      opacity: cancelada ? 0.6 : 1,
-                      color: cancelada ? '#6B818C' : '#fff',
+                      opacity: naoAconteceu ? 0.6 : 1,
+                      color: naoAconteceu ? '#6B818C' : '#fff',
                       fontFamily: "'Plus Jakarta Sans', sans-serif",
                       zIndex: 2,
                     }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: cancelada ? 'line-through' : 'none' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: naoAconteceu ? 'line-through' : 'none' }}>
                       {inicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} {c.lead?.nome_lead ?? 'Sem nome'}
                     </div>
                     {altura > 32 && (

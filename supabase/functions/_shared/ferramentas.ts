@@ -351,7 +351,7 @@ export async function executar(
           profissional: { nome: string; sobrenome: string } | null
         }>(
           `consultas?select=procedimento,data_consulta,status,profissional:profissionais(nome,sobrenome)` +
-          `&lead_id=eq.${ctx.leadId}&status=in.(realizada,cancelada)` +
+          `&lead_id=eq.${ctx.leadId}&status=in.(realizada,cancelada,faltou)` +
           `&order=data_consulta.desc&limit=20`,
         )
 

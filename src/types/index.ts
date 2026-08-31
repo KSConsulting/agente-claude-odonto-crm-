@@ -9,7 +9,17 @@ export type LeadStatus =
   | 'consulta_realizada'
   | 'paciente_recorrente'
 
-export type ConsultaStatus = 'agendada' | 'realizada' | 'cancelada'
+/**
+ * O estado de uma consulta.
+ *
+ * `realizada` é a única porta automática para Pacientes: o trigger
+ * `consultas_sincroniza_lead` promove o lead quando a consulta vira isso.
+ * `faltou` (migração 0015) não é `cancelada` — quem avisa e quem some pedem
+ * telefonemas diferentes, e a clínica precisa medir a taxa de falta.
+ *
+ * Precisa bater com o CHECK de `consultas.status`. Nada sincroniza sozinho.
+ */
+export type ConsultaStatus = 'agendada' | 'realizada' | 'cancelada' | 'faltou'
 
 /** Quem criou a consulta. `agente_ia` chega pela API; `equipe`, pela tela. */
 export type ConsultaOrigem = 'equipe' | 'agente_ia'
