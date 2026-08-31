@@ -146,6 +146,7 @@ src/
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 │   ├── conversas.ts            ler, enviar, assumir e devolver conversa
 │   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
+│   ├── agente.ts               como o Agente de IA se chama NA TELA (ver Design system)
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
@@ -355,6 +356,39 @@ legíveis com texto branco.
 mais tarde, alguém escolha amarelo-limão e o bloco suma no fundo branco. O banco
 aceita qualquer hex válido, então ampliar a paleta não exige migração — e
 `fundoSuave()` tem fallback para cores fora da lista.
+
+### Cores dos balões da conversa
+
+Três vozes na tela **Conversas**, e elas precisam ser distinguíveis sem
+esforço — principalmente onde uma pessoa entra no lugar da IA.
+
+| Quem | Fundo | Texto | Lado |
+|---|---|---|---|
+| Paciente | `#FFFFFF` + borda `#DCE6EA` | `#16232B` | esquerda |
+| Secretária IA | `#1E6E8C` (Principal) | `#FFFFFF` | direita |
+| Atendente da clínica | `#16232B` (Texto) | `#FFFFFF` | direita |
+
+**As duas cores cheias são as duas cores mais fortes da identidade** — nada de
+cor nova, e o resultado combina com o resto do sistema. A primeira versão usava
+branco contra `#EAF3F6`: dois quase-brancos que, de relance, viravam a mesma
+coisa.
+
+Cor não é o único sinal: o rótulo acima do balão traz um ícone (`Bot` para a
+IA, `UserCheck` para a pessoa) e aparece sempre que o autor muda.
+
+### O Agente de IA tem dois nomes, e isso é proposital
+
+| Onde | Como aparece | Definido em |
+|---|---|---|
+| Nas telas da equipe | **Secretária IA · Letícia** | [`src/lib/agente.ts`](src/lib/agente.ts) |
+| Na conversa com o paciente | **Letícia**, e só | [`agente-ia/prompt.md`](agente-ia/prompt.md) |
+
+A equipe precisa saber de relance que quem respondeu foi a IA, e não uma colega.
+O paciente, não: o prompt proíbe — em regra inegociável — que ela diga ser
+assistente virtual, inteligência artificial, bot, robô ou sistema.
+
+**São dois públicos e dois contratos.** Mexer em `agente.ts` muda a tela; mudar
+como ela se apresenta no WhatsApp é mexer no prompt. Um não é o outro.
 
 ### Ícones
 

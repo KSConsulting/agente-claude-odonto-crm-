@@ -6,29 +6,42 @@ import {
 } from 'lucide-react'
 import { formatarParaExibicao } from '../lib/telefones'
 import { urlDaMidia, hora, diaPorExtenso, nomeDoAutor } from '../lib/conversas'
+import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
 import type { ConversaResumo, MensagemWhatsapp, AutorMensagem } from '../types'
 
 /**
  * A coluna da direita: a conversa aberta.
  *
- * TRÊS CORES DE BALÃO, e a diferença importa: dá para ver de relance onde uma
- * pessoa assumiu o atendimento.
+ * TRÊS BALÕES QUE NÃO SE PARECEM. Quem lê precisa saber, sem prestar atenção,
+ * quem falou — principalmente onde uma pessoa entrou no lugar da IA:
  *
- *   paciente   → esquerda, branco
- *   Letícia    → direita, azul claro
- *   atendente  → direita, azul cheio
+ *   paciente       → esquerda, BRANCO com borda
+ *   Secretária IA  → direita, AZUL DA MARCA cheio, texto branco
+ *   atendente      → direita, GRAFITE cheio, texto branco
+ *
+ * As duas cores cheias são as duas cores mais fortes da identidade (`#1E6E8C`
+ * e `#16232B`), então o contraste é grande sem inventar cor nova. A versão
+ * anterior usava branco contra `#EAF3F6` — dois quase-brancos, que de relance
+ * viravam a mesma coisa.
  *
  * A CAIXA DE TEXTO SÓ ABRE COM A CONVERSA ASSUMIDA. Sem isso, o atendente
- * responderia junto com a Letícia, e o paciente receberia duas versões da mesma
+ * responderia junto com a IA, e o paciente receberia duas versões da mesma
  * resposta — de duas pessoas que não sabem uma da outra.
  */
 
 const FONTE = "'Plus Jakarta Sans', sans-serif"
 
 const ESTILO_BALAO: Record<AutorMensagem, React.CSSProperties> = {
-  paciente: { background: '#fff', border: '1px solid #DCE6EA', color: '#16232B' },
-  agente: { background: '#EAF3F6', border: '1px solid #D3E5EC', color: '#16232B' },
-  atendente: { background: '#1E6E8C', border: '1px solid #1E6E8C', color: '#fff' },
+  paciente:  { background: '#FFFFFF', border: '1px solid #DCE6EA', color: '#16232B' },
+  agente:    { background: '#1E6E8C', border: '1px solid #1E6E8C', color: '#FFFFFF' },
+  atendente: { background: '#16232B', border: '1px solid #16232B', color: '#FFFFFF' },
+}
+
+/** Cor não basta: quem enxerga mal, ou lê rápido, se guia pelo ícone. */
+const ICONE_AUTOR: Record<AutorMensagem, typeof Bot | null> = {
+  paciente: null,
+  agente: Bot,
+  atendente: UserCheck,
 }
 
 /* ──────────────────────────────────────────────
@@ -82,6 +95,7 @@ function Midia({ mensagem }: { mensagem: MensagemWhatsapp }) {
 function Balao({ mensagem, mostrarAutor }: { mensagem: MensagemWhatsapp; mostrarAutor: boolean }) {
   const doPaciente = mensagem.autor === 'paciente'
   const temMidia = !!mensagem.midia_url && mensagem.tipo !== 'texto'
+  const Icone = ICONE_AUTOR[mensagem.autor]
 
   return (
     <div style={{
@@ -89,7 +103,11 @@ function Balao({ mensagem, mostrarAutor }: { mensagem: MensagemWhatsapp; mostrar
       alignItems: doPaciente ? 'flex-start' : 'flex-end', marginBottom: 8,
     }}>
       {mostrarAutor && (
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#6B818C', margin: '4px 4px 3px' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          fontSize: 10, fontWeight: 700, color: '#6B818C', margin: '4px 4px 3px',
+        }}>
+          {Icone && <Icone size={10} />}
           {nomeDoAutor(mensagem.autor)}
         </div>
       )}
@@ -119,7 +137,8 @@ function Balao({ mensagem, mostrarAutor }: { mensagem: MensagemWhatsapp; mostrar
         )}
 
         <div style={{
-          fontSize: 9.5, opacity: 0.6, marginTop: 4,
+          // No balão cheio o texto é branco, e 0.6 já some no azul.
+          fontSize: 9.5, opacity: doPaciente ? 0.55 : 0.78, marginTop: 4,
           textAlign: doPaciente ? 'left' : 'right',
         }}>
           {hora(mensagem.criada_em)}
@@ -167,7 +186,7 @@ export default function JanelaConversa({
           Escolha uma conversa
         </div>
         <div style={{ fontSize: 12.5, color: '#6B818C', maxWidth: 320, lineHeight: 1.6 }}>
-          Aqui você lê o que a Letícia respondeu e, quando precisar, assume a
+          Aqui você lê o que a {AGENTE_POR_EXTENSO} respondeu e, quando precisar, assume a
           conversa para falar você mesmo.
         </div>
       </div>
@@ -229,7 +248,7 @@ export default function JanelaConversa({
               cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#16232B',
               fontFamily: FONTE, flexShrink: 0,
             }}>
-            <Undo2 size={13} /> Devolver para a Letícia
+            <Undo2 size={13} /> Devolver para a {AGENTE_NOME}
           </button>
         ) : (
           <button onClick={onAssumir}
@@ -264,10 +283,10 @@ export default function JanelaConversa({
         {assumida ? <UserCheck size={12} /> : <Bot size={12} />}
         {assumida
           ? <span>
-              <strong>Você está atendendo.</strong> A Letícia não responde nesta
+              <strong>Você está atendendo.</strong> A {AGENTE_NOME} não responde nesta
               conversa{conversa.assumido_por_nome ? ` — assumida por ${conversa.assumido_por_nome}` : ''}.
             </span>
-          : <span><strong>A Letícia está atendendo.</strong> Assuma a conversa para responder você mesmo.</span>}
+          : <span><strong>A {AGENTE_POR_EXTENSO} está atendendo.</strong> Assuma a conversa para responder você mesmo.</span>}
       </div>
 
       {/* Mensagens */}
@@ -352,7 +371,7 @@ export default function JanelaConversa({
           }}>
             <span style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.55 }}>
               Para escrever para esta pessoa, <strong>assuma a conversa</strong> — assim
-              a Letícia para de responder e vocês dois não falam ao mesmo tempo.
+              a {AGENTE_NOME} para de responder e vocês dois não falam ao mesmo tempo.
             </span>
             <button onClick={onAssumir}
               style={{

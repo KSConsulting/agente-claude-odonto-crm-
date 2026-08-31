@@ -5,6 +5,7 @@ import {
 import { supabase } from '../lib/supabase'
 import CampoTelefone from './CampoTelefone'
 import { formatarParaExibicao } from '../lib/telefones'
+import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
 import type { ConfiguracoesAgente, ModeloAgente } from '../types'
 
 /**
@@ -199,7 +200,7 @@ export default function TabAgenteIA() {
 
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: ativo ? '#1A7A48' : '#6B818C' }}>
-              {ativo ? 'A Letícia está atendendo' : 'A Letícia está desligada'}
+              {ativo ? `A ${AGENTE_POR_EXTENSO} está atendendo` : `A ${AGENTE_POR_EXTENSO} está desligada`}
             </div>
             <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 2 }}>
               {ativo
@@ -228,7 +229,7 @@ export default function TabAgenteIA() {
       <div style={cartao}>
         <div style={titulo}>Modo teste</div>
         <p style={legenda}>
-          Com o modo teste ligado, a Letícia só responde aos números desta lista. As
+          Com o modo teste ligado, a {AGENTE_NOME} só responde aos números desta lista. As
           mensagens de qualquer outra pessoa continuam aparecendo no sistema, mas ficam
           sem resposta — para a equipe atender à mão.
         </p>

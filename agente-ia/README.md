@@ -229,6 +229,14 @@ Três decisões que ficaram de pé:
 -   **Assumir pausa uma conversa, não o agente.** Ela continua atendendo todo
     mundo; só naquele número fica calada. Quem desliga o agente inteiro é a aba
     de Configurações.
+-   **Na tela ela é "Secretária IA · Letícia"; no WhatsApp, só "Letícia".** A
+    equipe precisa saber de relance que quem respondeu foi a IA; o paciente,
+    não — o prompt proíbe que ela se declare IA. O nome de tela vive em
+    [`src/lib/agente.ts`](../src/lib/agente.ts), o de conversa no
+    [`prompt.md`](prompt.md). Mexer num não mexe no outro.
+-   **Três balões que não se parecem:** paciente em branco, Secretária IA no
+    azul da marca, atendente em grafite. As duas cores cheias são as mais
+    fortes da identidade — contraste grande sem inventar cor.
 -   **O painel da direita abre e fecha**, e a escolha fica gravada no navegador.
     Ele mostra a ficha que a Letícia vai preenchendo: nome, interesse, resumo e
     as consultas. **O nome só aparece depois que a pessoa disser como se chama**
@@ -269,6 +277,7 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `src/components/JanelaConversa.tsx` | 4 | Coluna direita: balões, cabeçalho e caixa de digitar |
 | `src/components/PainelLead.tsx` | 4 | Coluna extra: ficha da pessoa, consultas e a foto do WhatsApp |
 | `src/lib/statusLead.ts` | 4 | Cores e rótulos de status, para código novo não fazer a quinta cópia |
+| `src/lib/agente.ts` | 4 | Como ela se chama **na tela** — separado de como se apresenta ao paciente |
 | `src/components/TabAgenteIA.tsx` | 5 | Aba de Configurações: modelo, prompt, liga/desliga |
 | `src/components/EditorProcedimento.tsx` | 5 | Modal de edição do procedimento: as duas descrições, com as réguas |
 | `src/components/ModalPortal.tsx` | 5 | Leva o modal para o `<body>` — ver Convenções no [`CLAUDE.md`](../CLAUDE.md) |

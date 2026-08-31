@@ -7,6 +7,7 @@ import {
 import { formatarParaExibicao } from '../lib/telefones'
 import { STATUS_LEAD, ROTULO_LEAD, STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
 import { carregarLead, carregarConsultas, fotoDoPerfil, type ConsultaComProfissional } from '../lib/conversas'
+import { AGENTE_NOME, AGENTE_TITULO } from '../lib/agente'
 import type { LeadClinica } from '../types'
 
 /**
@@ -142,7 +143,7 @@ export default function PainelLead({ leadId, onFechar }: Props) {
                 <MessageCircleQuestion size={13} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>
                   Ainda sem nome. Ele aparece aqui <strong>quando a pessoa disser
-                  como se chama</strong> na conversa — a Letícia grava sozinha.
+                  como se chama</strong> na conversa — a {AGENTE_NOME} grava sozinha.
                 </span>
               </div>
             )}
@@ -188,7 +189,7 @@ export default function PainelLead({ leadId, onFechar }: Props) {
             <div style={rotulo}>Resumo da conversa</div>
             <div style={valor}>
               {lead.resumo_conversa?.trim() || (
-                <span style={{ color: '#6B818C' }}>A Letícia ainda não resumiu esta conversa.</span>
+                <span style={{ color: '#6B818C' }}>A {AGENTE_NOME} ainda não resumiu esta conversa.</span>
               )}
             </div>
           </div>
@@ -246,7 +247,7 @@ export default function PainelLead({ leadId, onFechar }: Props) {
                       )}
                       {c.origem === 'agente_ia' && (
                         <div style={{ fontSize: 10.5, color: '#1E6E8C', marginTop: 4, fontWeight: 600 }}>
-                          marcada pela Letícia
+                          marcada pela {AGENTE_TITULO}
                         </div>
                       )}
                     </div>

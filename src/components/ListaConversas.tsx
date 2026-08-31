@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search, UserCheck, MessageSquareDashed } from 'lucide-react'
 import { formatarParaExibicao } from '../lib/telefones'
 import { previaDaMensagem, quandoCurto } from '../lib/conversas'
+import { AGENTE_TITULO, AGENTE_POR_EXTENSO } from '../lib/agente'
 import type { ConversaResumo } from '../types'
 
 /**
@@ -45,7 +46,7 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
           Conversas
         </h1>
         <p style={{ fontSize: 12, color: '#6B818C', margin: '0 0 13px' }}>
-          O WhatsApp da clínica, com o que a Letícia respondeu.
+          O WhatsApp da clínica, com o que a {AGENTE_POR_EXTENSO} respondeu.
         </p>
 
         <div style={{ position: 'relative' }}>
@@ -139,7 +140,7 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
                   }}>
                     {c.ultimo_autor !== 'paciente' && (
                       <span style={{ color: '#6B818C' }}>
-                        {c.ultimo_autor === 'agente' ? 'Letícia: ' : 'Você: '}
+                        {c.ultimo_autor === 'agente' ? `${AGENTE_TITULO}: ` : 'Você: '}
                       </span>
                     )}
                     {previaDaMensagem(c.ultimo_tipo, c.ultimo_conteudo)}
