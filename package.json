@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prompt": "node agente-ia/gerar-prompt.mjs",
+    "agente:deploy": "npm run prompt && npx supabase functions deploy whatsapp --project-ref wrdwoqtsyqcndgdeflgb --no-verify-jwt",
+    "agente:secrets": "npx supabase secrets set --project-ref wrdwoqtsyqcndgdeflgb --env-file agente-ia/.env.agente.local"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

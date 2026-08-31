@@ -62,7 +62,18 @@ export interface HorarioComercial {
 export interface ServicoClinica {
   id: string
   nome: string
+  /**
+   * A frase curta do catálogo. **Vai no prompt do Agente de IA em toda
+   * mensagem**, junto com a de todos os outros procedimentos ativos — por isso
+   * o editor avisa quando ela passa de ~120 caracteres.
+   */
   descricao: string
+  /**
+   * A explicação completa. **Não** vai no prompt: o agente busca pela
+   * ferramenta `detalhes_do_procedimento`, só quando o paciente pergunta
+   * daquele procedimento. Vazia, ele cai na `descricao`.
+   */
+  descricao_longa: string | null
   ativo: boolean
   created_at: string
 }
@@ -90,6 +101,13 @@ export interface LeadClinica {
   data_nascimento: string | null
   valor_pago_acumulado: number | null
   minutos_ultima_mensagem: number | null
+  /**
+   * Ligado, o Agente de IA salva a mensagem e **não responde** nesta conversa.
+   * É o botão "Assumir conversa" da tela Conversas.
+   */
+  agente_pausado: boolean
+  assumido_por: string | null
+  assumido_em: string | null
   created_at: string
 }
 
@@ -184,4 +202,65 @@ export interface ApiToken {
  */
 export interface ConsultaAgenda extends Consulta {
   lead: { id: string; nome_lead: string | null; whatsapp_lead: string | null } | null
+}
+
+/* ===========================================================================
+ * Agente de IA — conversas do WhatsApp (migração 0010)
+ * Documentação: agente-ia/README.md
+ * =========================================================================== */
+
+/** Quem escreveu. Define a cor do balão na tela Conversas. */
+export type AutorMensagem = 'paciente' | 'agente' | 'atendente'
+
+export type TipoMensagem = 'texto' | 'audio' | 'imagem' | 'video' | 'documento'
+
+export interface MensagemWhatsapp {
+  id: string
+  lead_id: string
+  autor: AutorMensagem
+  tipo: TipoMensagem
+  /** O texto. Em áudio, guarda a **transcrição** — é o que o modelo lê. */
+  conteudo: string | null
+  /** Caminho no bucket privado `midias-whatsapp`. Abrir com signed URL. */
+  midia_url: string | null
+  /** Id da mensagem na Evolution. Único — impede duplicata em reenvio. */
+  id_externo: string | null
+  /** Preenchido só quando `autor === 'atendente'`. */
+  enviada_por: string | null
+  /** Leitura da equipe inteira, não por usuário. */
+  lida: boolean
+  criada_em: string
+}
+
+/**
+ * Modelos que a aba "Agente de IA" oferece. Acrescentar um aqui exige
+ * acrescentar o tratamento correspondente em
+ * `supabase/functions/_shared/llm.ts` — nada sincroniza isso sozinho.
+ */
+export type ModeloAgente =
+  | 'claude-opus-5'
+  | 'claude-sonnet-5'
+  | 'gpt-4.1'
+  | 'gpt-4.1-mini'
+
+export interface ConfiguracoesAgente {
+  id: string
+  /** Desligado por padrão. Ligar é ato consciente, feito na tela. */
+  ativo: boolean
+  modelo: ModeloAgente
+  /**
+   * `null` = está rodando o prompt oficial de `agente-ia/prompt.md`.
+   * Preenchido = alguém editou pela tela, e **este** é o que está no ar.
+   */
+  prompt: string | null
+  /**
+   * Ligado, o agente só responde aos números de `numeros_teste`. As demais
+   * mensagens são gravadas, aparecem na tela, e ficam sem resposta.
+   */
+  modo_teste: boolean
+  /** Formato canônico: só dígitos com DDI (`5511987654321`). */
+  numeros_teste: string[]
+  atualizado_por: string | null
+  created_at: string
+  updated_at: string
 }
