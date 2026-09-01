@@ -280,6 +280,17 @@ export interface ConfiguracoesAgente {
   modo_teste: boolean
   /** Formato canônico: só dígitos com DDI (`5511987654321`). */
   numeros_teste: string[]
+  /**
+   * Qual ponte com o WhatsApp está ativa (migração 0017). **UMA de cada vez.**
+   *
+   * ⚠️ Os valores vivem em dois lugares: o `CHECK` no banco e este tipo.
+   * Acrescentou provedor? Mude os dois no mesmo commit.
+   *
+   * As credenciais NÃO vêm daqui — moram nas secrets do Supabase, fora do
+   * alcance do navegador. Esta coluna diz quem está ativo, nunca como se
+   * autentica.
+   */
+  provedor_whatsapp: 'evolution' | 'uazapi'
   atualizado_por: string | null
   created_at: string
   updated_at: string

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import ListaConversas from '../components/ListaConversas'
 import JanelaConversa from '../components/JanelaConversa'
 import PainelLead from '../components/PainelLead'
+import AvisoWhatsAppCaiu from '../components/AvisoWhatsAppCaiu'
 import {
   listarConversas, carregarMensagens, enviarMensagem,
   assumirConversa, devolverConversa, marcarComoLidas,
@@ -156,7 +157,13 @@ export default function Conversas() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: '#fff' }}>
+    // Coluna: a faixa de aviso ocupa a largura inteira, e as três colunas da
+    // tela ficam na linha de baixo. `minHeight: 0` no meio é o que deixa elas
+    // rolarem por dentro em vez de esticar a página.
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
+      <AvisoWhatsAppCaiu />
+
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
       <ListaConversas
         conversas={conversas}
         selecionada={selecionada}
@@ -180,6 +187,7 @@ export default function Conversas() {
         // reaproveitaria o estado anterior e mostraria a foto de quem já saiu.
         <PainelLead key={aberta.lead_id} leadId={aberta.lead_id} onFechar={alternarPainel} />
       )}
+      </div>
     </div>
   )
 }

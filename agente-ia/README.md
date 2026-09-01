@@ -48,7 +48,7 @@ caminhos próprios. Esta é a lista completa, para ninguém procurar:
 
 | Onde | O que é |
 |---|---|
-| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde |
+| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`) |
 | `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, Evolution, montagem do prompt, conversão de fuso (`tempo.ts`) |
 | `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
@@ -269,7 +269,7 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `supabase/migrations/0010_agente_conversas.sql` | 2 | Tabela de mensagens, colunas de pausa, configuração e bucket |
 | `supabase/functions/whatsapp/index.ts` | 3 | O cérebro: webhook da Evolution e envio manual do atendente |
 | `supabase/functions/_shared/llm.ts` | 3 | Fala com Claude e GPT pela mesma porta — é o que permite trocar de modelo |
-| `supabase/functions/_shared/evolution.ts` | 3 | Envia mensagem, "digitando…", baixa áudio e foto |
+| `supabase/functions/_shared/evolution.ts` | 3 | Envia mensagem, "digitando…", baixa áudio e foto. E o estado da conexão: consultar, parear, desconectar |
 | `supabase/functions/_shared/prompt.ts` | 3 | Monta o prompt: identidade + dados da clínica + data de hoje + histórico |
 | `src/pages/Conversas.tsx` | 4 | A página, em duas colunas |
 | `supabase/migrations/0013_conversas_lista.sql` | 4 | A view `conversas_lista`: última mensagem, não lidas e quem assumiu |
@@ -290,6 +290,10 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `agente-ia/exemplos/*.md` | 1 | Conversas de teste: como ela deve responder |
 | `agente-ia/README.md` | — | ✅ **já criado** — este documento |
 | `agente-ia/.env.agente.local` | — | ✅ **já criado** — as 6 chaves a preencher |
+| `supabase/migrations/0017_provedor_whatsapp.sql` | — | A coluna `provedor_whatsapp`: qual ponte está ativa |
+| `src/lib/whatsappConexao.ts` | — | Consultar, parear e desconectar — e o `useConexao()` que acompanha |
+| `src/components/ConexaoWhatsApp.tsx` | — | A seção "Conexão do WhatsApp", em Secretária de IA |
+| `src/components/AvisoWhatsAppCaiu.tsx` | — | Faixa vermelha em Conversas, só quando a ponte cai |
 
 ### Alterados
 
@@ -649,6 +653,63 @@ O que mudou:
 > escapar travessão, o passo seguinte é filtrar no envio
 > (`supabase/functions/whatsapp/index.ts`, onde a resposta é quebrada em
 > mensagens) — prompt acerta quase sempre, código acerta sempre.
+
+---
+
+## 8.5. A conexão com o WhatsApp
+
+A ponte com o WhatsApp é a **Evolution API** (v2.3.7), num servidor próprio. A
+uazapi está no plano; a coluna `provedor_whatsapp` (migração `0017`) já existe
+para dizer qual está ativa — **uma de cada vez**.
+
+### O dia em que ela caiu, e o que isso mudou
+
+Em 01/09 o servidor da Evolution saiu do ar. O sintoma foi **silêncio**:
+mensagem enviada pelo WhatsApp, nenhuma resposta, e nada de anormal em tela
+nenhuma. Pior: a página da Secretária continuava dizendo **"está atendendo"**,
+porque só olhava o nosso liga/desliga.
+
+Atender depende de duas coisas, e a tela conhecia uma. Daí saíram três peças:
+
+| Peça | Onde | O que faz |
+|---|---|---|
+| O card de estado | Secretária de IA | Passou a exigir **as duas** condições. Sem WhatsApp, diz "Ligada, mas o WhatsApp está desconectado" |
+| Seção "Conexão do WhatsApp" | Secretária de IA | Provedor, quem está conectado, reconectar e desconectar |
+| Faixa vermelha | Conversas | Aparece **só** quando cai. É lá que a recepção passa o dia |
+
+### `desconectado` ≠ `indisponivel`
+
+A distinção mais útil do módulo, porque cada estado manda a pessoa para um
+lugar diferente:
+
+- **`desconectado`** — a ponte respondeu, mas a sessão do WhatsApp caiu. Religa
+  na própria tela, com código de pareamento.
+- **`indisponivel`** — a ponte não respondeu. **Nenhum botão da tela adianta:**
+  quem precisa subir é o servidor, no painel da hospedagem.
+
+Sem essa separação, a pessoa clica em "Reconectar" dez vezes enquanto o
+problema está em outra máquina.
+
+### Detalhes que não são detalhe
+
+**Timeout de 8 segundos** em toda chamada de conexão. Servidor fora do ar deixa
+um `fetch` pendurado mais de 20s; a tela consulta a cada 30s, então sem prazo
+ela viveria em "verificando…" justo quando precisa avisar que caiu.
+
+**Só consulta com a aba visível**, e a cada 30s (60s na faixa de Conversas, que
+é vigia de fundo). Cada verificação é uma chamada à ponte.
+
+**`logout`, nunca `delete`.** O primeiro derruba a sessão e deixa a instância de
+pé para parear de novo; o segundo apagaria a instância e o histórico junto. Não
+há botão nesta tela que justifique esse estrago.
+
+**Código de pareamento antes do QR.** Num painel de computador, digitar 8
+dígitos no celular é melhor do que apontar a câmera para o monitor. O QR volta
+como reserva, porque nem toda conta aceita o código.
+
+**A chave nunca vai para o navegador.** As três rotas passam pela Edge Function
+e exigem sessão do Supabase — mesmo motivo da `/foto`. Quem tem a chave da
+Evolution manda mensagem por aquele WhatsApp.
 
 ---
 

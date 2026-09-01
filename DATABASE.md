@@ -79,6 +79,9 @@ ordem**:
 16. `supabase/migrations/0016_ultima_consulta.sql` — a coluna calculada
     `ultima_consulta` em `crm_clinica`, para a tela Pacientes. Subconsulta
     escalar, **não** join: a view é escrita pela aplicação. Ver a seção 3.
+17. `supabase/migrations/0017_provedor_whatsapp.sql` — a coluna
+    `provedor_whatsapp` em `configuracoes_agente`: qual ponte com o WhatsApp
+    está ativa. Ver [seção 4.17](#417-mensagens_whatsapp--configuracoes_agente-migração-0010).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -1046,13 +1049,35 @@ resumo, para quem estiver lendo o schema de cima a baixo.
 | Objeto | O que é |
 |---|---|
 | `mensagens_whatsapp` | Cada mensagem trocada. É a memória do agente **e** a fonte da tela Conversas — a mesma, de propósito |
-| `configuracoes_agente` | Uma linha: modelo, prompt em uso, liga/desliga e o modo teste |
+| `configuracoes_agente` | Uma linha: modelo, prompt em uso, liga/desliga, modo teste e o provedor de WhatsApp ativo |
 | `agente_deve_responder(text)` | A regra do modo teste, num lugar só |
 | `mensagens_whatsapp_atualiza_lead` | Trigger que mantém `ultima_mensagem` — **só conta mensagem do paciente** |
 | Bucket `midias-whatsapp` | **Privado**, diferente de `avatars` e `logos` (seção 7) |
 
 Três colunas novas em `crm_clinica_dados`: `agente_pausado`, `assumido_por` e
 `assumido_em` — o botão "Assumir conversa".
+
+#### `provedor_whatsapp` (migração `0017`)
+
+Qual ponte com o WhatsApp está ativa: `evolution` ou `uazapi`. **Uma de cada
+vez** — o `CHECK` não impede, mas o sistema fala com uma só.
+
+A coluna nasceu com um provedor implementado, de propósito: ela é barata agora
+e cara depois. Sem ela, a tela diria "Evolution" em texto fixo, e o dia da
+troca viraria caça ao literal espalhado por telas, rotas e mensagens de erro.
+
+> ⚠️ **As credenciais NÃO moram aqui.** Ficam nas secrets do Supabase, fora do
+> alcance do navegador. `configuracoes_agente` é lida por `authenticated` com
+> acesso total (seção 6): chave de API nessa tabela seria chave visível para
+> qualquer pessoa com login no sistema. Esta coluna diz **quem** está ativo,
+> nunca **como** se autentica.
+
+> Por que a tela precisa mostrar isso: em 01/09 o servidor da Evolution caiu e o
+> único sintoma foi silêncio no WhatsApp. Saber qual provedor está ativo é o que
+> diz em qual painel ir olhar — "WhatsApp desconectado", sozinho, não responde
+> essa pergunta.
+
+Regra do projeto: mudou o `CHECK`, mude `src/types/index.ts` no mesmo commit.
 
 > ⚠️ **A view `crm_clinica` foi dropada e recriada nessa migração.** Ela é
 > `select d.*`, e o Postgres **congela** essa expansão no momento da criação:

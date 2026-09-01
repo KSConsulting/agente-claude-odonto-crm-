@@ -83,7 +83,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **dezesseis arquivos, nesta ordem**:
+A migração é aplicada em **dezessete arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -99,7 +99,8 @@ agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
 `0014_conversas_agendamento.sql` (o `data_agendamento` nessa view, para a
 etiqueta "Agendada") e `0015_baixa_da_consulta.sql` (o status `faltou` e o
 trigger que promove o lead a Paciente) e `0016_ultima_consulta.sql` (a coluna
-calculada `ultima_consulta`, que a tela Pacientes mostra).
+calculada `ultima_consulta`, que a tela Pacientes mostra) e
+`0017_provedor_whatsapp.sql` (qual ponte com o WhatsApp está ativa).
 
 Os pontos que mais causam erro:
 
@@ -167,6 +168,7 @@ src/
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 │   ├── conversas.ts            ler, enviar, assumir, devolver; e a etiqueta "Agendada"
 │   ├── baixaConsulta.ts        compareceu ou faltou: a baixa que fecha o funil
+│   ├── whatsappConexao.ts      a ponte está de pé? quem está conectado? (com polling)
 │   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
 │   ├── agente.ts               como o Agente de IA se chama NA TELA (ver Design system)
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
@@ -188,6 +190,8 @@ src/
 │   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
 │   ├── PainelLead.tsx          coluna extra: ficha da pessoa, com abrir/esconder
 │   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
+│   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
+│   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha em Conversas — só quando cai
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -469,6 +473,33 @@ No card, os botões que agem sobre o item ficam **dentro dele** — não numa co
 
 > **O rodapé do card não esmaece junto.** Desligar um procedimento apaga o corpo
 > (`opacity: 0.5`), mas não o rodapé: apagar o botão que religa é apagar a saída.
+
+### A conexão do WhatsApp: seção, não aba; e o fornecedor é dado
+
+A ponte com o WhatsApp vive em **Secretária de IA**, como seção da pilha de
+cards — não como aba, e não em Configurações.
+
+| Decisão | Por quê |
+|---|---|
+| **Seção, não aba** | A página inteira é um assunto só: a secretária. Aba separa **temas diferentes** (é o caso de Configurações: Perfil, Clínica, Horários). Aba aqui esconderia o estado da conexão, que é justamente o que precisa ser visto sem clicar |
+| **Nome: "Conexão do WhatsApp"** | É o que a coisa é para quem usa. "Evolution API" é nome de fornecedor, e o rótulo teria que mudar junto com ele |
+| **Mas o provedor aparece dentro** | Quando cai, é ele que diz **em qual painel ir olhar**. "WhatsApp desconectado", sozinho, não responde isso |
+| **Nesta página, não em Configurações** | A conexão é o telefone da secretária. Separar as duas coisas seria esconder de quem cuida dela |
+
+**`desconectado` e `indisponivel` são estados diferentes, e a diferença é a
+saída:** o primeiro é a ponte de pé com a sessão caída (religa na própria
+tela); o segundo é o servidor fora do ar (nenhum botão daqui resolve — quem
+sobe é a máquina, no painel da hospedagem). Confundir os dois faz a pessoa
+clicar em "Reconectar" enquanto o problema está em outro lugar.
+
+> **O card de estado precisa das duas condições.** Atender depende do agente
+> ligado **e** do WhatsApp conectado. Até 01/09 o card só conhecia a primeira,
+> e por isso afirmou "está atendendo" por horas com a ponte fora do ar. Painel
+> que afirma o que não sabe é pior que painel vazio.
+
+O aviso de queda também aparece em **Conversas**, em faixa vermelha que só
+existe quando há problema — mesmo princípio do `AvisoBaixaConsulta`. É lá que a
+recepção passa o dia, e é lá que a queda seria notada primeiro.
 
 ### Ícones
 

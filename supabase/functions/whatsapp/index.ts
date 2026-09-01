@@ -8,6 +8,9 @@
  *   POST /whatsapp/enviar          envio manual do atendente (sessão)
  *   GET  /whatsapp/prompt-oficial  o prompt publicado, para a tela comparar (sessão)
  *   GET  /whatsapp/foto            foto de perfil de um número (sessão)
+ *   GET  /whatsapp/conexao         a conexão está de pé? quem está conectado? (sessão)
+ *   POST /whatsapp/conexao/conectar     abre pareamento, devolve código ou QR (sessão)
+ *   POST /whatsapp/conexao/desconectar  encerra a sessão do WhatsApp (sessão)
  *
  * PUBLICADA COM `--no-verify-jwt`, igual à `agenda/`: quem chama é a Evolution,
  * que não tem sessão do Supabase. A autenticação é nossa. Reimplantar no padrão
@@ -23,7 +26,10 @@ import { conversar, transcrever, type MensagemLLM, type Parte } from '../_shared
 import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
-import { digitando, enviarTexto, baixarMidia, numeroDoJid, fotoDoPerfil } from '../_shared/evolution.ts'
+import {
+  digitando, enviarTexto, baixarMidia, numeroDoJid, fotoDoPerfil,
+  estadoDaConexao, iniciarConexao, desconectar,
+} from '../_shared/evolution.ts'
 
 const SEGREDO = Deno.env.get('WEBHOOK_SEGREDO') ?? ''
 const URL_SUPABASE = Deno.env.get('SUPABASE_URL')!
@@ -91,6 +97,9 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && rota === '/enviar') return await rotaEnviar(req)
     if (req.method === 'GET' && rota === '/prompt-oficial') return await rotaPromptOficial(req)
     if (req.method === 'GET' && rota === '/foto') return await rotaFoto(req)
+    if (req.method === 'GET' && rota === '/conexao') return await rotaConexao(req)
+    if (req.method === 'POST' && rota === '/conexao/conectar') return await rotaConectar(req)
+    if (req.method === 'POST' && rota === '/conexao/desconectar') return await rotaDesconectar(req)
     if (req.method === 'POST' && (rota === '' || rota === '/')) return await rotaWebhook(req)
     return json({ ok: false, motivo: 'rota_desconhecida' }, 404)
   } catch (e) {
@@ -348,6 +357,66 @@ async function rotaFoto(req: Request): Promise<Response> {
   if (!numero) return json({ ok: false, motivo: 'sem_numero' }, 400)
 
   return json({ ok: true, url: await fotoDoPerfil(numero) })
+}
+
+// ---------------------------------------------------------------------------
+// A conexão com o WhatsApp — para a tela Secretária de IA
+//
+// A chave da Evolution é de servidor. Estas rotas existem pelo mesmo motivo da
+// `/foto`: mandar a chave para o navegador daria a qualquer pessoa com o
+// DevTools aberto o controle do WhatsApp da clínica.
+// ---------------------------------------------------------------------------
+
+/**
+ * Qual ponte está ativa. UMA de cada vez (migração 0017).
+ *
+ * Hoje só a Evolution tem código. Quando o provedor for outro, estas rotas
+ * dizem isso em voz alta em vez de chamar a Evolution assim mesmo — silêncio
+ * aqui viraria "conectado" mentiroso na tela.
+ */
+async function provedorAtivo(): Promise<string> {
+  const cfg = await selecionar<{ provedor_whatsapp: string }>(
+    'configuracoes_agente?select=provedor_whatsapp&limit=1',
+  )
+  return cfg[0]?.provedor_whatsapp ?? 'evolution'
+}
+
+async function rotaConexao(req: Request): Promise<Response> {
+  const usuario = await usuarioDaSessao(req)
+  if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
+
+  const provedor = await provedorAtivo()
+  if (provedor !== 'evolution') {
+    return json({
+      ok: true, provedor, estado: 'nao_implementado',
+      numero: null, perfil: null, foto: null,
+    })
+  }
+  return json({ ok: true, provedor, ...(await estadoDaConexao()) })
+}
+
+async function rotaConectar(req: Request): Promise<Response> {
+  const usuario = await usuarioDaSessao(req)
+  if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
+  if ((await provedorAtivo()) !== 'evolution') {
+    return json({ ok: false, motivo: 'provedor_nao_implementado' }, 400)
+  }
+
+  const corpo = await req.json().catch(() => ({})) as { numero?: string }
+  const r = await iniciarConexao(corpo.numero)
+  if (!r) return json({ ok: false, motivo: 'servidor_fora' }, 502)
+  return json({ ok: true, ...r })
+}
+
+async function rotaDesconectar(req: Request): Promise<Response> {
+  const usuario = await usuarioDaSessao(req)
+  if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
+  if ((await provedorAtivo()) !== 'evolution') {
+    return json({ ok: false, motivo: 'provedor_nao_implementado' }, 400)
+  }
+  return (await desconectar())
+    ? json({ ok: true })
+    : json({ ok: false, motivo: 'servidor_fora' }, 502)
 }
 
 // ---------------------------------------------------------------------------

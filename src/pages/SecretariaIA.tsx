@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
 import { formatarParaExibicao } from '../lib/telefones'
 import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
+import ConexaoWhatsApp from '../components/ConexaoWhatsApp'
+import { useConexao, conexaoDePe } from '../lib/whatsappConexao'
 import type { ConfiguracoesAgente, ModeloAgente } from '../types'
 
 /**
@@ -89,6 +91,8 @@ export default function SecretariaIA() {
   const [numeros, setNumeros] = useState<string[]>([])
   const [prompt, setPrompt] = useState<string | null>(null)
 
+  const { conexao, recarregar: recarregarConexao } = useConexao()
+
   const [novoNumero, setNovoNumero] = useState('')
   const [novoValido, setNovoValido] = useState(false)
   const [buscandoOficial, setBuscandoOficial] = useState(false)
@@ -117,6 +121,18 @@ export default function SecretariaIA() {
       .from('configuracoes_agente').update({ ativo: novo }).eq('id', cfg.id)
     if (error) { setErro('Não consegui mudar o estado do agente. Tente de novo.'); return }
     setCfg({ ...cfg, ativo: novo })
+  }
+
+  /** Troca a ponte ativa. Grava na hora, como o liga/desliga — não é rascunho. */
+  async function trocarProvedor(novo: string) {
+    if (!cfg || novo === cfg.provedor_whatsapp) return
+    setErro('')
+    const { error } = await supabase
+      .from('configuracoes_agente')
+      .update({ provedor_whatsapp: novo }).eq('id', cfg.id)
+    if (error) { setErro('Não consegui trocar o provedor.'); return }
+    setCfg({ ...cfg, provedor_whatsapp: novo as ConfiguracoesAgente['provedor_whatsapp'] })
+    recarregarConexao()
   }
 
   async function salvar() {
@@ -185,6 +201,47 @@ export default function SecretariaIA() {
   const ativo = cfg.ativo
   const usandoOficial = !cfg.prompt
 
+  /**
+   * O que dizer no card de cima.
+   *
+   * ⚠️ ATENDER DEPENDE DE DUAS COISAS: o agente ligado **e** o WhatsApp
+   * conectado. O card antigo só conhecia a primeira, e por isso afirmava "está
+   * atendendo" em 01/09 enquanto a ponte estava fora do ar e nenhuma mensagem
+   * chegava. Um painel que afirma o que não sabe é pior que um painel vazio.
+   */
+  function situacaoDoAgente() {
+    if (!ativo) {
+      return {
+        cor: '#6B818C', fundo: '#F2F6F7', borda: '#DCE6EA',
+        titulo: `A ${AGENTE_POR_EXTENSO} está desligada`,
+        detalhe: 'As mensagens continuam sendo registradas, mas ninguém recebe resposta.',
+      }
+    }
+    if (!conexao || conexao.estado === 'verificando') {
+      return {
+        cor: '#6B818C', fundo: '#F2F6F7', borda: '#DCE6EA',
+        titulo: `A ${AGENTE_POR_EXTENSO} está ligada`,
+        detalhe: 'Verificando a conexão com o WhatsApp...',
+      }
+    }
+    if (!conexaoDePe(conexao)) {
+      return {
+        cor: '#DC2626', fundo: '#FEF2F2', borda: '#FECACA',
+        titulo: `Ligada, mas o WhatsApp está desconectado`,
+        detalhe: 'Ela não recebe nem responde nada enquanto a conexão estiver fora. Veja logo abaixo, em Conexão do WhatsApp.',
+      }
+    }
+    return {
+      cor: '#1A7A48', fundo: '#E8F8EF', borda: '#A7D8C0',
+      titulo: `A ${AGENTE_POR_EXTENSO} está atendendo`,
+      detalhe: modoTeste
+        ? `Respondendo só aos ${numeros.length} número(s) de teste.`
+        : 'Respondendo a qualquer número que mandar mensagem.',
+    }
+  }
+
+  const situacao = situacaoDoAgente()
+
   return (
     <div style={{ padding: '32px 36px', maxWidth: 900, margin: '0 auto' }}>
 
@@ -194,26 +251,22 @@ export default function SecretariaIA() {
       </div>
 
       {/* ---------------- Estado ---------------- */}
-      <div style={{ ...cartao, borderColor: ativo ? '#A7D8C0' : '#DCE6EA' }}>
+      <div style={{ ...cartao, borderColor: situacao.borda }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div style={{
             width: 44, height: 44, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: ativo ? '#E8F8EF' : '#F2F6F7',
+            background: situacao.fundo,
           }}>
-            <Bot size={22} color={ativo ? '#1A7A48' : '#6B818C'} />
+            <Bot size={22} color={situacao.cor} />
           </div>
 
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: ativo ? '#1A7A48' : '#6B818C' }}>
-              {ativo ? `A ${AGENTE_POR_EXTENSO} está atendendo` : `A ${AGENTE_POR_EXTENSO} está desligada`}
+            <div style={{ fontSize: 15, fontWeight: 700, color: situacao.cor }}>
+              {situacao.titulo}
             </div>
-            <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 2 }}>
-              {ativo
-                ? modoTeste
-                  ? `Respondendo só aos ${numeros.length} número(s) de teste.`
-                  : 'Respondendo a qualquer número que mandar mensagem.'
-                : 'As mensagens continuam sendo registradas, mas ninguém recebe resposta.'}
+            <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 2, lineHeight: 1.5 }}>
+              {situacao.detalhe}
             </div>
           </div>
 
@@ -230,6 +283,16 @@ export default function SecretariaIA() {
 
         <Erro texto={erro} />
       </div>
+
+      {/* ---------------- Conexão do WhatsApp ---------------- */}
+      {/* Fica logo depois do card de estado de propósito: quando o card avisa
+          que o WhatsApp caiu, o conserto está na linha de baixo. */}
+      <ConexaoWhatsApp
+        conexao={conexao}
+        recarregar={recarregarConexao}
+        provedor={cfg.provedor_whatsapp ?? 'evolution'}
+        onTrocarProvedor={trocarProvedor}
+      />
 
       {/* ---------------- Modo teste ---------------- */}
       <div style={cartao}>
