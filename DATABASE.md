@@ -592,6 +592,11 @@ nulo); `configuracoes_clinica_cep_valido` exige `^\d{8}$`.
 > pela mesma razão que a paleta de `cores.ts` não tem: ampliar a lista um dia não
 > deve exigir migração. Até 01/09/2026 não havia tela nenhuma para este campo, e
 > corrigi-lo era um `update` no SQL Editor.
+>
+> ⚠️ **Trocar o valor não move nenhuma consulta já gravada.** `data_consulta` é
+> `timestamptz` — um **instante**, não "14:00". Corrigir o fuso acerta o que for
+> marcado dali para frente; o que entrou com o fuso errado continua na hora
+> errada, e só sai de lá remarcado à mão.
 
 A unicidade é garantida por um índice sobre uma expressão constante:
 
