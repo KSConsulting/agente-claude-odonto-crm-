@@ -974,20 +974,48 @@ lido tanto pela Letícia quanto por quem abre a conversa.
 | **Ele descreve o visível, nunca o que significa** | A Letícia **repete o que estiver ali**. Um diagnóstico no descritor sai pela boca dela — e ela tem proibição inegociável de dar diagnóstico |
 | **`Sem relação com odontologia:` é marcador** | Contrato com o `prompt.md`, que tem uma resposta própria para esse caso |
 
-> ⚠️ **"Está saudável" também é diagnóstico.** Na primeira versão da instrução
-> o descritor escreveu *"dentes com boa saúde aparente, sem sinais visíveis de
-> inflamação"* — correto como observação, e proibido como fala de secretária.
-> A instrução passou a vetar por escrito *saudável, bom, normal, bonito, feio,
-> preocupante* e o "não há sinal de nada". Sobrou o que é físico: cor, posição,
-> quebrado, faltando, escuro, torto, inchado, sangrando.
+> ⚠️ **"Está saudável" também é diagnóstico — e tranquilizar, também.** A
+> instrução foi apertada **duas vezes**, e cada aperto veio de uma frase que
+> escapou num teste:
+>
+> | Ele escreveu | Por que não pode |
+> |---|---|
+> | *"dentes com boa saúde aparente"* | Julga o estado. Quem julga é o dentista |
+> | *"gengivas aparentam sem alteração visível"* | Descreve o que **não** viu. Dizer que algo não está lá tranquiliza — e tranquilizar sobre uma foto é avaliar |
+>
+> As duas passariam por qualquer revisão descuidada: são observações corretas.
+> O problema é que **a Letícia repete o que estiver ali**, e na boca dela viram
+> laudo. Hoje a instrução veta por escrito *saudável, bom, normal, bonito,
+> feio, preocupante*, e proíbe a forma negativa com as palavras dela: *"sem
+> sinal de"*, *"sem alteração visível"*, *"aparenta normal"*, *"nada fora do
+> comum"*. Sobrou o físico: cor, posição, quebrado, faltando, escuro, torto,
+> inchado, sangrando.
 
-Medido em 01/09/2026, com as fotos de teste de verdade:
+#### Testado nas DUAS pontes, com mídia de verdade
 
-| Foto | O que o descritor escreveu |
+Em 01/09/2026, contra as instâncias reais — pela uazapi, as fotos mandadas no
+teste do dia; pela Evolution, as seis mídias que sobraram no histórico dela:
+
+| Ponte | O que foi testado | Resultado |
+|---|---|---|
+| **uazapi** | 4 capturas de tela, 1 gato, 1 foto de dentes, 2 áudios | Todas descritas; os áudios transcritos |
+| **Evolution** | 4 imagens (1 delas de dentes) e 2 áudios do histórico | Idem — `getBase64FromMediaMessage` devolveu as seis |
+
+Exemplos do que saiu:
+
+| Foto | O descritor escreveu |
 |---|---|
 | Captura de tela do editor de código | `Sem relação com odontologia: captura de tela de um editor de código…` |
+| Tela de erro 404 | `Sem relação com odontologia: tela de erro 404 Not Found…` |
 | Um gato | `Sem relação com odontologia: gato sentado sobre uma superfície clara…` |
-| Dentes de perto | `boca aberta com dentes frontais superiores e inferiores visíveis… Não há dentes quebrados ou faltando.` |
+| Dentes de perto | `Foto da boca aberta mostrando dentes superiores e inferiores com os dentes frontais superiores desalinhados e com espaço entre eles.` |
+
+> **Por que a Evolution precisava de teste próprio.** O descritor é o mesmo — ele
+> entra **depois** do download, e não sabe de qual ponte veio o arquivo. Mas o
+> download não é: a Evolution devolve base64 por `getBase64FromMediaMessage`, a
+> uazapi devolve uma URL por `/message/download`. Só o `baixarMidia` de cada uma
+> podia dizer se o arquivo chega — e até este teste, **nenhuma mídia tinha
+> passado pela Evolution neste banco**.
 
 ### O dia em que ela caiu, e o que isso mudou
 
