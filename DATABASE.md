@@ -91,6 +91,9 @@ ordem**:
     `configuracoes_agente`: o nome do Agente de IA vira **dado**, lido pelas
     telas e pelo marcador `{{NOME_AGENTE}}` do prompt. Uma fonte, dois
     leitores.
+20. `supabase/migrations/0020_apagar_foto_e_logo.sql` — as políticas de
+    **DELETE** em `avatars` e `logos`. Sem elas dava para trocar as duas
+    imagens e não dava para tirar. Ver a [seção 7](#7-storage).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -1449,14 +1452,33 @@ Três buckets. Os dois primeiros são **públicos**, porque o código usa
 | `avatars_public_read` | avatars | SELECT | público |
 | `avatars_own_insert` | avatars | INSERT | só na própria pasta (`auth.uid()`) |
 | `avatars_own_update` | avatars | UPDATE | só na própria pasta |
+| `avatars_own_delete` | avatars | DELETE | só na própria pasta |
 | `logos_public_read` | logos | SELECT | público |
 | `logos_team_insert` | logos | INSERT | qualquer autenticado |
 | `logos_team_update` | logos | UPDATE | qualquer autenticado |
+| `logos_team_delete` | logos | DELETE | qualquer autenticado |
 | `midias_whatsapp_equipe_le` | midias-whatsapp | SELECT | qualquer autenticado |
 | `midias_whatsapp_equipe_grava` | midias-whatsapp | INSERT | qualquer autenticado |
 
 > INSERT **e** UPDATE são necessários em `avatars` e `logos` porque o upload usa
 > `{ upsert: true }`. Só com INSERT, a segunda troca de foto falha.
+
+> ⚠️ **DELETE chegou na migração `0020`, e antes dela o botão "Remover" seria
+> uma mentira.** `storage.objects` tem RLS: sem política, o `remove()` do
+> cliente volta sem apagar. A tela nularia a coluna achando que deu certo, e o
+> arquivo ficaria servindo na URL antiga — apagado na tela, vivo na internet.
+> Por isso a tela apaga **o arquivo primeiro e a coluna depois**, e desiste da
+> coluna se o arquivo não sair.
+>
+> E ela esvazia a **pasta inteira**, não o arquivo da URL: a extensão entra no
+> caminho (`avatar.png`, `avatar.jpg`), então quem já trocou de formato deixou
+> o anterior lá dentro.
+
+> **`midias-whatsapp` continua sem DELETE, de propósito.** Ali quem apaga é a
+> Edge Function com a `service_role key`, pela rota `/whatsapp/apagar-pessoa`,
+> em ordem (mídia primeiro, ficha depois). Uma política para a equipe abriria
+> um segundo caminho para o mesmo estrago, sem essa ordem e sem a contagem na
+> frente.
 
 > ⚠️ **`midias-whatsapp` é privado de propósito, e precisa continuar assim.**
 > Ali ficam áudios e fotos que pacientes mandaram — foto de boca, inclusive. Um

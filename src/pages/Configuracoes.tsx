@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   User, Clock, Upload, Save, MapPin, Check, Eye, EyeOff,
-  Stethoscope, KeyRound,
+  Stethoscope, KeyRound, Trash2,
 } from 'lucide-react'
 import zxcvbn from 'zxcvbn'
 import { supabase } from '../lib/supabase'
 import type { Usuario, ConfiguracoesClinica, HorarioComercial } from '../types'
 import TabClinica from '../components/TabClinica'
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 
 /* ──────────────────────────────────────────────
    Upload validation constants
@@ -18,6 +19,29 @@ function validateImageFile(file: File): string | null {
   if (file.size > MAX_FILE_SIZE) return 'O arquivo excede o tamanho máximo de 2MB.'
   if (!ALLOWED_MIME.includes(file.type)) return 'Tipo de arquivo não permitido. Use JPG, PNG, WebP ou SVG.'
   return null
+}
+
+/**
+ * Esvazia uma pasta do Storage.
+ *
+ * **A pasta inteira, e não o arquivo da URL.** A extensão entra no caminho
+ * (`avatar.png`, `avatar.jpg`), então quem já trocou de formato deixou o
+ * anterior lá dentro — apagar só o último não apagaria nada, na prática.
+ *
+ * Devolve `false` se não deu para apagar. Quem chama **não pode** nular a
+ * coluna nesse caso: a coluna é o rastro, e sem ela o arquivo vira órfão num
+ * bucket público — a URL continua de pé, servindo a foto que a pessoa mandou
+ * apagar. É a mesma ordem da rota `/whatsapp/apagar-pessoa`: arquivo primeiro,
+ * registro depois.
+ */
+async function esvaziarPasta(bucket: string, pasta: string): Promise<boolean> {
+  const { data, error } = await supabase.storage.from(bucket).list(pasta)
+  if (error) return false
+  if (!data || data.length === 0) return true
+  const { error: erroRemocao } = await supabase.storage
+    .from(bucket)
+    .remove(data.map((arquivo) => `${pasta}/${arquivo.name}`))
+  return !erroRemocao
 }
 
 /* ──────────────────────────────────────────────
@@ -81,6 +105,10 @@ function TabPerfil({ userId }: { userId: string }) {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [avatarError, setAvatarError] = useState('')
   const [logoError, setLogoError] = useState('')
+  const [confirmandoAvatar, setConfirmandoAvatar] = useState(false)
+  const [confirmandoLogo, setConfirmandoLogo] = useState(false)
+  const [removendoAvatar, setRemovendoAvatar] = useState(false)
+  const [removendoLogo, setRemovendoLogo] = useState(false)
   // Password change
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -108,6 +136,7 @@ function TabPerfil({ userId }: { userId: string }) {
     const { error } = await supabase.from('usuarios').update({ nome: nome.trim() }).eq('id', userId)
     if (error) { setNomeError('Erro ao salvar. Tente novamente.'); setSavingNome(false); return }
     setUsuario((prev) => prev ? { ...prev, nome: nome.trim() } : prev)
+    window.dispatchEvent(new Event('usuario-atualizado'))
     setSavingNome(false); setSavedNome(true)
     setTimeout(() => setSavedNome(false), 2000)
   }
@@ -127,8 +156,40 @@ function TabPerfil({ userId }: { userId: string }) {
     const url = `${publicUrl}?t=${Date.now()}`
     const { error: dbError } = await supabase.from('usuarios').update({ avatar_url: url }).eq('id', userId)
     if (dbError) { setAvatarError('Imagem enviada, mas erro ao salvar no perfil.') }
-    else { setUsuario((prev) => prev ? { ...prev, avatar_url: url } : prev) }
+    else {
+      setUsuario((prev) => prev ? { ...prev, avatar_url: url } : prev)
+      // A barra lateral já carregou o usuário quando a sessão abriu; sem este
+      // aviso a foto nova só apareceria no próximo F5.
+      window.dispatchEvent(new Event('usuario-atualizado'))
+    }
     setUploadingAvatar(false); e.target.value = ''
+  }
+
+  /**
+   * Tira a foto de perfil: arquivo primeiro, coluna depois.
+   *
+   * Se o arquivo não sair, a coluna **não** é nulada. `avatars` é um bucket
+   * público: nular primeiro deixaria a imagem servindo na URL antiga, sem
+   * nada no banco apontando para ela — apagada na tela e viva na internet.
+   */
+  const handleAvatarRemove = async () => {
+    setAvatarError('')
+    setRemovendoAvatar(true)
+
+    if (!(await esvaziarPasta('avatars', userId))) {
+      setAvatarError('Não consegui apagar a imagem. Tente novamente.')
+      setRemovendoAvatar(false); setConfirmandoAvatar(false)
+      return
+    }
+
+    const { error } = await supabase.from('usuarios')
+      .update({ avatar_url: null }).eq('id', userId)
+    if (error) { setAvatarError('A imagem foi apagada, mas o perfil não atualizou.') }
+    else {
+      setUsuario((prev) => prev ? { ...prev, avatar_url: null } : prev)
+      window.dispatchEvent(new Event('usuario-atualizado'))
+    }
+    setRemovendoAvatar(false); setConfirmandoAvatar(false)
   }
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,6 +220,31 @@ function TabPerfil({ userId }: { userId: string }) {
       window.dispatchEvent(new Event('clinica-atualizada'))
     }
     setUploadingLogo(false); e.target.value = ''
+  }
+
+  /** Tira a logo. Mesma ordem e mesmo motivo da foto — `logos` também é público. */
+  const handleLogoRemove = async () => {
+    setLogoError('')
+    setRemovendoLogo(true)
+
+    if (!(await esvaziarPasta('logos', 'clinic'))) {
+      setLogoError('Não consegui apagar a imagem. Tente novamente.')
+      setRemovendoLogo(false); setConfirmandoLogo(false)
+      return
+    }
+
+    if (clinica) {
+      const { error } = await supabase.from('configuracoes_clinica')
+        .update({ logo_url: null }).eq('id', clinica.id)
+      if (error) {
+        setLogoError('A imagem foi apagada, mas a configuração não atualizou.')
+        setRemovendoLogo(false); setConfirmandoLogo(false)
+        return
+      }
+      setClinica({ ...clinica, logo_url: null })
+      window.dispatchEvent(new Event('clinica-atualizada'))
+    }
+    setRemovendoLogo(false); setConfirmandoLogo(false)
   }
 
   const handleSavePassword = async () => {
@@ -225,10 +311,20 @@ function TabPerfil({ userId }: { userId: string }) {
           </div>
           <div>
             <p style={{ fontSize: 13, color: '#6B818C', margin: '0 0 10px' }}>JPG, PNG ou WebP. Tamanho máximo: 2MB.</p>
-            <button onClick={() => { setAvatarError(''); avatarRef.current?.click() }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              <Upload size={14} /> {uploadingAvatar ? 'Enviando...' : 'Alterar foto'}
-            </button>
+            {/* "Remover" só existe quando há o que remover. Botão que não faz
+                nada é botão que ensina a ignorar botões. */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => { setAvatarError(''); avatarRef.current?.click() }}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <Upload size={14} /> {uploadingAvatar ? 'Enviando...' : 'Alterar foto'}
+              </button>
+              {usuario?.avatar_url && (
+                <button onClick={() => { setAvatarError(''); setConfirmandoAvatar(true) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 9, border: '1px solid #FECACA', background: '#FEF2F2', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#DC2626', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <Trash2 size={14} /> Remover
+                </button>
+              )}
+            </div>
             <input ref={avatarRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={handleAvatarUpload} />
           </div>
         </div>
@@ -254,10 +350,18 @@ function TabPerfil({ userId }: { userId: string }) {
           </div>
           <div>
             <p style={{ fontSize: 13, color: '#6B818C', margin: '0 0 10px' }}>A logo aparece na sidebar do sistema. JPG, PNG ou SVG.</p>
-            <button onClick={() => { setLogoError(''); logoRef.current?.click() }}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              <Upload size={14} /> {uploadingLogo ? 'Enviando...' : 'Alterar logo'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => { setLogoError(''); logoRef.current?.click() }}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#16232B', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <Upload size={14} /> {uploadingLogo ? 'Enviando...' : 'Alterar logo'}
+              </button>
+              {clinica?.logo_url && (
+                <button onClick={() => { setLogoError(''); setConfirmandoLogo(true) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 9, border: '1px solid #FECACA', background: '#FEF2F2', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#DC2626', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <Trash2 size={14} /> Remover
+                </button>
+              )}
+            </div>
             <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={handleLogoUpload} />
           </div>
         </div>
@@ -318,6 +422,40 @@ function TabPerfil({ userId }: { userId: string }) {
           </button>
         </div>
       </SectionCard>
+
+      {/* ---------------- Confirmações ----------------
+
+          Trocar a imagem é um clique; apagar também deveria ser — mas os dois
+          botões ficam lado a lado, e o segundo não tem "desfazer": quem apaga
+          sem ter o arquivo original em mãos não recupera. A logo é pior ainda,
+          porque some para a equipe inteira.                                  */}
+      {confirmandoAvatar && (
+        <ConfirmDeleteModal
+          itemName="sua foto de perfil"
+          title="Remover a foto de perfil?"
+          message={<>Sua foto sai desta tela e da barra lateral, e volta a aparecer
+            a inicial do seu nome. Para ter uma foto de novo, é só enviar outra.</>}
+          confirmLabel="Remover"
+          loadingLabel="Removendo..."
+          loading={removendoAvatar}
+          onConfirm={handleAvatarRemove}
+          onClose={() => setConfirmandoAvatar(false)}
+        />
+      )}
+
+      {confirmandoLogo && (
+        <ConfirmDeleteModal
+          itemName="a logo da clínica"
+          title="Remover a logo da clínica?"
+          message={<>A logo sai da barra lateral <strong>para a equipe inteira</strong>,
+            e volta o ícone padrão. Para ter uma logo de novo, é só enviar outra.</>}
+          confirmLabel="Remover"
+          loadingLabel="Removendo..."
+          loading={removendoLogo}
+          onConfirm={handleLogoRemove}
+          onClose={() => setConfirmandoLogo(false)}
+        />
+      )}
     </>
   )
 }

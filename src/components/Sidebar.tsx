@@ -94,8 +94,24 @@ export default function Sidebar() {
       supabase.from('configuracoes_clinica').select('*').limit(1).single()
         .then(({ data }) => { if (data) setClinica(data) })
     }
+
+    // E o mesmo para o usuário: a barra carrega a linha dele uma vez, quando a
+    // sessão abre. Sem este aviso, trocar a foto ou o nome em Configurações só
+    // aparecia aqui no próximo F5 — na tela em que a pessoa acabou de mexer.
+    const onUsuarioAtualizado = () => {
+      void supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return
+        return supabase.from('usuarios').select('*').eq('id', user.id).single()
+          .then(({ data }) => { if (data) setUsuario(data) })
+      })
+    }
+
     window.addEventListener('clinica-atualizada', onClinicaAtualizada)
-    return () => window.removeEventListener('clinica-atualizada', onClinicaAtualizada)
+    window.addEventListener('usuario-atualizado', onUsuarioAtualizado)
+    return () => {
+      window.removeEventListener('clinica-atualizada', onClinicaAtualizada)
+      window.removeEventListener('usuario-atualizado', onUsuarioAtualizado)
+    }
   }, [])
 
   const handleLogout = async () => {
@@ -363,23 +379,40 @@ export default function Sidebar() {
             fontFamily: "'Plus Jakarta Sans', sans-serif",
           }}
         >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: '50%',
-              background: '#EAF3F6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 13,
-              fontWeight: 700,
-              color: '#1E6E8C',
-              flexShrink: 0,
-            }}
-          >
-            {initials}
-          </div>
+          {/* A foto do perfil, e a inicial como reserva. `alt` com o nome
+              porque na barra recolhida este é o único conteúdo do botão — sem
+              ele, o botão fica sem nome para quem usa leitor de tela. */}
+          {usuario?.avatar_url ? (
+            <img
+              src={usuario.avatar_url}
+              alt={nomeUsuario}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                objectFit: 'cover',
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                background: '#EAF3F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#1E6E8C',
+                flexShrink: 0,
+              }}
+            >
+              {initials}
+            </div>
+          )}
           {!collapsed && (
             <div style={{ overflow: 'hidden' }}>
               <div

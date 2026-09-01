@@ -91,7 +91,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **dezenove arquivos, nesta ordem**:
+A migração é aplicada em **vinte arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -112,7 +112,8 @@ calculada `ultima_consulta`, que a tela Pacientes mostra) e
 `0018_avaliacao_e_precos.sql` (a avaliação como porta de entrada, o preço
 que pode ser dito, e o que o paciente procura gravado na consulta) e
 `0019_nome_do_agente.sql` (o nome do agente vira dado, lido pelas telas e pelo
-prompt).
+prompt) e `0020_apagar_foto_e_logo.sql` (as políticas de DELETE que faltavam em
+`avatars` e `logos`).
 
 Os pontos que mais causam erro:
 
@@ -371,6 +372,28 @@ metade fora da tela.
 modal direto no `<body>`. **Todo modal novo nasce dentro dele.** Os modais
 antigos das outras páginas escapam por acidente — são irmãos dos blocos
 animados, não filhos —, mas basta alguém aninhar um para o sintoma voltar.
+
+### A barra lateral não recarrega sozinha
+
+[`Sidebar.tsx`](src/components/Sidebar.tsx) carrega o usuário e a clínica
+**uma vez**, quando a sessão abre. Ela não é filha de nenhuma página, então
+trocar a foto, o nome ou a logo em Configurações não chegava nela — a mudança
+só aparecia no próximo F5, justamente na tela em que a pessoa acabou de mexer.
+
+Dois eventos de janela resolvem, e são o contrato entre as duas telas:
+
+| Evento | Quem dispara | O que a barra refaz |
+|---|---|---|
+| `clinica-atualizada` | Troca ou remoção da logo, e a aba Clínica | Relê `configuracoes_clinica` |
+| `usuario-atualizado` | Troca ou remoção da foto, e o salvar do nome | Relê a linha do usuário |
+
+São `window.dispatchEvent(new Event(...))` — sem estado global, sem provider.
+A barra é o único assinante, e uma tela só; um `Context` para dois avisos que
+atravessam a aplicação inteira seria mais encanamento do que ganho.
+
+> **Quem grava, avisa.** Esquecer o `dispatchEvent` não quebra nada e não
+> aparece em teste nenhum: a tela onde você mexeu mostra o valor novo (o estado
+> local foi atualizado junto), e só a barra fica para trás.
 
 ### Outras convenções
 
