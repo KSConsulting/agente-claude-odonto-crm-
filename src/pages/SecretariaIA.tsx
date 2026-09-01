@@ -7,6 +7,7 @@ import CampoTelefone from '../components/CampoTelefone'
 import { formatarParaExibicao } from '../lib/telefones'
 import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
 import ConexaoWhatsApp from '../components/ConexaoWhatsApp'
+import ApagarPessoa from '../components/ApagarPessoa'
 import { useConexao, conexaoDePe } from '../lib/whatsappConexao'
 import type { ConfiguracoesAgente, ModeloAgente } from '../types'
 
@@ -462,7 +463,7 @@ export default function SecretariaIA() {
       </div>
 
       {/* ---------------- Salvar ---------------- */}
-      <div style={{ ...cartao, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+      <div style={{ ...cartao, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button onClick={salvar} disabled={salvando} style={botao(salvo ? '#1A7A48' : '#1E6E8C')}>
           {salvo ? <Check size={14} /> : <Save size={14} />}
           {salvo ? 'Salvo!' : salvando ? 'Salvando...' : 'Salvar'}
@@ -472,6 +473,11 @@ export default function SecretariaIA() {
         </span>
         <Erro texto={erro} />
       </div>
+
+      {/* ---------------- Zona de perigo ----------------
+          Por último, e depois do botão Salvar, de propósito: nada aqui passa
+          por "Salvar", e ninguém deve topar com isso a caminho de outra coisa. */}
+      <ApagarPessoa />
     </div>
   )
 }

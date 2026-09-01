@@ -1392,6 +1392,32 @@ Três buckets. Os dois primeiros são **públicos**, porque o código usa
 > política nenhuma. As duas políticas acima existem para a **equipe logada** ver
 > a mídia na tela e anexar arquivo ao responder.
 
+### ⚠️ O Storage **não** cascateia
+
+Apagar um lead leva junto as mensagens e as consultas — as duas chaves
+estrangeiras são `ON DELETE CASCADE`. **Os arquivos não vão.** Eles não são
+linha do banco; `midia_url` é só o caminho.
+
+Pior: apagar por SQL também não resolve, porque o Postgres recusa — e o
+motivo é justamente esse:
+
+```
+ERROR: 42501: Direct deletion from storage tables is not allowed.
+HINT:  This prevents accidental data loss from orphaned objects.
+```
+
+Apagar só o registro deixaria o arquivo no backend, invisível e sem ninguém que
+soubesse a quem pertencia. O único caminho é a **Storage API**, que exige a
+`service_role key`.
+
+**Por isso apagar uma pessoa é rota de Edge Function, e não `delete` da tela:**
+`POST /whatsapp/apagar-pessoa` apaga a mídia **primeiro** e a ficha depois. A
+ordem não é detalhe — o caminho do arquivo é `{lead_id}/...`, então apagar a
+ficha antes destruiria a única forma de saber quais arquivos eram dela.
+
+> Um órfão real ficou no bucket em 01/09, de um lead apagado por SQL antes desta
+> rota existir. Fica de exemplo do que a regra evita.
+
 ---
 
 ## 8. Integração com o Agente de IA

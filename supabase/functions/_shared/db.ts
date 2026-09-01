@@ -95,3 +95,53 @@ export async function subirMidia(
   if (!r.ok) throw new Error(`storage: ${r.status} ${await r.text()}`)
   return caminho
 }
+
+/** Apaga linhas. `filtro` é a query do PostgREST, ex.: `id=eq.${id}`. */
+export async function apagar(tabela: string, filtro: string): Promise<void> {
+  const r = await fetch(`${URL_BASE}/rest/v1/${tabela}?${filtro}`, {
+    method: 'DELETE',
+    headers: { ...CABECALHOS, Prefer: 'return=minimal' },
+  })
+  if (!r.ok) throw new Error(`delete ${tabela}: ${r.status} ${await r.text()}`)
+}
+
+/**
+ * Os arquivos que uma pessoa mandou, pelo prefixo da pasta dela.
+ *
+ * A mídia é gravada em `{lead_id}/{uuid}.{ext}`, então a pasta é o próprio id
+ * do lead — é o que torna possível apagar tudo de alguém sem varrer o bucket.
+ */
+export async function listarMidias(prefixo: string): Promise<string[]> {
+  const r = await fetch(`${URL_BASE}/storage/v1/object/list/midias-whatsapp`, {
+    method: 'POST',
+    headers: CABECALHOS,
+    body: JSON.stringify({ prefix: prefixo, limit: 1000, offset: 0 }),
+  })
+  if (!r.ok) throw new Error(`storage list: ${r.status} ${await r.text()}`)
+  const itens = await r.json() as { name?: string }[]
+  return (itens ?? []).filter((i) => i.name).map((i) => `${prefixo}/${i.name}`)
+}
+
+/**
+ * Apaga arquivos do bucket, de verdade.
+ *
+ * ⚠️ TEM QUE SER PELA STORAGE API. O Postgres **recusa** `delete from
+ * storage.objects`, com uma mensagem que explica por quê: apagar só o registro
+ * deixaria o arquivo órfão no backend, invisível e impossível de achar depois.
+ *
+ *   ERROR: Direct deletion from storage tables is not allowed.
+ *   HINT:  This prevents accidental data loss from orphaned objects.
+ *
+ * Por isso a exclusão de uma pessoa mora aqui, na função, e não no navegador:
+ * é o único lugar com a `service_role key` para falar com esta API.
+ */
+export async function apagarMidias(caminhos: string[]): Promise<number> {
+  if (!caminhos.length) return 0
+  const r = await fetch(`${URL_BASE}/storage/v1/object/midias-whatsapp`, {
+    method: 'DELETE',
+    headers: CABECALHOS,
+    body: JSON.stringify({ prefixes: caminhos }),
+  })
+  if (!r.ok) throw new Error(`storage delete: ${r.status} ${await r.text()}`)
+  return caminhos.length
+}

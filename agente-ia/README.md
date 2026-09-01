@@ -48,7 +48,7 @@ caminhos próprios. Esta é a lista completa, para ninguém procurar:
 
 | Onde | O que é |
 |---|---|
-| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`) |
+| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`) e a de apagar uma pessoa (`/apagar-pessoa`) |
 | `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, Evolution, montagem do prompt, conversão de fuso (`tempo.ts`) |
 | `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
@@ -294,6 +294,8 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `src/lib/whatsappConexao.ts` | — | Consultar, parear e desconectar — e o `useConexao()` que acompanha |
 | `src/components/ConexaoWhatsApp.tsx` | — | A seção "Conexão do WhatsApp", em Secretária de IA |
 | `src/components/AvisoWhatsAppCaiu.tsx` | — | Faixa vermelha em Conversas, só quando a ponte cai |
+| `src/lib/apagarPessoa.ts` | — | Prever o estrago e apagar tudo de uma pessoa |
+| `src/components/ApagarPessoa.tsx` | — | A zona de perigo, no fim da página Secretária de IA |
 
 ### Alterados
 
@@ -328,11 +330,12 @@ mostra — a mesma fonte, para nunca divergirem.
 |---|---|
 | `lead_id` | De quem é a conversa (aponta para `crm_clinica_dados`) |
 | `autor` | `paciente`, `agente` ou `atendente` — é o que dá a cor do balão |
-| `tipo` | `texto`, `audio`, `imagem` ou `documento` |
+| `tipo` | `texto`, `audio`, `imagem`, `video` ou `documento` |
 | `conteudo` | O texto — ou a transcrição, quando for áudio |
 | `midia_url` | Onde o áudio ou a foto ficou guardado |
 | `id_externo` | O código da mensagem na Evolution. **Único** — impede a mesma mensagem entrar duas vezes se o WhatsApp reenviar |
 | `enviada_por` | Qual usuário escreveu, quando foi um atendente |
+| `lida` | Alimenta a bolinha de não lidas da tela Conversas |
 | `criada_em` | Quando chegou |
 
 ### Três colunas em `crm_clinica_dados`
@@ -734,6 +737,40 @@ função** — nunca do banco. Só saem pela rota `/conexao`, que exige sessão.
 > copiar no navegador. Ele **não vira link**: a Evolution anuncia o manager dela
 > em `http://`, e link que rebaixa de https para http é mau hábito para deixar
 > no código.
+
+### Apagar uma pessoa — a zona de perigo
+
+`POST /whatsapp/apagar-pessoa` apaga **tudo** de quem tem aquele número: ficha,
+conversa inteira, consultas (inclusive as já realizadas) e os arquivos que ela
+mandou. Sem lixeira, sem volta.
+
+Serve para três coisas: direito ao esquecimento da LGPD, número errado, e lixo
+de teste.
+
+**A contagem é a parte importante.** A tela mostra o que vai destruir antes de
+liberar o botão:
+
+> **Afonso** — +55 (11) 98765-4321
+> 68 mensagens · 3 consultas (1 já realizada)
+
+Botão irreversível que só pergunta "tem certeza?" vira clique automático na
+terceira vez. É o "1 já realizada" que faz alguém parar — e o pop-up destaca
+essa linha quando ela existe, porque é registro de atendimento sumindo.
+
+**Por que é rota de função, e não `delete` da tela.** A ficha o navegador
+apagaria: o `CASCADE` levaria conversa e consultas junto. Os **arquivos**, não
+— ver "O Storage não cascateia", na seção 7 do
+[`DATABASE.md`](../DATABASE.md). A Storage API exige a `service_role key`, que
+só existe dentro da função.
+
+**Mídia primeiro, ficha depois.** O caminho do arquivo é `{lead_id}/...`:
+apagar a ficha antes destruiria a única forma de saber quais arquivos eram
+dela. E se a mídia falhar, a rota **para e não apaga nada** — meio-apagado com
+arquivo órfão é o pior dos dois mundos.
+
+Depois disso a Letícia não reconhece mais a pessoa: a ficha volta a ser "você
+ainda não sabe nada sobre esta pessoa", e ela se apresenta de novo na próxima
+mensagem.
 
 ---
 

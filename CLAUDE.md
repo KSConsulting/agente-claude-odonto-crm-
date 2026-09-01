@@ -169,6 +169,7 @@ src/
 │   ├── conversas.ts            ler, enviar, assumir, devolver; e a etiqueta "Agendada"
 │   ├── baixaConsulta.ts        compareceu ou faltou: a baixa que fecha o funil
 │   ├── whatsappConexao.ts      a ponte está de pé? quem está conectado? (com polling)
+│   ├── apagarPessoa.ts         prever o estrago e apagar tudo de alguém
 │   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
 │   ├── agente.ts               como o Agente de IA se chama NA TELA (ver Design system)
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
@@ -192,6 +193,7 @@ src/
 │   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
 │   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
 │   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha em Conversas — só quando cai
+│   ├── ApagarPessoa.tsx        zona de perigo: apaga uma pessoa inteira
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -500,6 +502,22 @@ clicar em "Reconectar" enquanto o problema está em outro lugar.
 O aviso de queda também aparece em **Conversas**, em faixa vermelha que só
 existe quando há problema — mesmo princípio do `AvisoBaixaConsulta`. É lá que a
 recepção passa o dia, e é lá que a queda seria notada primeiro.
+
+### Apagar uma pessoa apaga a mídia por fora
+
+`crm_clinica_dados` cascateia para `mensagens_whatsapp` e `consultas`, mas
+**não para o Storage** — e o Postgres recusa apagar de `storage.objects` por
+SQL, de propósito, para não deixar arquivo órfão.
+
+Por isso a exclusão é a rota `POST /whatsapp/apagar-pessoa`, e não um `delete`
+da tela: só a Edge Function tem a `service_role key` que a Storage API exige.
+Ela apaga **mídia primeiro, ficha depois** — o caminho do arquivo é
+`{lead_id}/...`, então a ordem inversa perderia o rastro. Detalhes na seção 7
+do [`DATABASE.md`](DATABASE.md).
+
+**A confirmação conta o que vai destruir** (`68 mensagens · 3 consultas (1 já
+realizada)`), e destaca a consulta realizada quando existe. Botão irreversível
+sem número vira clique automático.
 
 ### Ícones
 

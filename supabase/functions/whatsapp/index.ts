@@ -11,6 +11,7 @@
  *   GET  /whatsapp/conexao         a conexão está de pé? quem está conectado? (sessão)
  *   POST /whatsapp/conexao/conectar     abre pareamento, devolve código ou QR (sessão)
  *   POST /whatsapp/conexao/desconectar  encerra a sessão do WhatsApp (sessão)
+ *   POST /whatsapp/apagar-pessoa   apaga TUDO de uma pessoa, mídia inclusive (sessão)
  *
  * PUBLICADA COM `--no-verify-jwt`, igual à `agenda/`: quem chama é a Evolution,
  * que não tem sessão do Supabase. A autenticação é nossa. Reimplantar no padrão
@@ -21,7 +22,10 @@
  * duplicada. Guardar a mensagem é rápido; pensar não.
  */
 
-import { rpc, selecionar, inserir, atualizar, subirMidia } from '../_shared/db.ts'
+import {
+  rpc, selecionar, inserir, atualizar, subirMidia,
+  apagar, listarMidias, apagarMidias,
+} from '../_shared/db.ts'
 import { conversar, transcrever, type MensagemLLM, type Parte } from '../_shared/llm.ts'
 import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
@@ -100,6 +104,7 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && rota === '/conexao') return await rotaConexao(req)
     if (req.method === 'POST' && rota === '/conexao/conectar') return await rotaConectar(req)
     if (req.method === 'POST' && rota === '/conexao/desconectar') return await rotaDesconectar(req)
+    if (req.method === 'POST' && rota === '/apagar-pessoa') return await rotaApagarPessoa(req)
     if (req.method === 'POST' && (rota === '' || rota === '/')) return await rotaWebhook(req)
     return json({ ok: false, motivo: 'rota_desconhecida' }, 404)
   } catch (e) {
@@ -420,6 +425,66 @@ async function rotaDesconectar(req: Request): Promise<Response> {
   return (await desconectar())
     ? json({ ok: true })
     : json({ ok: false, motivo: 'servidor_fora' }, 502)
+}
+
+// ---------------------------------------------------------------------------
+// Apagar uma pessoa inteira
+// ---------------------------------------------------------------------------
+
+/**
+ * Apaga TUDO de uma pessoa: ficha, conversa, consultas e arquivos.
+ *
+ * ⚠️ NÃO TEM VOLTA, e não tem lixeira. É o direito ao esquecimento da LGPD, e
+ * também a saída para número errado e para lixo de teste.
+ *
+ * ── POR QUE ISTO NÃO PODE MORAR NO NAVEGADOR ───────────────────────────────
+ *
+ * A ficha e a conversa até dá: `crm_clinica_dados` tem `ON DELETE CASCADE` para
+ * `mensagens_whatsapp` e `consultas`, e a tela poderia apagar a linha e pronto.
+ *
+ * **Os arquivos, não.** O Postgres recusa `delete from storage.objects`, porque
+ * apagar o registro deixaria o arquivo órfão no backend. A Storage API exige a
+ * `service_role key`, que só existe aqui dentro.
+ *
+ * ── A ORDEM IMPORTA ────────────────────────────────────────────────────────
+ *
+ * Mídia primeiro, ficha depois. O caminho do arquivo é `{lead_id}/...`, então
+ * apagar a ficha antes tiraria de nós a única forma de saber quais arquivos
+ * eram dela — e eles ficariam no bucket para sempre, sem ninguém que soubesse
+ * a quem pertenciam.
+ */
+async function rotaApagarPessoa(req: Request): Promise<Response> {
+  const usuario = await usuarioDaSessao(req)
+  if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
+
+  const corpo = await req.json().catch(() => ({})) as { lead_id?: string }
+  const leadId = String(corpo.lead_id ?? '').trim()
+  if (!/^[0-9a-f-]{36}$/i.test(leadId)) {
+    return json({ ok: false, motivo: 'lead_invalido' }, 400)
+  }
+
+  // Confere que existe ANTES de apagar, para responder "não achei" em vez de
+  // "apaguei" quando o id não é de ninguém.
+  const pessoa = await selecionar<{ id: string; nome_lead: string | null }>(
+    `crm_clinica_dados?select=id,nome_lead&id=eq.${leadId}&limit=1`,
+  )
+  if (!pessoa.length) return json({ ok: false, motivo: 'nao_encontrada' }, 404)
+
+  // 1) Os arquivos, enquanto ainda sabemos de quem são.
+  let midias = 0
+  try {
+    midias = await apagarMidias(await listarMidias(leadId))
+  } catch (e) {
+    // Falhar aqui e seguir apagando a ficha deixaria arquivo órfão para sempre.
+    console.error('apagar midias:', e)
+    return json({ ok: false, motivo: 'falha_na_midia' }, 500)
+  }
+
+  // 2) A ficha. O CASCADE leva mensagens e consultas junto.
+  await apagar('crm_clinica_dados', `id=eq.${leadId}`)
+
+  console.log(`pessoa apagada: ${leadId} por ${usuario.id} (${midias} arquivo(s))`)
+  return json({ ok: true, midias })
 }
 
 // ---------------------------------------------------------------------------
