@@ -37,8 +37,9 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 agente-ia/
 ├── README.md            📖 este documento
 ├── prompt.md            ⭐ o prompt da Letícia — quem ela é e como se comporta
+├── gerar-prompt.mjs     ⚙️ `npm run prompt`: o .md vira `_shared/prompt-oficial.ts`
 ├── .env.agente.local    🔑 as chaves (fora do Git)
-└── exemplos/            🧪 conversas de teste: como ela DEVE responder
+└── exemplos/            🧪 vazia — conversas de teste, quando existirem
 ```
 
 ### Fora dela (código: onde as ferramentas obrigam)
@@ -84,7 +85,7 @@ com revisão e histórico.
 | 3 | O cérebro — [`whatsapp/index.ts`](../supabase/functions/whatsapp/index.ts) | ✅ **no ar** |
 | 4 | Página Conversas — [`Conversas.tsx`](../src/pages/Conversas.tsx) | ✅ **no ar** |
 | 5 | Tela "Secretária de IA" — [`SecretariaIA.tsx`](../src/pages/SecretariaIA.tsx) | ✅ **no ar** |
-| 6 | Documentação e verificação | ⬜ |
+| 6 | Documentação e verificação | ✅ |
 
 ---
 
@@ -208,7 +209,7 @@ Registradas com o motivo, para ninguém refazer a discussão daqui a três meses
 | **Modelo de IA** | Selecionável na tela. Começando em **`gpt-4.1-mini`** | A clínica já tinha a chave da OpenAI. Anthropic fica para depois |
 | **Áudio** | Transcrito automaticamente | Paciente brasileiro manda áudio. Sem isso o agente trava na primeira mensagem |
 | **Foto** | O modelo enxerga, mas **nunca diagnostica** | Acolhe e encaminha para avaliação presencial |
-| **Preço** | **Nunca fala valor** | Não existe preço no banco. A regra antiga faria o agente inventar |
+| **Preço** | Fala **só** o que está escrito no catálogo | `preco_a_partir_de` (migração `0018`) tem três estados, e o `0` da avaliação — "é gratuita" — é a melhor resposta que ela tem para quem trava no valor. Ver seção 7 |
 | **Assumir conversa** | Qualquer usuário logado | Clínica pequena, equipe conhecida. A tela mostra quem assumiu |
 | **Redis** | Fica para depois | A espera de 8 segundos resolve dentro da função |
 | **Chaves de API** | Secrets do Supabase, **nunca no `.env`** | O `.env` vira JavaScript no site — a chave ficaria pública |
@@ -277,10 +278,15 @@ No menu do usuário, e não em Configurações: escolher o modelo, editar o prom
 ligar e desligar o agente — sem republicar nada. Depois ela ganhou também a
 seção da conexão com o WhatsApp e a zona de perigo (seção 8.5).
 
-### Etapa 6 — Documentação e verificação
+### Etapa 6 — Documentação e verificação ✅
 
-Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
-`npm run lint` limpos.
+`DATABASE.md`, `CLAUDE.md` e este arquivo acompanham o código, e `npm run build`
+e `npm run lint` rodam limpos.
+
+Não é etapa que fecha e acaba: **cada mudança no agente reabre ela**. A tabela da
+seção 12 diz o que atualizar em cada caso, e a regra 1 do
+[`CLAUDE.md`](../CLAUDE.md) é a mesma — documentação entra no commit da mudança,
+não depois.
 
 ---
 
@@ -295,6 +301,8 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `supabase/functions/_shared/llm.ts` | 3 | Fala com Claude e GPT pela mesma porta — é o que permite trocar de modelo |
 | `supabase/functions/_shared/evolution.ts` | 3 | Envia mensagem, "digitando…", baixa áudio e foto. E o estado da conexão: consultar, parear, desconectar |
 | `supabase/functions/_shared/prompt.ts` | 3 | Monta o prompt: identidade + dados da clínica + data de hoje + histórico |
+| `supabase/functions/_shared/prompt-oficial.ts` | 1 | O `prompt.md` embutido na função. **Gerado — não edite à mão** |
+| `agente-ia/gerar-prompt.mjs` | 1 | `npm run prompt`: transforma o `.md` no arquivo acima |
 | `supabase/functions/_shared/tempo.ts` | 3 | Texto de data vira instante no fuso da clínica. Cópia deliberada da API — ver seção 7 |
 | `src/pages/Conversas.tsx` | 4 | A página, em duas colunas |
 | `supabase/migrations/0013_conversas_lista.sql` | 4 | A view `conversas_lista`: última mensagem, não lidas e quem assumiu |
@@ -308,11 +316,11 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `src/components/ModalPortal.tsx` | 5 | Leva o modal para o `<body>` — ver Convenções no [`CLAUDE.md`](../CLAUDE.md) |
 | `supabase/migrations/0011_procedimentos_detalhados.sql` | 5 | A coluna `descricao_longa` e os 20 textos |
 | `supabase/migrations/0012_procedimentos_texto_enxuto.sql` | 5 | Os 20 textos, curtos (~430) e sem travessão |
-| `supabase/functions/_shared/ferramentas.ts` | 3 | As 7 ferramentas e o `executar()` que despacha |
+| `supabase/functions/_shared/ferramentas.ts` | 3 | As 8 ferramentas e o `executar()` que despacha |
 | `supabase/functions/_shared/db.ts` | 3 | PostgREST por `fetch` puro: ler, gravar e subir mídia |
 | `src/lib/conversas.ts` | 4 | Ler, enviar, assumir e devolver — fora dos componentes |
 | `agente-ia/prompt.md` | 1 | ⭐ O prompt da Letícia — identidade, tom, fluxo e regras |
-| `agente-ia/exemplos/*.md` | 1 | Conversas de teste: como ela deve responder |
+| `agente-ia/exemplos/` | 1 | ⬜ **vazia** — conversas de teste, quando existirem |
 | `agente-ia/README.md` | — | ✅ **já criado** — este documento |
 | `agente-ia/.env.agente.local` | — | ✅ **já criado** — as 6 chaves a preencher |
 | `supabase/migrations/0017_provedor_whatsapp.sql` | — | A coluna `provedor_whatsapp`: qual ponte está ativa |
@@ -618,7 +626,7 @@ procedimento, o que a conversa pediu.
 A conta é o motivo: os 20 textos longos somam ~8.600 caracteres. Dentro do
 prompt, seriam cobrados de toda mensagem, inclusive a de quem só mandou "oi",
 para carregar 19 explicações que aquela conversa nunca vai usar. Fora dele, o
-prompt continua nos mesmos **1.961 caracteres** de antes de a coluna existir.
+prompt continua **na ordem de dois mil caracteres**, e não de dez mil.
 
 Quem escreve esses textos é a equipe, na página **Procedimentos →
 Editar** ([`EditorProcedimento.tsx`](../src/components/EditorProcedimento.tsx)),
@@ -659,7 +667,7 @@ a cada conversa. O cache de prompt reaproveita o **prefixo comum** entre
 chamadas — subir a data ou a ficha joga fora o desconto do texto inteiro, de
 todas as conversas de uma vez. **Não mova as duas últimas seções para cima.**
 
-Efeito prático: **desligar um procedimento em Configurações tira ele da boca da
+Efeito prático: **desligar um procedimento na página Procedimentos tira ele da boca da
 Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
 
 > ⚠️ Mexeu num marcador (nome, quantidade, formato)? A montagem em
@@ -684,7 +692,6 @@ Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
 | Exige o dentista para agendar | Dentista é opcional | Nenhuma etapa do fluxo perguntava isso, e a maioria não tem preferência |
 | "Você não informa valor. Nunca." | "Só fala o que está escrito no catálogo" | A avaliação virou gratuita, e "gratuita" é a melhor resposta que ela tem para quem trava no preço. A proibição absoluta jogava isso fora |
 | Agendava qualquer procedimento | Agenda a avaliação, e guarda o desejado em `interesse` | Ela não pode decidir que alguém precisa de canal. O diagnóstico é do dentista |
-| "Informe o valor disponível" | Nunca fala preço | Não existe preço em `servicos_clinica`. A regra antiga faria o agente inventar |
 | "informações do estúdio" | "informações da clínica" | Sobra de outro negócio — o agente repetiria isso com o paciente |
 | Um bloco de 50 palavras | Dois ou três balões curtos | É como gente escreve no WhatsApp |
 
