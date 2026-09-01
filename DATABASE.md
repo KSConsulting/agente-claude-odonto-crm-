@@ -1652,8 +1652,10 @@ Duas consequências:
    `mensagens_whatsapp` — antes de qualquer coisa, para nada se perder
 3. Se o número ainda não tem ficha, cria o lead em `crm_clinica` com
    `status = 'iniciou_conversa'`
-4. Áudio e foto vão para o bucket `midias-whatsapp`; o áudio ainda é
-   transcrito, e a transcrição volta para a coluna `conteudo`
+4. Áudio e foto vão para o bucket `midias-whatsapp`, e **os dois viram texto
+   na coluna `conteudo`**: o áudio pelo Whisper, a foto por um modelo de visão
+   que a descreve. Nenhuma imagem segue para o modelo da conversa — ver a
+   seção "A foto vira texto" do [`agente-ia/README.md`](agente-ia/README.md)
 5. **Espera 12 segundos, em duas etapas.** Aos 8, acende o "digitando…"; aos 12,
    responde. Se chegou mensagem nova em qualquer uma delas, esta execução
    desiste — quem responde é a última. É o que faz a Letícia responder as três

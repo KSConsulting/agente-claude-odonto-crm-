@@ -27,7 +27,7 @@ import {
   apagar, listarMidias, apagarMidias,
 } from '../_shared/db.ts'
 import {
-  conversar, transcrever, chavesDeIA, type MensagemLLM, type Parte,
+  conversar, transcrever, descreverImagem, chavesDeIA, type MensagemLLM,
 } from '../_shared/llm.ts'
 import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
@@ -203,9 +203,11 @@ async function processar(
 ): Promise<void> {
   const whatsapp = recebida.whatsapp
 
-  // ---- Mídia: baixar, guardar e transcrever -------------------------------
-  let imagem: Parte | null = null
-
+  // ---- Mídia: baixar, guardar e virar texto -------------------------------
+  //
+  // As duas mídias que a Letícia entende terminam no mesmo lugar: uma linha de
+  // texto no `conteudo` da mensagem. O áudio pelo Whisper, a foto pelo
+  // descritor. Nada de imagem viaja daqui para a frente.
   if (recebida.midia) {
     const midia = await ponte.baixarMidia(recebida.midia)
     if (midia) {
@@ -226,20 +228,26 @@ async function processar(
           conteudo: texto ?? '[áudio que não consegui entender]',
         })
       } else if (recebida.tipo === 'imagem') {
-        imagem = { tipo: 'imagem', tipoMime: midia.tipoMime, base64: midia.base64 }
+        const descricao = await descreverImagem(midia.base64, midia.tipoMime)
+        await atualizar('mensagens_whatsapp', `id=eq.${mensagemId}`, {
+          conteudo: descricao ?? 'não consegui abrir esta foto',
+        })
       }
     } else {
       // O DOWNLOAD FALHOU, E ISSO PRECISA VIRAR TEXTO.
       //
-      // Sem esta linha, o `conteudo` fica nulo e o histórico mostra só
-      // "[foto enviada]" — que o prompt manda acolher, porque ele promete à
-      // Letícia que ela vê a imagem. Foi o que aconteceu na estreia da
-      // uazapi: ela agradeceu a foto, disse "imagino que esteja te
-      // incomodando" e recusou o diagnóstico de uma imagem que nunca chegou
-      // ao modelo.
+      // Sem esta linha o `conteudo` fica nulo, e o histórico mostra só
+      // "[foto enviada]" — uma foto que, para o modelo, existe e não diz
+      // nada. Foi o que aconteceu na estreia da uazapi: ela agradeceu a foto,
+      // disse "imagino que isso esteja te incomodando" e recusou o
+      // diagnóstico de uma imagem que nunca chegou até ela.
       //
       // Falha de mídia tem que chegar ao modelo como falha. Ele sabe pedir de
       // novo; o que ele não sabe é adivinhar que está cego.
+      //
+      // ⚠️ As frases são **contrato com o `prompt.md`**, que tem uma resposta
+      // própria para cada uma. Mudar o texto aqui sem mudar lá devolve o
+      // sintoma: ela volta a improvisar sobre o que não recebeu.
       console.error(`midia nao baixada: ${recebida.tipo} de ${whatsapp}`)
       const aviso = recebida.tipo === 'audio'
         ? '[áudio que não consegui abrir]'
@@ -301,7 +309,7 @@ async function processar(
   // execução: nos 8 segundos de espera a Letícia pode ter gravado o nome.
   const ficha = await montarFicha(lead.id, atual[0] ?? lead, fuso)
   const sistema = await montarPrompt(cfg[0]?.prompt, ficha, cfg[0]?.nome_agente)
-  const mensagens = await montarHistorico(lead.id, imagem)
+  const mensagens = await montarHistorico(lead.id)
   const ctx: Contexto = { leadId: lead.id, whatsapp, fuso }
 
   let resposta = ''
@@ -667,12 +675,14 @@ async function acharOuCriarLead(whatsapp: string): Promise<Lead> {
 }
 
 /**
- * A conversa como o modelo vê.
+ * A conversa como o modelo vê — **texto puro, do começo ao fim**.
  *
- * A foto acompanha só a mensagem ATUAL. Fotos antigas viram "[foto enviada]" —
- * reenviar imagem a cada volta multiplicaria o custo sem mudar a resposta.
+ * A foto já chegou aqui descrita em uma linha (ver `descreverImagem`), e o
+ * áudio transcrito. Não há mais anexo de imagem: a descrição de uma foto de
+ * três semanas atrás continua no histórico igual à de agora, e a conversa
+ * inteira custa o mesmo em qualquer modelo.
  */
-async function montarHistorico(leadId: string, imagem: Parte | null): Promise<MensagemLLM[]> {
+async function montarHistorico(leadId: string): Promise<MensagemLLM[]> {
   const linhas = await selecionar<Mensagem>(
     `mensagens_whatsapp?select=id,autor,tipo,conteudo,criada_em&lead_id=eq.${leadId}` +
     `&order=criada_em.desc&limit=${HISTORICO}`,
@@ -695,11 +705,7 @@ async function montarHistorico(leadId: string, imagem: Parte | null): Promise<Me
     if (!rotulo.trim()) return
 
     if (l.autor === 'paciente') {
-      if (ultima && imagem) {
-        saida.push({ papel: 'user', conteudo: [{ tipo: 'texto', texto: rotulo }, imagem] })
-      } else {
-        saida.push({ papel: 'user', conteudo: rotulo })
-      }
+      saida.push({ papel: 'user', conteudo: rotulo })
     } else {
       // O que o atendente humano escreveu entra como fala da própria Letícia:
       // para o paciente foi a mesma pessoa, e ela precisa saber o que "disse".

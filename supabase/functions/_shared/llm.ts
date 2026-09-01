@@ -304,6 +304,112 @@ async function viaAnthropic(pedido: PedidoLLM): Promise<RespostaLLM> {
 // ---------------------------------------------------------------------------
 
 /**
+ * O modelo que olha a foto — fixo, e não o que a clínica escolheu na tela.
+ *
+ * Mesma razão do Whisper: descrever a imagem é **pré-processamento**, não
+ * conversa. Ele precisa funcionar quando a clínica escolhe um Claude, e
+ * precisa funcionar igual em todos os modelos — senão a mesma foto vira uma
+ * descrição diferente a cada troca de seletor, e ninguém entende por quê.
+ *
+ * O `4.1-mini` enxerga, é o mais barato da lista e já é o padrão do sistema.
+ */
+const MODELO_VISAO = 'gpt-4.1-mini'
+
+/**
+ * O que o descritor pode e não pode escrever.
+ *
+ * ⚠️ **A secretária repete isto.** A descrição não é uma anotação interna: ela
+ * vira o `conteudo` da mensagem, entra no histórico e é lida como se fosse o
+ * que a paciente disse. Um diagnóstico aqui sai pela boca da Letícia — que tem
+ * proibição inegociável de dar diagnóstico. Por isso a regra é repetida com
+ * todas as letras, e por isso o descritor descreve **o visível**, nunca o que
+ * aquilo significa.
+ *
+ * O marcador `Sem relação com odontologia:` é **contrato com o prompt dela**.
+ * Ela tem uma resposta própria para esse caso — sem ele, uma captura de tela
+ * vira "imagino que isso esteja te incomodando".
+ */
+const INSTRUCAO_VISAO = `Você descreve fotos que pacientes mandam para o WhatsApp de uma clínica odontológica. Quem lê a sua descrição é a secretária da clínica, e ela NÃO vê a imagem.
+
+Escreva UMA descrição curta, no máximo 2 frases, em português do Brasil.
+
+Se a foto tiver a ver com odontologia — boca, dentes, gengiva, aparelho, prótese, radiografia, receita, orçamento, comprovante de pagamento ou documento de clínica — descreva o que dá para ver, de forma objetiva.
+
+Se NÃO tiver, comece a resposta exatamente com "Sem relação com odontologia:" e diga em poucas palavras o que é.
+
+NUNCA dê diagnóstico, nome de doença, grau de gravidade, causa nem tratamento.
+
+NUNCA diga que algo está saudável, bom, normal, bonito, feio ou preocupante, nem que não há sinal de nada. Isso é avaliação, e quem avalia é o dentista. Descreva só o que é visível: cor, posição, e se algo está quebrado, faltando, escuro, torto, inchado ou sangrando. Pare aí.
+
+Não cumprimente, não faça perguntas, não dê conselho. Escreva só a descrição.`
+
+/**
+ * Descreve a foto do paciente, para a secretária poder responder sobre ela.
+ *
+ * ── POR QUE DESCREVER, E NÃO MANDAR A IMAGEM ───────────────────────────────
+ *
+ * A imagem ia anexada à mensagem, direto para o modelo da conversa. Funcionava
+ * na hora e falhava depois, por três motivos:
+ *
+ * 1. **Não sobrava memória.** Só a mensagem ATUAL levava a foto — reenviar a
+ *    cada volta multiplicaria o custo. Duas mensagens depois, o histórico
+ *    dizia `[foto enviada]` e mais nada: ela esquecia o que tinha visto.
+ * 2. **Dependia do modelo.** Trocar o seletor trocava os olhos dela.
+ * 3. **Não aparecia na tela.** A recepção, em Conversas, via um balão de foto
+ *    sem uma linha do que a IA entendeu dali.
+ *
+ * Descrita, a foto vira texto — e texto é permanente, é igual em todo modelo,
+ * e é lido tanto pela Letícia quanto por quem abre a conversa. É o mesmo
+ * caminho do áudio, e agora os dois têm uma forma só.
+ *
+ * `null` quando não deu: quem chama grava o aviso de falha, e o prompt manda
+ * pedir a foto de novo em vez de fingir que viu.
+ */
+export async function descreverImagem(
+  base64: string,
+  tipoMime: string,
+): Promise<string | null> {
+  if (!CHAVE_OPENAI) return null
+
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${CHAVE_OPENAI}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODELO_VISAO,
+        max_tokens: 300,
+        messages: [
+          { role: 'system', content: INSTRUCAO_VISAO },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Descreva esta foto.' },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${tipoMime};base64,${base64}` },
+              },
+            ],
+          },
+        ],
+      }),
+    })
+    if (!r.ok) {
+      console.error('visao:', r.status, (await r.text()).slice(0, 300))
+      return null
+    }
+    const dados = await r.json()
+    const texto = (dados?.choices?.[0]?.message?.content ?? '').trim()
+    return texto || null
+  } catch (e) {
+    console.error('visao:', e)
+    return null
+  }
+}
+
+/**
  * A extensão que o Whisper vai ler no nome do arquivo.
  *
  * As duas pontes entregam formatos diferentes: a Evolution passa o

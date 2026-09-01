@@ -142,7 +142,7 @@ O caminho de uma mensagem, do celular do paciente até a resposta:
               Salva no banco
                     │
                     ▼
-      Transcreve áudio · guarda foto
+   Áudio vira texto · foto vira texto
                     │
                     ▼
      Espera 8s · silêncio  ─── chegou outra ───▶  Encerra ·
@@ -173,8 +173,8 @@ O caminho de uma mensagem, do celular do paciente até a resposta:
 ```
 
 > ⚠️ **A ordem acima é a do código, e ela não é óbvia.** A mídia é baixada e
-> transcrita **antes** da espera — o áudio precisa virar texto de qualquer jeito,
-> e fazer isso enquanto se espera não custa nada. Já as travas (`agente_pausado`
+> vira texto **antes** da espera — áudio e foto precisam virar texto de qualquer
+> jeito, e fazer isso enquanto se espera não custa nada. Já as travas (`agente_pausado`
 > e `agente_deve_responder`) são conferidas **depois** dela, de propósito: doze
 > segundos são tempo de sobra para alguém assumir a conversa, e a resposta a
 > essa pergunta tem que ser a mais recente possível.
@@ -274,6 +274,7 @@ Registradas com o motivo, para ninguém refazer a discussão daqui a três meses
 | **Memória** | Postgres do próprio Supabase | A memória do agente e a tela de Conversas leem a mesma tabela |
 | **Modelo de IA** | Selecionável na tela: **seis da OpenAI, dois da Anthropic**. Em uso, o `gpt-4.1-mini` | A clínica já tinha a chave da OpenAI. Os Claude aparecem **desligados** enquanto a `ANTHROPIC_API_KEY` estiver vazia — ver seção 9 |
 | **Áudio** | Transcrito automaticamente (Whisper) | Paciente brasileiro manda áudio. Sem isso o agente trava na primeira mensagem |
+| **Foto** | **Descrita** por um modelo de visão, e o que segue é a descrição — não a imagem | Texto sobrevive no histórico, custa igual em qualquer modelo e aparece em Conversas. Ver a seção logo abaixo |
 | **Foto** | O modelo enxerga, mas **nunca diagnostica** | Acolhe e encaminha para avaliação presencial |
 | **Preço** | Fala **só** o que está escrito no catálogo | `preco_a_partir_de` (migração `0018`) tem três estados, e o `0` da avaliação — "é gratuita" — é a melhor resposta que ela tem para quem trava no valor. Ver seção 7 |
 | **Assumir conversa** | Qualquer usuário logado | Clínica pequena, equipe conhecida. A tela mostra quem assumiu |
@@ -438,7 +439,7 @@ mostra — a mesma fonte, para nunca divergirem.
 | `lead_id` | De quem é a conversa (aponta para `crm_clinica_dados`) |
 | `autor` | `paciente`, `agente` ou `atendente` — é o que dá a cor do balão |
 | `tipo` | `texto`, `audio`, `imagem`, `video` ou `documento` |
-| `conteudo` | O texto — ou a transcrição, quando for áudio |
+| `conteudo` | O texto — a transcrição, quando for áudio; a descrição, quando for foto |
 | `midia_url` | Onde o áudio ou a foto ficou guardado |
 | `id_externo` | O código da mensagem na Evolution. **Único** — impede a mesma mensagem entrar duas vezes se o WhatsApp reenviar |
 | `enviada_por` | Qual usuário escreveu, quando foi um atendente |
@@ -950,6 +951,44 @@ Por isso a correção tem duas metades, e a segunda é a que importa:
 > roteiro. Ele sabe pedir de novo; o que ele não sabe é adivinhar que está
 > cego.
 
+### A foto vira texto, e é isso que ela lê
+
+A imagem ia **anexada** à mensagem, direto para o modelo da conversa. Funcionava
+no instante e falhava depois:
+
+| Problema | O que acontecia |
+|---|---|
+| **Não sobrava memória** | Só a mensagem ATUAL levava a foto — reenviar a cada volta multiplicaria o custo. Duas mensagens depois o histórico dizia `[foto enviada]`, e ela tinha esquecido o que viu |
+| **Dependia do modelo** | Trocar o seletor trocava os olhos dela. Um modelo sem visão a deixaria cega sem nada na tela dizendo isso |
+| **Não aparecia em Conversas** | A recepção via um balão de foto e nenhuma linha do que a IA entendeu ali |
+
+Hoje a foto passa por um **descritor** (`descreverImagem()`, em
+[`llm.ts`](../supabase/functions/_shared/llm.ts)) e o que segue é uma linha de
+texto — igual ao áudio. Texto é permanente, é igual em qualquer modelo, e é
+lido tanto pela Letícia quanto por quem abre a conversa.
+
+| Decisão | Por quê |
+|---|---|
+| **Modelo fixo (`gpt-4.1-mini`)**, e não o do seletor | Descrever é pré-processamento, não conversa — a mesma razão do Whisper. Precisa funcionar com a clínica no Claude, e precisa dar a mesma descrição sempre: senão a mesma foto muda de sentido a cada troca de seletor, e ninguém entende por quê |
+| **A descrição vai para o `conteudo`** | É onde a transcrição do áudio já vivia. Uma coluna, dois tipos de mídia, e a tela Conversas mostra os dois sem saber que são diferentes |
+| **Ele descreve o visível, nunca o que significa** | A Letícia **repete o que estiver ali**. Um diagnóstico no descritor sai pela boca dela — e ela tem proibição inegociável de dar diagnóstico |
+| **`Sem relação com odontologia:` é marcador** | Contrato com o `prompt.md`, que tem uma resposta própria para esse caso |
+
+> ⚠️ **"Está saudável" também é diagnóstico.** Na primeira versão da instrução
+> o descritor escreveu *"dentes com boa saúde aparente, sem sinais visíveis de
+> inflamação"* — correto como observação, e proibido como fala de secretária.
+> A instrução passou a vetar por escrito *saudável, bom, normal, bonito, feio,
+> preocupante* e o "não há sinal de nada". Sobrou o que é físico: cor, posição,
+> quebrado, faltando, escuro, torto, inchado, sangrando.
+
+Medido em 01/09/2026, com as fotos de teste de verdade:
+
+| Foto | O que o descritor escreveu |
+|---|---|
+| Captura de tela do editor de código | `Sem relação com odontologia: captura de tela de um editor de código…` |
+| Um gato | `Sem relação com odontologia: gato sentado sobre uma superfície clara…` |
+| Dentes de perto | `boca aberta com dentes frontais superiores e inferiores visíveis… Não há dentes quebrados ou faltando.` |
+
 ### O dia em que ela caiu, e o que isso mudou
 
 Em 01/09 o servidor da Evolution saiu do ar. O sintoma foi **silêncio**:
@@ -1138,7 +1177,8 @@ mensagens.
 | **Claude Sonnet 5** — equilíbrio | US$ 0,06 – 0,16 | US$ 18 – 48 |
 | **GPT-4.1** e **GPT-4.1 mini** | faixa parecida, o mini bem abaixo | confirme no painel da OpenAI |
 | **GPT-5.1 / 5.4 mini / 5.5** | acima dos 4.1: o raciocínio é cobrado como saída | idem |
-| Transcrição de áudio | ~US$ 0,006 / minuto | poucos dólares |
+| Transcrição de áudio (Whisper) | ~US$ 0,006 / minuto | poucos dólares |
+| Descrição de foto (`gpt-4.1-mini`) | fração de centavo por foto | poucos dólares — e **uma vez por foto**, não a cada mensagem: a descrição fica no histórico como texto |
 | Servidor da Evolution | — | ~R$ 40 / mês |
 | Supabase | — | o que já se paga |
 

@@ -926,10 +926,10 @@ seria palpite. O `whatsapp/index.ts` não conhece nenhuma das duas.
 > estreia — o caso está na seção 8 do
 > [`agente-ia/README.md`](agente-ia/README.md).
 >
-> **E mídia que não baixa precisa virar texto**, nunca silêncio. O prompt
-> promete à Letícia que ela vê a imagem: diante de um `[foto enviada]` sem
-> conteúdo, ela acolhe a dor de uma foto que nunca chegou. Hoje a falha grava
-> `não consegui abrir esta foto`, e o prompt manda pedir de novo.
+> **E mídia que não baixa precisa virar texto**, nunca silêncio. Diante de um
+> `[foto enviada]` sem conteúdo, ela acolhe a dor de uma foto que nunca
+> chegou. Hoje a falha grava `não consegui abrir esta foto`, e o prompt manda
+> pedir de novo.
 
 > **Atender depende de TRÊS condições, e o card demorou a aprender as duas
 > últimas.** O agente ligado, o WhatsApp conectado **e o webhook apontado para
@@ -1236,6 +1236,25 @@ Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.
 
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.
+
+### A foto não vai para o modelo — a descrição dela vai
+
+Áudio e foto terminam no mesmo lugar: uma linha de texto no `conteudo` da
+mensagem. O áudio pelo Whisper; a foto por `descreverImagem()`, em
+[`llm.ts`](supabase/functions/_shared/llm.ts), que a olha e escreve uma linha.
+**Nenhuma imagem segue para o modelo da conversa.**
+
+| Decisão | Por quê |
+|---|---|
+| **A descrição, e não a imagem** | Anexada, a foto só acompanhava a mensagem atual — duas mensagens depois o histórico dizia `[foto enviada]` e ela tinha esquecido o que viu. Texto fica |
+| **Modelo fixo (`gpt-4.1-mini`)** | Pré-processamento, como o Whisper: precisa funcionar com a clínica no Claude, e dar a mesma descrição sempre |
+| **Descreve o visível, nunca o que significa** | Ela **repete o que estiver ali**. "Está saudável" é diagnóstico, e diagnóstico é proibição inegociável dela |
+| **`Sem relação com odontologia:`** | Marcador literal, contrato com o `prompt.md` — sem ele, uma captura de tela vira "imagino que isso esteja te incomodando" |
+
+> ⚠️ **As duas frases do código são contrato com o prompt.**
+> `Sem relação com odontologia` e `não consegui abrir esta foto` têm resposta
+> própria lá. Mudar o texto de um lado sem mudar o outro devolve o sintoma —
+> ela volta a improvisar sobre o que não recebeu, e nada na tela diz isso.
 
 ### A memória dela tem duas camadas
 
