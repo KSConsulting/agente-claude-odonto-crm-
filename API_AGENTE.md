@@ -353,8 +353,11 @@ A saída é remarcar com `procedimento` valendo o nome devolvido em
 `marque_no_lugar`, e o tratamento desejado em **`interesse`** — que é o que faz
 o dentista abrir a agenda e já saber do que se trata.
 
-`GET /procedimentos` diz quais passam pela avaliação, então dá para saber antes
-de tentar.
+> ⚠️ **`GET /procedimentos` ainda devolve só os nomes**, então não dá para saber
+> de antemão quais passam pela avaliação: quem consome descobre pela recusa.
+> Para um agente conversando, isso significa oferecer horário e voltar atrás na
+> frente do paciente. A Letícia não sofre disso porque lê o catálogo pela view
+> `procedimentos_clinica_agente`, que traz o fluxo escrito na linha.
 
 > **Procedimento fora do catálogo continua passando.** `procedimento` é texto
 > livre, e integração que marca algo que não está em `servicos_clinica` não

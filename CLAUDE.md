@@ -477,6 +477,12 @@ punhado de campos curtos, a linha é mais densa e melhor.
 No card, os botões que agem sobre o item ficam **dentro dele** — não numa coluna
 à direita, longe do nome, onde é fácil clicar no procedimento vizinho.
 
+Mas **só o que é ciclo de vida**: ativar, editar, excluir. O que é conteúdo ou
+regra — as descrições, o fluxo de agendamento, o valor — mora no modal de
+Editar. A diferença é o custo do erro: religar um procedimento desligado por
+engano é um clique; mudar o fluxo de agendamento sem perceber muda o que a
+Letícia marca para o paciente.
+
 > **O rodapé do card não esmaece junto.** Desligar um procedimento apaga o corpo
 > (`opacity: 0.5`), mas não o rodapé: apagar o botão que religa é apagar a saída.
 
@@ -921,10 +927,23 @@ haveria duas versões da mesma regra e um dia a tela mostraria uma coisa e o
 paciente ouviria outra.
 
 `procedimentos_clinica_agente` segue a mesma receita, com os procedimentos
-ativos — um por linha, `Nome: descrição`, na ordem da tela de Configurações. Sem
-prefixo `Procedimento:`, porque aqui todas as linhas são da mesma natureza e a
-palavra repetida vinte vezes viraria ruído lido em voz alta. Sem descrição, a
-linha é só o nome.
+ativos — um por linha, na ordem da tela de Procedimentos. Sem prefixo
+`Procedimento:`, porque aqui todas as linhas são da mesma natureza e a palavra
+repetida vinte vezes viraria ruído lido em voz alta.
+
+A linha é `Nome: descrição`, e ganha uma frase final quando há o que dizer:
+
+```
+Avaliação Odontológica: primeira consulta, o dentista examina... Gratuita.
+Lentes de Contato: lâminas finíssimas de porcelana... Antes deste, marque Avaliação Odontológica.
+Limpeza e Profilaxia: remoção de placa e tártaro... A partir de R$ 250,00.
+Clareamento Dental: gel clareador que remove manchas...
+```
+
+**A ordem do `case` é a regra de negócio:** exigir avaliação vence o preço, e é
+o que garante que um valor preenchido por engano num procedimento que passa pela
+avaliação nunca seja falado. Sem descrição, a linha é só o nome; sem nada a
+dizer sobre fluxo ou valor, termina na descrição.
 
 `profissionais_clinica_agente` faz o mesmo com os dentistas ativos, trazendo a
 jornada de cada um: `Estevão Jorge: atende segunda a sexta das 08:00 às 18:00`.

@@ -879,7 +879,8 @@ jornada (`time` sem fuso) e a consulta (`timestamptz`) só é confiável com o
 | `agenda_profissionais_livres(inicio, duracao)` | Quem está livre num horário |
 | `agenda_horarios_disponiveis(data, profissional, duracao, passo)` | Slots livres num dia |
 | `agenda_proxima_vaga(a_partir_de, profissional, duracao)` | Próximo dia com vaga (até 60 dias) |
-| `agenda_marcar(...)` | Acha ou cria o paciente, escolhe profissional, insere |
+| `agenda_marcar(...)` | Acha ou cria o paciente, escolhe profissional, insere. **Recusa** o procedimento com `exige_avaliacao`, devolvendo o nome da porta em `sugestao` |
+| `reais(numeric)` | `1500.5` → `R$ 1.500,50`. Independente de locale, de propósito |
 | `agenda_cancelar(...)` | Cancela, com conferência opcional pelo WhatsApp |
 | `agenda_remarcar(...)` | Move a consulta num `UPDATE` só |
 
