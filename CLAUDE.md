@@ -900,7 +900,8 @@ aparece, é problema de verdade.
 | O prazo tem `setTimeout` próprio | Sem ele, a faixa nasceria na consulta seguinte ao vencimento: até um minuto atrasada, por uma diferença de milissegundos |
 | O componente guarda o **instante** em que o prazo tocou, não um "já venceu" | A queda seguinte tem um `caidaDesde` mais novo, e a conta volta a ser falsa sozinha. Com um booleano, a segunda queda apareceria na hora |
 | `conectando` não conta como queda | Alguém está pareando naquele instante; zerar o relógio ali é o certo |
-| Recarregar a página zera a contagem | A aba fechada não observa nada, e afirmar "está caído há 4 minutos" sem ter olhado seria inventar |
+| `caidaDesde` fica no `localStorage` | **Sem isso o aviso quase nunca aparece.** Quem vê que caiu dá F5 para conferir — e o relógio voltava ao zero. Quem recarrega a cada dois minutos nunca chega aos quatro |
+| Dois relógios, e vale o mais adiantado | O `setTimeout` é pontual mas dispara uma vez só; o `verificadoEm` muda a cada consulta e sozinho já garante a faixa, no máximo um minuto depois da hora. Um cobre a falha do outro |
 
 > ⚠️ **`minHeight: 0` na linha que contém a barra lateral.** A faixa entrou como
 > irmã dela dentro de um flex em coluna; sem isso, ela empurraria a barra e o

@@ -40,7 +40,7 @@ const FONTE = "'Plus Jakarta Sans', sans-serif"
 const CAIDO = ['desconectado', 'indisponivel', 'nao_configurado']
 
 export default function AvisoWhatsAppCaiu() {
-  const { conexao, caidaDesde } = useConexao()
+  const { conexao, caidaDesde, verificadoEm } = useConexao()
   const estado = conexao?.estado
 
   // `verificando` (antes da primeira resposta) e `conectando` (alguém está
@@ -70,8 +70,19 @@ export default function AvisoWhatsAppCaiu() {
     return () => { clearTimeout(id) }
   }, [caidaDesde])
 
+  // Dois relógios, e vale o que estiver mais adiantado.
+  //
+  // O `setTimeout` é o pontual: acende a faixa no minuto exato. Mas ele é um
+  // disparo só — se por qualquer motivo não vier (aba suspensa pelo navegador,
+  // efeito remontado, temporizador estrangulado em segundo plano), a faixa
+  // ficaria escondida para sempre com a conexão caída.
+  //
+  // O `verificadoEm` é o teimoso: muda a cada consulta, uma por minuto, e
+  // sozinho já garante que a faixa apareça — no máximo uma consulta depois da
+  // hora. Um cobre a falha do outro.
+  const marcoDoPrazo = Math.max(agora, verificadoEm?.getTime() ?? 0)
   const venceuOPrazo =
-    caidaDesde !== null && agora - caidaDesde >= ESPERA_ANTES_DE_AVISAR
+    caidaDesde !== null && marcoDoPrazo - caidaDesde >= ESPERA_ANTES_DE_AVISAR
 
   if (!caido || !venceuOPrazo) return null
 

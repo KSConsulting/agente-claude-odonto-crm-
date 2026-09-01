@@ -200,6 +200,42 @@ export const INTERVALO_PADRAO = 60_000
 export const ESPERA_ANTES_DE_AVISAR = 4 * 60_000
 
 /**
+ * Onde o começo da queda fica guardado entre carregamentos da página.
+ *
+ * ⚠️ **SEM ISTO O AVISO QUASE NUNCA APARECE**, e o motivo é o comportamento
+ * mais natural do mundo: a pessoa vê que caiu, dá F5 para conferir, e o relógio
+ * volta ao zero. Quem recarrega a cada dois minutos nunca chega aos quatro.
+ *
+ * A versão anterior guardava só em memória, e a justificativa parecia boa — "a
+ * aba fechada não observa nada, afirmar que está caído há 4 minutos sem ter
+ * olhado seria inventar". Só que o efeito prático era um aviso que não avisa.
+ *
+ * `localStorage` porque a informação é **desta máquina e deste navegador**: é o
+ * relógio de quem está olhando, não um dado da clínica. Falha em silêncio no
+ * modo privado — e aí o relógio vale só enquanto a aba estiver aberta, que é
+ * exatamente o comportamento de antes.
+ */
+const CHAVE_QUEDA = 'odonto:whatsapp-caiu-em'
+
+function lerQuedaGuardada(): number | null {
+  try {
+    const valor = Number(localStorage.getItem(CHAVE_QUEDA))
+    return Number.isFinite(valor) && valor > 0 ? valor : null
+  } catch {
+    return null
+  }
+}
+
+function guardarQueda(instante: number | null): void {
+  try {
+    if (instante === null) localStorage.removeItem(CHAVE_QUEDA)
+    else localStorage.setItem(CHAVE_QUEDA, String(instante))
+  } catch {
+    // Modo privado, ou storage cheio. O relógio passa a valer só nesta aba.
+  }
+}
+
+/**
  * `a cada 1 minuto`, para a frase embaixo do botão.
  *
  * Sai do intervalo de verdade porque a versão digitada à mão já mentiu: a tela
@@ -256,11 +292,18 @@ export function useConexao(intervaloMs = INTERVALO_PADRAO) {
         //
         // `conectando` não é queda: alguém está pareando agora, e zerar o
         // relógio no meio disso é o comportamento certo.
-        setCaidaDesde((atual) => (
-          nova.estado === 'conectado' || nova.estado === 'conectando'
-            ? null
-            : atual ?? Date.now()
-        ))
+        setCaidaDesde((atual) => {
+          if (nova.estado === 'conectado' || nova.estado === 'conectando') {
+            guardarQueda(null)
+            return null
+          }
+          // A ordem importa: o que está na memória vale mais que o guardado
+          // (é desta sessão), e o guardado vale mais que agora (senão o F5
+          // devolveria o relógio para o zero).
+          const marco = atual ?? lerQuedaGuardada() ?? Date.now()
+          guardarQueda(marco)
+          return marco
+        })
       } finally {
         setVerificando(false)
       }
