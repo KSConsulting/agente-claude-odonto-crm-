@@ -343,24 +343,26 @@ export default function SecretariaIA() {
 
       {/* ---------------- Modo teste ---------------- */}
       <div style={cartao}>
-        <div style={titulo}>Modo teste</div>
+        <div style={titulo}>Modo de teste</div>
+        <p style={{ ...legenda, marginBottom: 10, color: '#3A5560', fontWeight: 500 }}>
+          Teste a {nomeAgente} ({agenteTitulo}) antes de liberar o atendimento para todos.
+        </p>
         <p style={legenda}>
-          Aqui você cadastra os números que podem <strong>testar</strong> a {nomeAgente},
-          a {agenteTitulo} da clínica. Sirva-se do seu próprio WhatsApp: mande mensagem
-          para o número da clínica e veja como ela responde.
+          Adicione abaixo os números de WhatsApp que poderão conversar com a {nomeAgente}{' '}
+          ({agenteTitulo}) durante os testes. Assim, você pode enviar mensagens e conferir
+          como ela responde antes de começar o atendimento aos pacientes.
         </p>
         <p style={{ ...legenda, marginBottom: 16 }}>
-          <strong>Com a caixa abaixo marcada, ela responde só a esses números.</strong>{' '}
-          Se um paciente de verdade mandar mensagem, ela aparece no sistema e fica{' '}
-          <strong>sem resposta</strong> — a equipe atende à mão, em Conversas. Desmarque
-          só quando a {nomeAgente} já estiver pronta para atender todo mundo.
+          Enquanto o modo de teste estiver ativo, a {nomeAgente} ({agenteTitulo}) responderá
+          apenas aos números cadastrados abaixo. As mensagens dos demais contatos continuarão
+          chegando normalmente, mas não serão respondidas pela {nomeAgente} ({agenteTitulo}).
         </p>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
           <input type="checkbox" checked={modoTeste} onChange={(e) => setModoTeste(e.target.checked)}
             style={{ width: 16, height: 16, accentColor: '#1E6E8C', cursor: 'pointer' }} />
           <span style={{ fontSize: 13.5, fontWeight: 600, color: '#16232B' }}>
-            Responder só aos números de teste
+            Ativar modo de teste
           </span>
         </label>
 
@@ -395,12 +397,12 @@ export default function SecretariaIA() {
                 <CampoTelefone
                   valor={novoNumero}
                   onChange={(canonico, valido) => { setNovoNumero(canonico); setNovoValido(valido) }}
-                  rotulo="Acrescentar número"
+                  rotulo="Adicionar número para teste"
                 />
               </div>
               <button onClick={adicionarNumero} disabled={!novoValido}
                 style={{ ...botao(novoValido ? '#1E6E8C' : '#B8CBD3'), cursor: novoValido ? 'pointer' : 'not-allowed' }}>
-                <Plus size={14} /> Acrescentar
+                <Plus size={14} /> Adicionar
               </button>
             </div>
           </>

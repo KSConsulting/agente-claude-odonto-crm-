@@ -76,7 +76,7 @@ export const PAISES: Pais[] = [
     iso: 'BR', nome: 'Brasil', ddi: '55', bandeira: '🇧🇷',
     tamanhos: [10, 11], exemplo: '(11) 98765-4321',
     formatar: formatarBrasil,
-    dica: 'DDD + número. Celular tem 11 dígitos (com o 9), fixo tem 10.',
+    dica: 'Digite o DDD e o número com WhatsApp.',
   },
   {
     iso: 'PT', nome: 'Portugal', ddi: '351', bandeira: '🇵🇹',
