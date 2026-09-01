@@ -590,6 +590,7 @@ cards — não como aba, e não em Configurações.
 | **Nome: "Conexão do WhatsApp"** | É o que a coisa é para quem usa. "Evolution API" é nome de fornecedor, e o rótulo teria que mudar junto com ele |
 | **Mas o provedor aparece dentro** | Quando cai, é ele que diz **em qual painel ir olhar**. "WhatsApp desconectado", sozinho, não responde isso |
 | **Servidor, instância e 4 dígitos da chave, dentro dela** | São as perguntas de quando quebra: em qual painel entrar, qual instância é a nossa, e se a chave é a que se pensa que é. Quatro caracteres de trinta e cinco **identificam** sem servir para usar — padrão de cartão e de Stripe |
+| **E o número do WhatsApp, inteiro** | A pergunta mais direta de todas: *é este o número que está atendendo?* Vai completo — a chave manda mensagem por aquele WhatsApp, o número está impresso no cartão da clínica. Cobrir o que já é público não protege nada e custa a conferência. É a única linha do bloco que vem da sessão, e não das secrets; por isso aparece também quando a sessão cai, que é quando o cartão verde some com ela |
 | **Nesta página, não em Configurações** | A conexão é o telefone da secretária. Separar as duas coisas seria esconder de quem cuida dela |
 
 **`desconectado` e `indisponivel` são estados diferentes, e a diferença é a

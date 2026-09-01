@@ -21,6 +21,15 @@ interface Props {
   onChange: (canonico: string, valido: boolean) => void
   rotulo?: string
   obrigatorio?: boolean
+  /**
+   * Mostra o `*` ou o `(opcional)` ao lado do rótulo.
+   *
+   * Desligue onde o campo não faz parte de um formulário que aceita ou recusa.
+   * Em "Apagar uma pessoa" ele é uma busca: "(opcional)" ali só informava que
+   * nada acontece se você não digitar nada — o que já é óbvio, e soava como
+   * permissão para pular um campo que é o assunto inteiro do cartão.
+   */
+  marcador?: boolean
   /** Mensagem vinda de fora — usada para avisar que o número já é de alguém. */
   aviso?: React.ReactNode
 }
@@ -31,7 +40,9 @@ const inputStyle: React.CSSProperties = {
   background: '#fff', boxSizing: 'border-box',
 }
 
-export default function CampoTelefone({ valor, onChange, rotulo = 'WhatsApp', obrigatorio = true, aviso }: Props) {
+export default function CampoTelefone({
+  valor, onChange, rotulo = 'WhatsApp', obrigatorio = true, marcador = true, aviso,
+}: Props) {
   const inicial = separarCanonico(valor)
   const [iso, setIso] = useState(inicial?.pais.iso ?? PAIS_PADRAO)
   const [nacional, setNacional] = useState(inicial?.nacional ?? '')
@@ -69,7 +80,10 @@ export default function CampoTelefone({ valor, onChange, rotulo = 'WhatsApp', ob
   return (
     <div>
       <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>
-        {rotulo} {obrigatorio ? '*' : <span style={{ color: '#6B818C', fontWeight: 400 }}>(opcional)</span>}
+        {rotulo}{marcador && ' '}
+        {marcador && (obrigatorio
+          ? '*'
+          : <span style={{ color: '#6B818C', fontWeight: 400 }}>(opcional)</span>)}
       </label>
 
       <div style={{ display: 'flex', gap: 8 }}>

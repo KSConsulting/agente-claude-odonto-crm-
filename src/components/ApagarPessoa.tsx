@@ -4,7 +4,6 @@ import CampoTelefone from './CampoTelefone'
 import ConfirmDeleteModal from './ConfirmDeleteModal'
 import { preverExclusao, apagarPessoa, resumoDoEstrago, type Previsao } from '../lib/apagarPessoa'
 import { formatarParaExibicao } from '../lib/telefones'
-import { useAgente } from '../lib/agente'
 
 /**
  * "Apagar uma pessoa" — a zona de perigo da página Secretária de IA.
@@ -29,7 +28,6 @@ import { useAgente } from '../lib/agente'
 const FONTE = "'Plus Jakarta Sans', sans-serif"
 
 export default function ApagarPessoa() {
-  const { nome: nomeAgente } = useAgente()
   const [numero, setNumero] = useState('')
   const [valido, setValido] = useState(false)
   const [previsao, setPrevisao] = useState<Previsao | null>(null)
@@ -85,11 +83,12 @@ export default function ApagarPessoa() {
         <TriangleAlert size={16} color="#DC2626" />
         <div style={{ fontSize: 15, fontWeight: 700, color: '#B91C1C' }}>Apagar uma pessoa</div>
       </div>
-      <p style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.6, margin: '6px 0 16px' }}>
-        Apaga <strong>tudo</strong> de quem tem este número: a ficha, a conversa inteira,
-        as consultas — inclusive as já realizadas — e os arquivos que ela mandou.
-        Depois disso a {nomeAgente} não a reconhece mais, e começa uma conversa nova
-        se ela voltar. <strong>Não tem volta.</strong>
+      <p style={{ fontSize: 12.5, color: '#3A5560', lineHeight: 1.6, fontWeight: 500, margin: '6px 0 6px' }}>
+        Apague permanentemente uma pessoa e todo o seu histórico da clínica.
+      </p>
+      <p style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.6, margin: '0 0 16px' }}>
+        Ao continuar, serão apagados os dados da pessoa, conversas, consultas e
+        arquivos enviados. Essa ação não pode ser desfeita.
       </p>
 
       <div style={{ maxWidth: 380 }}>
@@ -100,6 +99,7 @@ export default function ApagarPessoa() {
           }}
           rotulo="WhatsApp da pessoa"
           obrigatorio={false}
+          marcador={false}
         />
       </div>
 

@@ -147,8 +147,10 @@ export default function ConexaoWhatsApp({
   /** A frase embaixo do estado. Cada uma aponta para uma saída diferente. */
   function explicacao(): string {
     if (estado === 'conectado' && conexao) {
-      const partes = [conexao.perfil, conexao.numero ? formatarParaExibicao(conexao.numero) : null]
-      return partes.filter(Boolean).join(' · ') || 'Sessão ativa'
+      // Só o perfil: o número mora na ficha acima, onde fica visível mesmo
+      // quando a sessão cai. Repetir a mesma linha a oitenta pixels de
+      // distância é ruído, não reforço.
+      return conexao.perfil || 'Sessão ativa'
     }
     if (foraDoAr) {
       return `O servidor da ${nomeDoProvedor(provedor)} não respondeu. Botão daqui não resolve — quem precisa subir é ele.`
@@ -220,7 +222,7 @@ export default function ConexaoWhatsApp({
           Referência para quando dá problema, não coisa de olhar todo dia — por
           isso cinza e miúdo. Cada linha responde uma pergunta: em qual painel
           entrar, qual instância é a nossa, e se a chave é a que se pensa. */}
-      {(conexao?.servidor || conexao?.instancia || conexao?.chaveFinal) && (
+      {(conexao?.servidor || conexao?.instancia || conexao?.chaveFinal || conexao?.numero) && (
         <div style={{
           display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px',
           fontSize: 11.5, color: '#6B818C', marginBottom: 16,
@@ -240,6 +242,18 @@ export default function ConexaoWhatsApp({
             <span>Chave</span>
             <span style={{ fontFamily: MONO, color: '#16232B' }} title="Os quatro últimos caracteres. Serve para conferir qual chave está configurada.">
               ····{conexao.chaveFinal}
+            </span>
+          </>)}
+          {/* O número vem INTEIRO, ao contrário da chave logo acima — e a
+              diferença é o que cada um faz na mão errada. A chave manda
+              mensagem por aquele WhatsApp; o número é o que a clínica
+              distribui em cartão e no Instagram. Esconder o que está impresso
+              na fachada não protege nada, e tira justamente a conferência que
+              importa: é ESTE o número que está atendendo? */}
+          {conexao.numero && (<>
+            <span>WhatsApp</span>
+            <span style={{ fontFamily: MONO, color: '#16232B' }}>
+              {formatarParaExibicao(conexao.numero)}
             </span>
           </>)}
         </div>

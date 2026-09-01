@@ -933,7 +933,7 @@ Evolution manda mensagem por aquele WhatsApp.
 
 ### A tela mostra como está configurado
 
-Três linhas cinzas acima do estado, e cada uma responde uma pergunta que só
+Quatro linhas cinzas acima do estado, e cada uma responde uma pergunta que só
 aparece quando algo quebra:
 
 | Campo | Responde |
@@ -941,9 +941,20 @@ aparece quando algo quebra:
 | **Servidor** `sua-evolution.exemplo.…` | Em qual painel entrar. Foi a pergunta de 01/09 |
 | **Instância** `clinica-principal` | Qual das instâncias do servidor é a nossa |
 | **Chave** `····949B` | Se a chave configurada é a que se pensa que é — útil depois de um `agente:secrets` |
+| **WhatsApp** `+55 (11) 98765-4321` | **Qual número está atendendo.** Inteiro, e não os últimos dígitos |
 
-Os três saem de `identificacao()` da ponte ativa, e vêm das **secrets da
-função** — nunca do banco. Só saem pela rota `/conexao`, que exige sessão.
+Os três primeiros saem de `identificacao()` da ponte ativa, e vêm das **secrets
+da função** — nunca do banco. O quarto é de outra natureza: sai do
+`estadoDaConexao()`, que é sessão e não configuração. Ele está nesse bloco
+mesmo assim porque a pergunta que responde é da mesma família — *o que exatamente
+está ligado aí?* — e porque ali ele aparece também quando a sessão cai, o que a
+linha verde do estado não faz.
+
+> **O número não é repetido no cartão verde.** Ele já esteve nos dois lugares,
+> a oitenta pixels de distância: a mesma string duas vezes é ruído, não reforço.
+> O verde ficou com o nome do perfil.
+
+Todos só saem pela rota `/conexao`, que exige sessão.
 
 > ⚠️ **Quatro caracteres da chave, e nunca mais.** É o padrão de cartão, AWS e
 > Stripe, pela mesma razão: quatro de trinta e cinco servem para **identificar**,
@@ -954,6 +965,13 @@ função** — nunca do banco. Só saem pela rota `/conexao`, que exige sessão.
 > copiar no navegador. Ele **não vira link**: a Evolution anuncia o manager dela
 > em `http://`, e link que rebaixa de https para http é mau hábito para deixar
 > no código.
+>
+> **E o número do WhatsApp vai inteiro pela mesma lógica, ao contrário.** A
+> diferença entre ele e a chave é o que cada um faz na mão errada: com a chave
+> se manda mensagem por aquele WhatsApp; o número é o que a clínica imprime em
+> cartão e publica no Instagram. Cobrir o que está na fachada não protege nada
+> e custa a única conferência que interessa — *é este o número que está
+> atendendo?*
 
 ### Apagar uma pessoa — a zona de perigo
 
