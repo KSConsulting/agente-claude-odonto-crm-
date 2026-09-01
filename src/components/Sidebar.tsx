@@ -46,6 +46,20 @@ const NAV_ITEMS = [
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
+/**
+ * O fundo de um item do menu.
+ *
+ * O passar do mouse precisa ser **evidente** sem virar sósia do item ativo —
+ * por isso o hover usa o cinza neutro da paleta e o ativo usa o azul da marca:
+ * um diz "dá para clicar", o outro diz "você está aqui". E o ativo também
+ * escurece no hover, senão a página em que você já está seria a única que não
+ * responde ao mouse.
+ */
+function fundoDoItem(ativo: boolean, sobMouse: boolean): string {
+  if (ativo) return sobMouse ? '#DCE6EA' : '#EAF3F6'
+  return sobMouse ? '#EDF2F4' : 'transparent'
+}
+
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
@@ -58,6 +72,12 @@ export default function Sidebar() {
   // passa por um `mousedown` fora, que já fecha.
   const [menuAberto, setMenuAberto] = useState(false)
   const rodape = useRef<HTMLDivElement | null>(null)
+
+  // O hover é estado, e não `style.background` mexido na mão como nos botões
+  // do menu: ali o elemento não re-renderiza, aqui sim — a cada troca de rota.
+  // Mexer no DOM direto deixaria o item clicado com o realce preso.
+  const [sobMouse, setSobMouse] = useState<string | null>(null)
+  const [rodapeSobMouse, setRodapeSobMouse] = useState(false)
 
   useEffect(() => {
     if (!menuAberto) return
@@ -144,86 +164,83 @@ export default function Sidebar() {
         zIndex: 10,
       }}
     >
-      {/* Header: logo + collapse button */}
+      {/* Header: a logo em cima, o nome embaixo.
+
+          Empilhado, e não lado a lado. A logo é a identidade da clínica e
+          merece tamanho de identidade — em linha ela ficava com 32px,
+          disputando largura com o nome, e o resultado era do tamanho de um
+          ícone de menu.
+
+          E é UM bloco para os dois estados. Eram duas cópias da mesma
+          marcação, uma para recolhido e outra para aberto: mudar o tamanho da
+          logo pedia mudar nas duas, e um dia mudaria só numa. */}
       <div
         style={{
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          padding: collapsed ? '20px 0' : '20px 16px',
+          gap: collapsed ? 0 : 9,
+          padding: collapsed ? '18px 0' : '18px 14px',
           borderBottom: '1px solid #DCE6EA',
-          minHeight: 64,
+          position: 'relative',
         }}
       >
-        {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            {clinica?.logo_url ? (
-              <img
-                src={clinica.logo_url}
-                alt="Logo"
-                style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: '#EAF3F6',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Stethoscope size={18} color="#1E6E8C" />
-              </div>
-            )}
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: '#16232B',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {clinica?.nome_clinica ?? 'Clínica'}
-            </span>
+        {clinica?.logo_url ? (
+          <img
+            src={clinica.logo_url}
+            alt="Logo"
+            style={{
+              width: collapsed ? 40 : 48,
+              height: collapsed ? 40 : 48,
+              borderRadius: 10,
+              objectFit: 'cover',
+              flexShrink: 0,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: collapsed ? 40 : 48,
+              height: collapsed ? 40 : 48,
+              borderRadius: 10,
+              background: '#EAF3F6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Stethoscope size={collapsed ? 22 : 26} color="#1E6E8C" />
           </div>
         )}
 
-        {collapsed && (
-          clinica?.logo_url ? (
-            <img
-              src={clinica.logo_url}
-              alt="Logo"
-              style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: '#EAF3F6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Stethoscope size={18} color="#1E6E8C" />
-            </div>
-          )
+        {!collapsed && (
+          <span
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: '#16232B',
+              textAlign: 'center',
+              lineHeight: 1.3,
+              maxWidth: '100%',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {clinica?.nome_clinica ?? 'Clínica'}
+          </span>
         )}
 
+        {/* Absoluto nos dois estados: com a logo centralizada, um botão no
+            fluxo puxaria o conteúdo para o lado. */}
         <button
           onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? 'Expandir a barra' : 'Recolher a barra'}
           style={{
-            position: collapsed ? 'absolute' : 'static',
-            right: collapsed ? -12 : 'auto',
-            top: collapsed ? 24 : 'auto',
+            position: 'absolute',
+            right: collapsed ? -12 : 8,
+            top: collapsed ? 24 : 14,
             width: 24,
             height: 24,
             borderRadius: '50%',
@@ -242,31 +259,39 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 3 }}>
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
+            onMouseEnter={() => { setSobMouse(to) }}
+            onMouseLeave={() => { setSobMouse((atual) => (atual === to ? null : atual)) }}
             style={({ isActive }) => ({
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              padding: collapsed ? '10px 0' : '10px 12px',
+              gap: 12,
+              padding: collapsed ? '11px 0' : '11px 12px',
               justifyContent: collapsed ? 'center' : 'flex-start',
               borderRadius: 10,
               textDecoration: 'none',
-              background: isActive ? '#EAF3F6' : 'transparent',
-              color: isActive ? '#1E6E8C' : '#6B818C',
+              background: fundoDoItem(isActive, sobMouse === to),
+              color: isActive ? '#1E6E8C' : sobMouse === to ? '#16232B' : '#6B818C',
               fontWeight: isActive ? 600 : 500,
-              fontSize: 13.5,
+              fontSize: 14.5,
               transition: 'background 0.15s ease, color 0.15s ease',
             })}
             title={collapsed ? label : undefined}
           >
             {({ isActive }) => (
               <>
-                <Icon size={18} color={isActive ? '#1E6E8C' : '#6B818C'} strokeWidth={isActive ? 2.2 : 1.8} />
+                {/* Maior quando recolhido: sem o rótulo ao lado, o ícone é a
+                    única coisa que separa Agenda de Conversas. */}
+                <Icon
+                  size={collapsed ? 22 : 20}
+                  color={isActive || sobMouse === to ? '#1E6E8C' : '#6B818C'}
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                />
                 {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>{label}</span>}
               </>
             )}
@@ -362,14 +387,17 @@ export default function Sidebar() {
         <button
           onClick={() => setMenuAberto((a) => !a)}
           title={collapsed ? nomeUsuario : undefined}
+          onMouseEnter={() => { setRodapeSobMouse(true) }}
+          onMouseLeave={() => { setRodapeSobMouse(false) }}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 9,
             overflow: 'hidden',
             flex: 1,
             minWidth: 0,
-            background: menuAberto ? '#EAF3F6' : 'transparent',
+            background: fundoDoItem(menuAberto, rodapeSobMouse),
+            transition: 'background 0.15s ease',
             border: 'none',
             borderRadius: 9,
             padding: collapsed ? 0 : '4px 6px',
@@ -387,8 +415,8 @@ export default function Sidebar() {
               src={usuario.avatar_url}
               alt={nomeUsuario}
               style={{
-                width: 34,
-                height: 34,
+                width: 36,
+                height: 36,
                 borderRadius: '50%',
                 objectFit: 'cover',
                 flexShrink: 0,
@@ -397,14 +425,14 @@ export default function Sidebar() {
           ) : (
             <div
               style={{
-                width: 34,
-                height: 34,
+                width: 36,
+                height: 36,
                 borderRadius: '50%',
                 background: '#EAF3F6',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 13,
+                fontSize: 13.5,
                 fontWeight: 700,
                 color: '#1E6E8C',
                 flexShrink: 0,
@@ -417,7 +445,7 @@ export default function Sidebar() {
             <div style={{ overflow: 'hidden' }}>
               <div
                 style={{
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                   fontWeight: 600,
                   color: '#16232B',
                   whiteSpace: 'nowrap',
@@ -427,7 +455,7 @@ export default function Sidebar() {
               >
                 {nomeUsuario}
               </div>
-              <div style={{ fontSize: 11, color: '#6B818C' }}>Secretária</div>
+              <div style={{ fontSize: 11.5, color: '#6B818C' }}>Secretária</div>
             </div>
           )}
           {!collapsed && (

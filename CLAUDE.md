@@ -495,6 +495,40 @@ mais tarde, alguém escolha amarelo-limão e o bloco suma no fundo branco. O ban
 aceita qualquer hex válido, então ampliar a paleta não exige migração — e
 `fundoSuave()` tem fallback para cores fora da lista.
 
+### A barra lateral: a marca em cima, o mouse com resposta
+
+Três decisões, e nenhuma é só tamanho de fonte:
+
+**A logo fica acima do nome, não ao lado.** Em linha ela cabia em 32px,
+disputando largura com o nome numa barra de 220 — do tamanho de um ícone de
+menu. Empilhada, ela vai a 48px e vira a identidade da clínica, que é o que
+ela é. O bloco é **um só** para aberto e recolhido: eram duas cópias da mesma
+marcação, e mudar o tamanho em uma delas era o erro esperando acontecer.
+
+**O ícone cresce quando a barra encolhe** (20 → 22). É o contrário do
+instinto, e é o certo: sem o rótulo ao lado, o ícone deixa de ser enfeite e
+passa a ser a única coisa que separa Agenda de Conversas.
+
+**O hover é estado do React, não `style.background` mexido na mão.** Os botões
+do menu do rodapé fazem no DOM direto, e ali funciona porque aquele elemento
+não re-renderiza. Um item de navegação re-renderiza a cada troca de rota — e o
+item que você acabou de clicar ficaria com o realce preso.
+
+A regra de cor mora em `fundoDoItem()`, e existe para os dois não se
+confundirem:
+
+| Estado | Fundo | Diz |
+|---|---|---|
+| Normal | transparente | — |
+| Sob o mouse | `#EDF2F4` (divisória) + texto `#16232B` | "dá para clicar" |
+| Ativo | `#EAF3F6` (fundo suave) + `#1E6E8C` | "você está aqui" |
+| Ativo, sob o mouse | `#DCE6EA` (borda) | idem, e o mouse responde |
+
+> **O hover neutro e o ativo azul, de propósito.** Pintar o hover com a cor da
+> marca faria todo item parecer o item ativo por meio segundo. E o ativo também
+> escurece: sem isso, a página em que você está seria a única da barra que não
+> reage ao mouse.
+
 ### Cores dos balões da conversa
 
 Três vozes na tela **Conversas**, e elas precisam ser distinguíveis sem
