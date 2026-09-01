@@ -148,6 +148,12 @@ O caminho de uma mensagem, do celular do paciente até a resposta:
                     ▼
           Espera 8 segundos  ─── chegou outra ───▶  Encerra ·
                     │                               a mais nova responde
+            silêncio · acende
+              "digitando…"
+                    │
+                    ▼
+          Espera mais 4  ─────── chegou outra ───▶  Encerra ·
+                    │                               a mais nova responde
            ninguém escreveu
                     ▼
       Transcreve áudio · guarda foto
@@ -168,18 +174,58 @@ O agente para sozinho em dois lugares, e os dois são propositais:
 
 1. **Conversa assumida.** Se `agente_pausado` estiver ligado, ele salva a
    mensagem e não responde. Quem responde é a pessoa.
-2. **Mensagem nova durante a espera.** Se outra mensagem chegar nos 8 segundos,
-   esta execução encerra e a mais nova responde por todas.
+2. **Mensagem nova durante a espera.** Se outra mensagem chegar nos 12
+   segundos, esta execução encerra e a mais nova responde por todas. São **duas**
+   conferências, uma em cada etapa da espera.
 
-### Por que os 8 segundos
+### Por que a espera existe
 
 Paciente no WhatsApp escreve assim: *"oi"* … *"tudo bem?"* … *"queria saber do
 clareamento"*. Três mensagens em cinco segundos. Sem a espera, a Letícia
 responderia três vezes, atropelando a própria conversa. Com ela, responde uma
 vez, ao tudo junto — como uma pessoa faria.
 
-É o mesmo efeito que um Redis daria, resolvido dentro da própria função. Redis
-entra depois, se o volume justificar.
+**O relógio reinicia a cada mensagem dele.** Quem manda cinco seguidas recebe
+uma resposta só, doze segundos depois da última — e não doze depois da primeira.
+Não há teto: alguém que escreva de cinco em cinco segundos por dez minutos fica
+dez minutos sem resposta. Na prática ninguém faz isso, mas é bom saber que a
+regra é essa.
+
+### A espera tem duas etapas, e a segunda mostra "digitando…"
+
+| Etapa | Dura | O que acontece |
+|---|---|---|
+| 1 | 8s | Silêncio. Se chegar mensagem nova, esta execução some |
+| — | — | Acende o **"digitando…"** no WhatsApp do paciente |
+| 2 | 4s | Se chegar mensagem nova, esta execução some |
+
+`ESPERA_MS` (12s) e `ESPERA_ATE_DIGITANDO_MS` (8s) vivem em
+[`whatsapp/index.ts`](../supabase/functions/whatsapp/index.ts).
+
+**Por que o "digitando…" não acende na hora:** ele apareceria também nas
+execuções que vão morrer caladas — uma por mensagem, para quem escreve
+picotado. "Digitando…" que pisca e some sem resposta é pior que tela parada.
+Aos oito segundos de silêncio, é provável que seja aquela execução mesmo a
+responder.
+
+> **Custo no banco: uma consulta a mais, e só para quem responde.** A segunda
+> conferência é o mesmo `select ... limit 1` da primeira, por índice, e as
+> execuções que morrem na etapa 1 continuam pagando uma só. O horário da
+> mensagem é lido **uma vez**, antes de dormir, e serve para as duas — o que
+> anula o custo extra. Uma chamada a mais de presença para a ponte do WhatsApp,
+> essa sim, por resposta.
+
+### Não é o Postgres que espera, e não é Redis
+
+A espera é `setTimeout` **dentro da própria função** — ela dorme. O Postgres é
+tocado só para a pergunta "chegou algo mais novo?", e o Redis **não existe neste
+projeto**.
+
+Seria a ferramenta clássica para isto (uma chave com TTL por conversa), e foi
+deliberadamente adiado: com a espera dentro da função o efeito é o mesmo, sem
+mais uma peça de infraestrutura para manter, pagar e monitorar. O preço é uma
+execução dormindo por mensagem recebida — irrelevante no volume de uma clínica,
+e o que mudaria a conta se um dia deixasse de ser.
 
 ### O lead nasce sem nome — e o `pushName` não entra
 

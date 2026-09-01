@@ -37,8 +37,26 @@ import type { MensagemRecebida, Ponte } from '../_shared/whatsapp.ts'
 const SEGREDO = Deno.env.get('WEBHOOK_SEGREDO') ?? ''
 const URL_SUPABASE = Deno.env.get('SUPABASE_URL')!
 
-/** Quanto esperamos o paciente terminar de escrever. */
-const ESPERA_MS = 8_000
+/**
+ * Quanto esperamos o paciente terminar de escrever.
+ *
+ * O relógio **reinicia a cada mensagem dele**: quem manda cinco seguidas recebe
+ * uma resposta só, doze segundos depois da última — como uma pessoa faria.
+ */
+const ESPERA_MS = 12_000
+
+/**
+ * Quando o "digitando…" acende, contado da última mensagem do paciente.
+ *
+ * A espera inteira em silêncio era tempo em que a tela dele não dava sinal
+ * nenhum de que a mensagem tinha chegado. Acendendo aos oito, os quatro
+ * segundos que sobram viram atenção visível em vez de vazio.
+ *
+ * **Oito, e não zero:** aceso na hora, ele apareceria também nas execuções que
+ * vão morrer caladas — a cada mensagem de quem escreve picotado. "Digitando…"
+ * que pisca e some sem resposta é pior que tela parada.
+ */
+const ESPERA_ATE_DIGITANDO_MS = 8_000
 
 /** Teto de idas e voltas com as ferramentas numa mesma resposta. */
 const MAX_VOLTAS = 6
@@ -210,17 +228,30 @@ async function processar(
     }
   }
 
-  // ---- A espera dos 8 segundos -------------------------------------------
-  await new Promise((r) => setTimeout(r, ESPERA_MS))
+  // ---- A espera, em duas etapas ------------------------------------------
+  //
+  // Quem manda mensagem picotada acorda uma execução por mensagem, e todas
+  // dormem. Ao acordar, cada uma pergunta se chegou coisa mais nova: se chegou,
+  // some calada, e a mais nova responde por todas. É o que evita três respostas
+  // para "oi", "tudo bem?", "queria saber do clareamento".
+  //
+  // O horário é lido UMA vez, antes de dormir: as duas conferências comparam
+  // contra o mesmo marco, e é uma consulta a menos.
+  const chegouEm = await criadaEm(mensagemId)
 
-  // Chegou outra mensagem enquanto esperávamos? Então esta execução some, e a
-  // mais nova responde por todas. É o que evita três respostas para "oi",
-  // "tudo bem?", "queria saber do clareamento".
-  const posteriores = await selecionar<{ id: string }>(
-    `mensagens_whatsapp?select=id&lead_id=eq.${lead.id}&autor=eq.paciente` +
-    `&id=neq.${mensagemId}&criada_em=gt.${encodeURIComponent(await criadaEm(mensagemId))}&limit=1`,
-  )
-  if (posteriores.length) return
+  await new Promise((r) => setTimeout(r, ESPERA_ATE_DIGITANDO_MS))
+  if (await chegouMaisNova(lead.id, mensagemId, chegouEm)) return
+
+  // Oito segundos calado: daqui em diante é provável que seja esta execução a
+  // responder, e o "digitando…" acende. Cosmético de propósito — `digitando`
+  // engole o próprio erro, e a resposta sai igual se a presença não aparecer.
+  const resto = ESPERA_MS - ESPERA_ATE_DIGITANDO_MS
+  await ponte.digitando(whatsapp, resto)
+  await new Promise((r) => setTimeout(r, resto))
+
+  // A segunda conferência não é zelo: quem escreveu no meio do "digitando…"
+  // tem execução própria, que responderá por todas. Sem ela, seriam duas.
+  if (await chegouMaisNova(lead.id, mensagemId, chegouEm)) return
 
   // ---- As duas travas ----------------------------------------------------
   const atual = await selecionar<Lead>(
@@ -527,6 +558,25 @@ async function rotaEnviar(req: Request): Promise<Response> {
 // ---------------------------------------------------------------------------
 // Apoio
 // ---------------------------------------------------------------------------
+
+/**
+ * Chegou mensagem do PACIENTE depois desta?
+ *
+ * `autor=eq.paciente` importa: a resposta da própria Letícia também entra em
+ * `mensagens_whatsapp`, e sem o filtro ela veria a si mesma como "mensagem mais
+ * nova" e calaria a execução seguinte.
+ */
+async function chegouMaisNova(
+  leadId: string,
+  mensagemId: string,
+  desde: string,
+): Promise<boolean> {
+  const posteriores = await selecionar<{ id: string }>(
+    `mensagens_whatsapp?select=id&lead_id=eq.${leadId}&autor=eq.paciente` +
+    `&id=neq.${mensagemId}&criada_em=gt.${encodeURIComponent(desde)}&limit=1`,
+  )
+  return posteriores.length > 0
+}
 
 async function criadaEm(mensagemId: string): Promise<string> {
   const linhas = await selecionar<{ criada_em: string }>(

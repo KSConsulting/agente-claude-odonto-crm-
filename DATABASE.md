@@ -1632,7 +1632,8 @@ Duas consequências:
    `status = 'iniciou_conversa'`
 4. Áudio e foto vão para o bucket `midias-whatsapp`; o áudio ainda é
    transcrito, e a transcrição volta para a coluna `conteudo`
-5. **Espera 8 segundos.** Se chegou mensagem nova nesse intervalo, esta execução
+5. **Espera 12 segundos, em duas etapas.** Aos 8, acende o "digitando…"; aos 12,
+   responde. Se chegou mensagem nova em qualquer uma delas, esta execução
    desiste — quem responde é a última. É o que faz a Letícia responder as três
    mensagens picadas de uma vez, como gente
 6. `agente_deve_responder()` decide: agente ligado? conversa não assumida por
