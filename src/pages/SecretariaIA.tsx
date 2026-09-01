@@ -80,7 +80,7 @@ function Erro({ texto }: { texto: string }) {
 }
 
 export default function SecretariaIA() {
-  const { nome: nomeAgente, porExtenso: agentePorExtenso } = useAgente()
+  const { nome: nomeAgente, titulo: agenteTitulo, porExtenso: agentePorExtenso } = useAgente()
   const [cfg, setCfg] = useState<ConfiguracoesAgente | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -345,9 +345,15 @@ export default function SecretariaIA() {
       <div style={cartao}>
         <div style={titulo}>Modo teste</div>
         <p style={legenda}>
-          Com o modo teste ligado, a {nomeAgente} só responde aos números desta lista. As
-          mensagens de qualquer outra pessoa continuam aparecendo no sistema, mas ficam
-          sem resposta — para a equipe atender à mão.
+          Aqui você cadastra os números que podem <strong>testar</strong> a {nomeAgente},
+          a {agenteTitulo} da clínica. Sirva-se do seu próprio WhatsApp: mande mensagem
+          para o número da clínica e veja como ela responde.
+        </p>
+        <p style={{ ...legenda, marginBottom: 16 }}>
+          <strong>Com a caixa abaixo marcada, ela responde só a esses números.</strong>{' '}
+          Se um paciente de verdade mandar mensagem, ela aparece no sistema e fica{' '}
+          <strong>sem resposta</strong> — a equipe atende à mão, em Conversas. Desmarque
+          só quando a {nomeAgente} já estiver pronta para atender todo mundo.
         </p>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
