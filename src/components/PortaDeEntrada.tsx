@@ -1,7 +1,5 @@
-import { useState } from 'react'
-import { DoorOpen, Clock, Pencil, TriangleAlert } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { formatarReais, lerPreco, precoParaCampo } from '../lib/procedimentos'
+import { DoorOpen, Clock, Pencil, TriangleAlert, Tag } from 'lucide-react'
+import { formatarReais } from '../lib/procedimentos'
 import { AGENTE_NOME } from '../lib/agente'
 import type { ServicoClinica } from '../types'
 
@@ -14,7 +12,7 @@ import type { ServicoClinica } from '../types'
  * ela vira o vigésimo card igual aos outros, quando é a consulta que mais vai
  * acontecer na clínica — e a única que a Letícia marca sozinha.
  *
- * Fica em cima, com contorno próprio, e os vinte tratamentos ficam embaixo.
+ * Fica em cima, com contorno próprio, e os tratamentos ficam embaixo.
  *
  * ── E POR QUE ELA EXISTE COMO REGISTRO ─────────────────────────────────────
  *
@@ -22,27 +20,21 @@ import type { ServicoClinica } from '../types'
  * do bloco, a gratuidade e o próprio nome ficariam presos num deploy. Aqui a
  * clínica muda os três quando quiser, e a mudança chega na conversa seguinte.
  *
- * ── GRATUITA É DADO, NÃO ROTULO ────────────────────────────────────────────
+ * ── SÓ MOSTRA; QUEM EDITA É O MODAL ────────────────────────────────────────
  *
- * `preco_a_partir_de = 0` é o que faz a Letícia dizer "a avaliação é gratuita"
- * — a frase que derruba a objeção de quem não quer pagar só para saber o preço.
- * Campo vazio é outra coisa: ela não fala valor nenhum. Por isso os dois
- * estados aparecem escritos aqui, e não como um campo em branco ambíguo.
+ * Nome, textos, duração e valor se mudam em **Editar**, no mesmo modal dos
+ * outros procedimentos. Ter campo editável aqui e no modal seria a mesma coisa
+ * em dois lugares, e um dia os dois discordariam.
  */
 
 const FONTE = "'Plus Jakarta Sans', sans-serif"
 
 interface Props {
   porta: ServicoClinica | null
-  onMudou: (novo: ServicoClinica) => void
   onEditar: (p: ServicoClinica) => void
 }
 
-export default function PortaDeEntrada({ porta, onMudou, onEditar }: Props) {
-  const [preco, setPreco] = useState(precoParaCampo(porta?.preco_a_partir_de ?? null))
-  const [duracao, setDuracao] = useState(String(porta?.duracao_minutos ?? 30))
-  const [erro, setErro] = useState('')
-
+export default function PortaDeEntrada({ porta, onEditar }: Props) {
   if (!porta) {
     return (
       <div className="fade-in-2" style={{
@@ -57,24 +49,11 @@ export default function PortaDeEntrada({ porta, onMudou, onEditar }: Props) {
           </div>
           <div style={{ fontSize: 12.5, color: '#B91C1C', lineHeight: 1.6, marginTop: 4 }}>
             Sem porta de entrada, a {AGENTE_NOME} marca qualquer tratamento direto —
-            inclusive os que precisam do dentista olhar antes. Marque um procedimento
-            como avaliação para restabelecer a regra.
+            inclusive os que precisam do dentista olhar antes.
           </div>
         </div>
       </div>
     )
-  }
-
-  async function salvar(campos: Partial<ServicoClinica>) {
-    setErro('')
-    const { data, error } = await supabase
-      .from('servicos_clinica')
-      .update(campos)
-      .eq('id', porta!.id)
-      .select()
-      .single()
-    if (error || !data) { setErro('Não consegui salvar. Tente de novo.'); return }
-    onMudou(data as ServicoClinica)
   }
 
   const gratuita = porta.preco_a_partir_de === 0
@@ -110,73 +89,31 @@ export default function PortaDeEntrada({ porta, onMudou, onEditar }: Props) {
           style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#16232B', fontFamily: FONTE, flexShrink: 0 }}
           onMouseEnter={(e) => { e.currentTarget.style.background = '#F7FAFB' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = '#fff' }}>
-          <Pencil size={13} color="#6B818C" /> Editar textos
+          <Pencil size={13} color="#6B818C" /> Editar
         </button>
       </div>
 
-      {/* Duração e valor: os dois dados que a Letícia usa */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, flexWrap: 'wrap', marginTop: 14, paddingTop: 13, borderTop: '1px solid #EDF2F4' }}>
-
-        <div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#6B818C', marginBottom: 5 }}>
-            <Clock size={12} /> Duração do bloco
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              value={duracao}
-              onChange={(e) => setDuracao(e.target.value.replace(/\D/g, ''))}
-              onBlur={() => {
-                const n = Number(duracao)
-                if (!n || n < 5) { setDuracao(String(porta.duracao_minutos)); return }
-                if (n !== porta.duracao_minutos) salvar({ duracao_minutos: n })
-              }}
-              style={{ width: 62, padding: '7px 10px', borderRadius: 8, border: '1px solid #DCE6EA', fontSize: 13, fontFamily: FONTE, color: '#16232B', outline: 'none', textAlign: 'right' }}
-              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
-            />
-            <span style={{ fontSize: 12.5, color: '#6B818C' }}>minutos</span>
-          </div>
-        </div>
-
-        <div>
-          <label style={{ fontSize: 11.5, fontWeight: 600, color: '#6B818C', marginBottom: 5, display: 'block' }}>
-            Valor
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #DCE6EA', borderRadius: 8, paddingLeft: 9, background: '#fff' }}>
-              <span style={{ fontSize: 12.5, color: '#9AAEB6' }}>R$</span>
-              <input
-                value={preco}
-                onChange={(e) => setPreco(e.target.value)}
-                onBlur={() => {
-                  const v = lerPreco(preco)
-                  setPreco(precoParaCampo(v))
-                  if (v !== porta.preco_a_partir_de) salvar({ preco_a_partir_de: v })
-                }}
-                placeholder="vazio"
-                style={{ width: 86, padding: '7px 9px', border: 'none', fontSize: 13, fontFamily: FONTE, color: '#16232B', outline: 'none', background: 'transparent' }}
-              />
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: gratuita ? '#1A7A48' : '#6B818C' }}>
-              {gratuita
-                ? 'Gratuita — ela diz isso'
-                : porta.preco_a_partir_de
-                  ? `Ela diz "a partir de ${formatarReais(porta.preco_a_partir_de)}"`
-                  : 'Vazio — ela não fala valor'}
-            </span>
-          </div>
-        </div>
+      {/* Os dois dados que a Letícia usa. Mudam em Editar. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginTop: 13, paddingTop: 12, borderTop: '1px solid #EDF2F4' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#6B818C' }}>
+          <Clock size={13} /> {porta.duracao_minutos} minutos
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: gratuita ? '#1A7A48' : '#6B818C' }}>
+          <Tag size={13} />
+          {gratuita
+            ? 'Gratuita'
+            : porta.preco_a_partir_de
+              ? `A partir de ${formatarReais(porta.preco_a_partir_de)}`
+              : 'Sem valor cadastrado'}
+        </span>
       </div>
 
       {gratuita && (
         <div style={{ fontSize: 12, color: '#1A7A48', background: '#E8F8EF', border: '1px solid #B7E7CB', borderRadius: 8, padding: '8px 11px', marginTop: 11, lineHeight: 1.6 }}>
-          Zero aqui não é campo em branco: é a frase que a {AGENTE_NOME} usa quando
-          alguém trava no preço. Sem ela, a resposta vira &ldquo;o valor a gente vê na
+          Gratuita não é só um preço zerado: é a frase que a {AGENTE_NOME} usa quando
+          alguém trava no valor. Sem ela, a resposta vira &ldquo;o valor a gente vê na
           avaliação&rdquo;, que soa como desconversa.
         </div>
-      )}
-
-      {erro && (
-        <div style={{ fontSize: 12.5, color: '#DC2626', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 11px', marginTop: 11 }}>{erro}</div>
       )}
     </div>
   )

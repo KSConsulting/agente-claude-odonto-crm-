@@ -490,7 +490,8 @@ Clareamento.
 |---|---|
 | **A avaliação existe como registro** | Seria mais fácil ter o nome dela no código. Mas aí a duração do bloco, a gratuidade e o próprio nome ficariam presos num deploy. Aqui a clínica muda os três, e a mudança chega na conversa seguinte |
 | **Mas fora da grade de cards** | Ela não é um tratamento, é por onde eles começam. No meio dos vinte ela vira o vigésimo card igual — sendo a consulta que mais vai acontecer |
-| **Uma caixa em cada card, não três categorias** | "Passa pela avaliação", ligado ou desligado. A versão de três níveis foi descartada: duas delas mandavam o agente fazer exatamente a mesma coisa, e categoria que não muda comportamento só serve para ser preenchida errado |
+| **Uma caixa, não três categorias** | "Passa pela avaliação", ligado ou desligado. A versão de três níveis foi descartada: duas delas mandavam o agente fazer exatamente a mesma coisa, e categoria que não muda comportamento só serve para ser preenchida errado |
+| **A caixa mora no modal de Editar** | É decisão que se toma pensando, uma vez — não coisa para clicar de passagem numa grade de vinte cards, onde é fácil errar o vizinho. O card **mostra** o resultado ("Passa pela avaliação" / "Agenda direto · a partir de R$ 250"), porque senão descobrir quais passam exigiria abrir vinte modais |
 | **Uma porta só, garantida por índice** | `servicos_clinica_avaliacao_unica` é parcial (`where e_avaliacao`). Duas portas seriam duas respostas para a mesma pergunta |
 | **A trava mora na função SQL** | `agenda_marcar` recusa, e devolve o nome da porta. Prompt é pedido, não trava — a Letícia já ignorou regra escrita com o dado na frente dela. E como as duas portas dos agentes descem para a mesma função, a API externa herda a regra de graça |
 | **A recepção passa por fora** | `NovoAgendamentoModal` grava direto em `consultas`. A regra existe para impedir um **agente** de decidir clínica, não para impedir a clínica de marcar o que quiser |
@@ -501,10 +502,14 @@ não é campo em branco: é a frase que derruba a objeção de quem não quer pa
 só para saber o preço — e sem ela a resposta vira "o valor a gente vê na
 avaliação", que soa como desconversa.
 
-> **O campo de valor some do card quando "passa pela avaliação" está ligado.**
-> Preço marcado ali nunca seria falado, e campo que existe sem ser usado é campo
-> preenchido errado. É a mesma ideia da caixa única: um estado contraditório
-> não deve ser representável.
+> **O campo de valor some do modal quando "passa pela avaliação" está ligado —
+> e o salvamento grava `null`.** Preço ali nunca seria falado, e campo que existe
+> sem ser usado é campo preenchido errado. É a mesma ideia da caixa única: um
+> estado contraditório não deve ser representável, nem na tela nem no banco.
+
+**A porta de entrada também só mostra.** Nome, textos, duração e valor dela se
+mudam no mesmo modal dos outros. Campo editável no bloco *e* no modal seria a
+mesma coisa em dois lugares, e um dia os dois discordariam.
 
 **E o card não mostra a frase que ela vai falar.** A frase é montada pela view
 `procedimentos_clinica_agente`, em SQL. Reimplementá-la no TypeScript daria duas

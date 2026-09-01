@@ -667,8 +667,10 @@ O nome da coluna é `preco_a_partir_de`, e não `preco`, porque é assim que o
 agente fala. Um campo chamado `preco` seria preenchido com valor fechado, e a
 frase continuaria dizendo "a partir de".
 
-É **ignorado** quando `exige_avaliacao` — por isso o campo some do card na tela
-de Procedimentos. Campo que existe sem ser usado é campo preenchido errado.
+É **ignorado** quando `exige_avaliacao` — por isso o campo some do modal de
+edição, e o salvamento grava `null`. Campo que existe sem ser usado é campo
+preenchido errado, e um preço guardado que nunca será falado é pior: parece
+combinado com alguém.
 
 > **Não cadastre marcas registradas** (ClearCorrect, Invisalign e similares).
 > Use a descrição genérica do procedimento: "Alinhadores Transparentes".

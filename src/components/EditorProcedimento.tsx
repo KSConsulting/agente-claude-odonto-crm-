@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { X, Save, Check, Stethoscope } from 'lucide-react'
+import { X, Save, Check, Stethoscope, DoorOpen } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lerPreco, precoParaCampo } from '../lib/procedimentos'
 import type { ServicoClinica } from '../types'
 import ModalPortal from './ModalPortal'
 
@@ -62,6 +63,9 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
   const [nome, setNome] = useState(procedimento.nome)
   const [curta, setCurta] = useState(procedimento.descricao ?? '')
   const [longa, setLonga] = useState(procedimento.descricao_longa ?? '')
+  const [exige, setExige] = useState(procedimento.exige_avaliacao)
+  const [preco, setPreco] = useState(precoParaCampo(procedimento.preco_a_partir_de))
+  const [duracao, setDuracao] = useState(String(procedimento.duracao_minutos ?? 60))
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
   const [erro, setErro] = useState('')
@@ -73,6 +77,9 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
     if (!nome.trim()) { setErro('O nome não pode ficar vazio.'); return }
     if (!curta.trim()) { setErro('A descrição curta não pode ficar vazia — é ela que vai para o agente.'); return }
 
+    const minutos = Number(duracao)
+    if (!minutos || minutos < 5) { setErro('A duração precisa ser de pelo menos 5 minutos.'); return }
+
     setSalvando(true)
     setErro('')
 
@@ -81,6 +88,11 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
         nome: nome.trim(),
         descricao: curta.trim(),
         descricao_longa: longa.trim() || null,
+        exige_avaliacao: exige,
+        // Passando pela avaliação, o valor nunca seria falado. Limpar em vez de
+        // guardar impede o estado contraditório de existir no banco.
+        preco_a_partir_de: exige ? null : lerPreco(preco),
+        duracao_minutos: minutos,
       })
       .eq('id', procedimento.id).select().single()
 
@@ -143,6 +155,108 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
               <div style={ajuda}>
                 É o nome que a Letícia usa ao falar com o paciente. Nada de marca
                 registrada — prefira a descrição genérica.
+              </div>
+            </div>
+
+            {/*
+              FLUXO E VALOR.
+
+              Mora aqui, e não no card: são decisões que se toma pensando, uma
+              vez, e não coisas para clicar de passagem numa grade de vinte.
+              O card mostra o resultado; a mudança acontece neste modal.
+            */}
+            <div style={{
+              background: '#F7FAFB', border: '1px solid #DCE6EA',
+              borderRadius: 11, padding: '15px 16px',
+            }}>
+              <label style={{ ...rotulo, marginBottom: 10 }}>
+                Como este procedimento é agendado
+              </label>
+
+              {procedimento.e_avaliacao ? (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: '#1E6E8C', lineHeight: 1.6 }}>
+                  <DoorOpen size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span>
+                    Este é a <strong>porta de entrada</strong> da clínica. É o que a Letícia
+                    marca no lugar de todo procedimento que exige avaliação — e por isso
+                    ele mesmo não passa por uma.
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setExige((v) => !v)}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONTE, textAlign: 'left', width: '100%' }}>
+                  <span style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 1,
+                    border: `1.5px solid ${exige ? '#1E6E8C' : '#C4D3D9'}`,
+                    background: exige ? '#1E6E8C' : '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}>
+                    {exige && (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M1.5 5.2L4 7.5L8.5 2.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#16232B', display: 'block' }}>
+                      Passa pela avaliação
+                    </span>
+                    <span style={{ fontSize: 11.5, color: '#6B818C', lineHeight: 1.55, display: 'block', marginTop: 2 }}>
+                      {exige
+                        ? 'A Letícia marca a avaliação e registra este procedimento como o que o paciente procura. Ela nunca agenda este nome direto.'
+                        : 'A Letícia agenda este procedimento direto, sem passar pelo dentista antes.'}
+                    </span>
+                  </span>
+                </button>
+              )}
+
+              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 14, paddingTop: 13, borderTop: '1px solid #E4EDF0' }}>
+
+                <div>
+                  <label style={{ fontSize: 11.5, fontWeight: 600, color: '#6B818C', display: 'block', marginBottom: 5 }}>
+                    Duração do bloco
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input value={duracao}
+                      onChange={(e) => setDuracao(e.target.value.replace(/\D/g, ''))}
+                      style={{ ...campo, width: 66, padding: '7px 10px', fontSize: 13, textAlign: 'right' }}
+                      onFocus={foco} onBlur={desfoco} />
+                    <span style={{ fontSize: 12.5, color: '#6B818C' }}>minutos</span>
+                  </div>
+                </div>
+
+                {/*
+                  O VALOR SÓ EXISTE QUANDO O AGENDAMENTO É DIRETO.
+
+                  Passando pela avaliação, o preço nunca seria falado — e campo
+                  que existe sem ser usado é campo preenchido errado.
+                */}
+                {!exige && (
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 600, color: '#6B818C', display: 'block', marginBottom: 5 }}>
+                      Valor, a partir de
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #DCE6EA', borderRadius: 9, paddingLeft: 9, background: '#fff' }}>
+                        <span style={{ fontSize: 12.5, color: '#9AAEB6' }}>R$</span>
+                        <input value={preco}
+                          onChange={(e) => setPreco(e.target.value)}
+                          onBlur={() => setPreco(precoParaCampo(lerPreco(preco)))}
+                          placeholder="vazio"
+                          style={{ width: 92, padding: '7px 9px', border: 'none', fontSize: 13, fontFamily: FONTE, color: '#16232B', outline: 'none', background: 'transparent' }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: lerPreco(preco) === 0 ? '#1A7A48' : '#6B818C', maxWidth: 190, lineHeight: 1.45 }}>
+                        {lerPreco(preco) === 0
+                          ? 'Zero: ela diz que é gratuito'
+                          : lerPreco(preco) === null
+                            ? 'Vazio: ela não fala valor, leva para a avaliação'
+                            : 'Ela fala sempre como piso, nunca como preço fechado'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

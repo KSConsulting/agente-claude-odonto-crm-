@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, X, ClipboardList, FileText } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, ClipboardList, FileText, DoorOpen, CalendarCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { AGENTE_POR_EXTENSO, AGENTE_NOME } from '../lib/agente'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import EditorProcedimento from '../components/EditorProcedimento'
 import PortaDeEntrada from '../components/PortaDeEntrada'
-import { lerPreco, precoParaCampo } from '../lib/procedimentos'
+import { formatarReais } from '../lib/procedimentos'
 import type { ServicoClinica } from '../types'
 
 /**
@@ -75,37 +75,6 @@ export default function Procedimentos() {
     if (error) {
       updateItem(item.data.id, { data: { ...item.data, ativo: item.data.ativo } })
       setToggleError('Erro ao atualizar status. Tente novamente.')
-    }
-  }
-
-  /**
-   * Liga e desliga a passagem pela avaliação, no próprio card.
-   *
-   * Escreve na hora, como o liga/desliga de ativo — e desfaz na tela se o banco
-   * recusar. Nenhum "salvar" no rodapé: uma caixinha que não obedece ao clique
-   * é a que mais confunde.
-   */
-  const handleToggleAvaliacao = async (item: ProcedimentoRowState) => {
-    const novo = !item.data.exige_avaliacao
-    setToggleError(null)
-    updateItem(item.data.id, { data: { ...item.data, exige_avaliacao: novo } })
-    const { error } = await supabase.from('servicos_clinica')
-      .update({ exige_avaliacao: novo }).eq('id', item.data.id)
-    if (error) {
-      updateItem(item.data.id, { data: { ...item.data, exige_avaliacao: item.data.exige_avaliacao } })
-      setToggleError('Erro ao atualizar o fluxo. Tente novamente.')
-    }
-  }
-
-  const handleSalvarPreco = async (item: ProcedimentoRowState, valor: number | null) => {
-    if (valor === item.data.preco_a_partir_de) return
-    setToggleError(null)
-    updateItem(item.data.id, { data: { ...item.data, preco_a_partir_de: valor } })
-    const { error } = await supabase.from('servicos_clinica')
-      .update({ preco_a_partir_de: valor }).eq('id', item.data.id)
-    if (error) {
-      updateItem(item.data.id, { data: { ...item.data, preco_a_partir_de: item.data.preco_a_partir_de } })
-      setToggleError('Erro ao salvar o valor. Tente novamente.')
     }
   }
 
@@ -234,7 +203,6 @@ export default function Procedimentos() {
       {items.length > 0 && (
         <PortaDeEntrada
           porta={porta?.data ?? null}
-          onMudou={(novo) => updateItem(novo.id, { data: novo })}
           onEditar={(p) => setEditando(p)}
         />
       )}
@@ -293,58 +261,24 @@ export default function Procedimentos() {
                     </p>
 
                     {/*
-                      O FLUXO DE AGENDAMENTO, no próprio card.
+                      O FLUXO, SÓ PARA LER.
 
-                      Marcado, a Letícia não agenda este procedimento: agenda a
-                      avaliação e guarda este nome junto. Por isso o campo de
-                      valor some — preço marcado aqui nunca seria falado, e
-                      campo que existe sem ser usado é campo preenchido errado.
+                      A caixa que muda isto mora no modal de Editar: é decisão
+                      que se toma pensando, uma vez, e não coisa para clicar de
+                      passagem numa grade de vinte cards.
+
+                      Mas o card PRECISA mostrar o resultado. Sem isso, saber
+                      quais passam pela avaliação exigiria abrir vinte modais.
                     */}
-                    <div style={{ marginTop: 2 }}>
-                      <button
-                        onClick={() => handleToggleAvaliacao(item)}
-                        title={p.exige_avaliacao
-                          ? `A ${AGENTE_NOME} marca ${porta?.data.nome ?? 'a avaliação'} no lugar deste.`
-                          : `A ${AGENTE_NOME} agenda este procedimento direto.`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONTE, textAlign: 'left' }}>
-                        <span style={{
-                          width: 15, height: 15, borderRadius: 4, flexShrink: 0,
-                          border: `1.5px solid ${p.exige_avaliacao ? '#1E6E8C' : '#C4D3D9'}`,
-                          background: p.exige_avaliacao ? '#1E6E8C' : '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'background 0.15s, border-color 0.15s',
-                        }}>
-                          {p.exige_avaliacao && (
-                            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                              <path d="M1.5 5.2L4 7.5L8.5 2.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: p.exige_avaliacao ? '#1E6E8C' : '#6B818C' }}>
-                          Passa pela avaliação
-                        </span>
-                      </button>
-
-                      {!p.exige_avaliacao && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8, paddingLeft: 22 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #DCE6EA', borderRadius: 7, paddingLeft: 8, background: '#fff' }}>
-                            <span style={{ fontSize: 11.5, color: '#9AAEB6' }}>R$</span>
-                            <input
-                              defaultValue={precoParaCampo(p.preco_a_partir_de)}
-                              placeholder="vazio"
-                              onBlur={(e) => {
-                                const v = lerPreco(e.target.value)
-                                e.target.value = precoParaCampo(v)
-                                handleSalvarPreco(item, v)
-                              }}
-                              style={{ width: 74, padding: '5px 8px', border: 'none', fontSize: 12.5, fontFamily: FONTE, color: '#16232B', outline: 'none', background: 'transparent' }}
-                            />
-                          </div>
-                          <span style={{ fontSize: 11, color: '#6B818C', lineHeight: 1.4 }}>
-                            {p.preco_a_partir_de ? 'a partir de' : 'sem valor, ela não fala'}
-                          </span>
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: p.exige_avaliacao ? '#1E6E8C' : '#6B818C' }}>
+                      {p.exige_avaliacao ? <DoorOpen size={12} /> : <CalendarCheck size={12} />}
+                      {p.exige_avaliacao
+                        ? 'Passa pela avaliação'
+                        : p.preco_a_partir_de === 0
+                          ? 'Agenda direto · gratuito'
+                          : p.preco_a_partir_de
+                            ? `Agenda direto · a partir de ${formatarReais(p.preco_a_partir_de)}`
+                            : 'Agenda direto · sem valor'}
                     </div>
 
                     <div
