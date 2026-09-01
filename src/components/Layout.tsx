@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import AvisoWhatsAppCaiu from './AvisoWhatsAppCaiu'
 import { supabase } from '../lib/supabase'
 import { definirNomeDoAgente } from '../lib/agente'
 
@@ -28,6 +29,14 @@ import { definirNomeDoAgente } from '../lib/agente'
  * Enquanto ela não volta, vale o `NOME_PADRAO` — a interface nunca fica com
  * frases sem sujeito. Se falhar, o padrão continua valendo: o nome errado é
  * pior que nome nenhum, mas frase quebrada é pior que os dois.
+ *
+ * ── E O AVISO DE QUEDA DO WHATSAPP TAMBÉM ──────────────────────────────────
+ *
+ * Pelo mesmo motivo: é o único componente por onde toda tela autenticada passa.
+ * A faixa morava dentro de Conversas, apostando que a recepção passa o dia ali
+ * — quem estivesse na Agenda ou no CRM não via nada. Aqui, ela alcança quem
+ * quer que esteja logado. Ela some sozinha quando está tudo bem, e só aparece
+ * depois de quatro minutos de queda contínua.
  */
 export default function Layout() {
   useEffect(() => {
@@ -44,11 +53,22 @@ export default function Layout() {
   }, [])
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F2F6F7' }}>
-      <Sidebar />
-      <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-        <Outlet />
-      </main>
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: '100vh', overflow: 'hidden', background: '#F2F6F7',
+    }}>
+      <AvisoWhatsAppCaiu />
+
+      {/* ⚠️ `minHeight: 0` é o que faz o `<main>` rolar por dentro em vez de
+          esticar a linha. Sem ele, a faixa empurraria a barra lateral e o
+          conteúdo para fora da janela — o mesmo defeito que o `height: 100vh`
+          acima existe para evitar. */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        <Sidebar />
+        <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

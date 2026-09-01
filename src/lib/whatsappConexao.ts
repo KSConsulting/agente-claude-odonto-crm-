@@ -181,6 +181,25 @@ export async function desconectar(): Promise<void> {
 export const INTERVALO_PADRAO = 60_000
 
 /**
+ * Quanto tempo a conexão precisa ficar caída antes de virar aviso na tela.
+ *
+ * **Quatro minutos, e o número não é medo de exagerar — é o contrário.** A
+ * ponte pisca: o servidor reinicia, a rede oscila, o WhatsApp derruba a sessão
+ * por um instante e volta. Avisar na primeira leitura ruim encheria o topo do
+ * sistema de faixa vermelha em queda que se resolve sozinha — e faixa que
+ * aparece à toa é faixa que ninguém lê no dia em que ela importa.
+ *
+ * ⚠️ **Tem que ser maior que `INTERVALO_PADRAO`**, senão não espera nada: a
+ * primeira leitura ruim já estouraria o prazo. Com um minuto de intervalo, são
+ * quatro leituras ruins seguidas antes de a faixa nascer.
+ *
+ * A contagem começa na primeira leitura ruim de **cada carregamento da
+ * página** — recarregar zera. É proposital: a aba fechada não observa nada, e
+ * afirmar "está caído há 4 minutos" sem ter olhado seria inventar.
+ */
+export const ESPERA_ANTES_DE_AVISAR = 4 * 60_000
+
+/**
  * `a cada 1 minuto`, para a frase embaixo do botão.
  *
  * Sai do intervalo de verdade porque a versão digitada à mão já mentiu: a tela
@@ -214,6 +233,7 @@ export function useConexao(intervaloMs = INTERVALO_PADRAO) {
   const [conexao, setConexao] = useState<Conexao | null>(null)
   const [verificando, setVerificando] = useState(false)
   const [verificadoEm, setVerificadoEm] = useState<Date | null>(null)
+  const [caidaDesde, setCaidaDesde] = useState<number | null>(null)
   const emVoo = useRef<Promise<void> | null>(null)
 
   const recarregar = useCallback((): Promise<void> => {
@@ -222,11 +242,25 @@ export function useConexao(intervaloMs = INTERVALO_PADRAO) {
     const tarefa = (async () => {
       setVerificando(true)
       try {
-        setConexao(await lerConexao())
+        const nova = await lerConexao()
+        setConexao(nova)
         // Falhou também é ter verificado: `lerConexao` nunca lança, devolve
         // 'indisponivel'. O horário é de quando perguntamos, não de quando deu
         // certo — é a informação que a pessoa quer ao clicar de novo.
         setVerificadoEm(new Date())
+
+        // A contagem da queda mora aqui, e não em quem exibe o aviso, porque é
+        // aqui que a leitura chega. Uma queda que continua é a MESMA queda:
+        // `?? Date.now()` só marca se ainda não havia marca — remarcar a cada
+        // leitura ruim adiaria o aviso para sempre.
+        //
+        // `conectando` não é queda: alguém está pareando agora, e zerar o
+        // relógio no meio disso é o comportamento certo.
+        setCaidaDesde((atual) => (
+          nova.estado === 'conectado' || nova.estado === 'conectando'
+            ? null
+            : atual ?? Date.now()
+        ))
       } finally {
         setVerificando(false)
       }
@@ -251,5 +285,5 @@ export function useConexao(intervaloMs = INTERVALO_PADRAO) {
     }
   }, [recarregar, intervaloMs])
 
-  return { conexao, recarregar, verificando, verificadoEm, intervaloMs }
+  return { conexao, recarregar, verificando, verificadoEm, intervaloMs, caidaDesde }
 }

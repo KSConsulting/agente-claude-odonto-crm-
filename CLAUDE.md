@@ -191,7 +191,7 @@ src/
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
 ├── components/
-│   ├── Layout.tsx              casca com Sidebar + <Outlet/> (ver Convenções)
+│   ├── Layout.tsx              casca: aviso de queda + Sidebar + <Outlet/> (ver Convenções)
 │   ├── Sidebar.tsx             navegação lateral, logo, logout
 │   ├── ProtectedRoute.tsx      guarda de sessão
 │   ├── PessoasPage.tsx         implementação compartilhada de /leads e /clientes
@@ -209,7 +209,7 @@ src/
 │   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
 │   ├── FiltroPeriodo.tsx       a lista de períodos + o botão "Personalizado"
 │   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
-│   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha em Conversas — só quando cai
+│   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha no topo do sistema — só depois de 4 min caído
 │   ├── ApagarPessoa.tsx        zona de perigo: apaga uma pessoa inteira
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
@@ -879,9 +879,33 @@ e era justamente ali que a linha não existia.
 > meio segundo da verificação automática — o sintoma exato de botão morto, uma
 > vez a cada tantas.
 
-O aviso de queda também aparece em **Conversas**, em faixa vermelha que só
-existe quando há problema — mesmo princípio do `AvisoBaixaConsulta`. É lá que a
-recepção passa o dia, e é lá que a queda seria notada primeiro.
+### O aviso de queda é do sistema, e demora quatro minutos
+
+A faixa vermelha vive no [`Layout.tsx`](src/components/Layout.tsx), acima da
+barra lateral — não dentro de uma página. Ela morava em **Conversas**, apostando
+que a recepção passa o dia ali; a aposta não é ruim, mas quem estivesse na
+Agenda, no CRM ou no Dashboard não via nada. Como casca, ela alcança quem quer
+que esteja logado, na tela em que estiver.
+
+**Ela só nasce depois de quatro minutos de queda contínua**
+(`ESPERA_ANTES_DE_AVISAR`, em
+[`whatsappConexao.ts`](src/lib/whatsappConexao.ts)). A ponte pisca — servidor
+que reinicia, rede que oscila, sessão que cai e volta —, e uma faixa que
+aparece a cada piscada é uma faixa que a equipe aprende a ignorar. Quando ela
+aparece, é problema de verdade.
+
+| Detalhe | Por quê |
+|---|---|
+| A contagem mora no `useConexao`, e não em quem exibe | É onde a leitura chega. `caidaDesde` marca a **primeira** leitura ruim da sequência — remarcar a cada leitura adiaria o aviso para sempre |
+| O prazo tem `setTimeout` próprio | Sem ele, a faixa nasceria na consulta seguinte ao vencimento: até um minuto atrasada, por uma diferença de milissegundos |
+| O componente guarda o **instante** em que o prazo tocou, não um "já venceu" | A queda seguinte tem um `caidaDesde` mais novo, e a conta volta a ser falsa sozinha. Com um booleano, a segunda queda apareceria na hora |
+| `conectando` não conta como queda | Alguém está pareando naquele instante; zerar o relógio ali é o certo |
+| Recarregar a página zera a contagem | A aba fechada não observa nada, e afirmar "está caído há 4 minutos" sem ter olhado seria inventar |
+
+> ⚠️ **`minHeight: 0` na linha que contém a barra lateral.** A faixa entrou como
+> irmã dela dentro de um flex em coluna; sem isso, ela empurraria a barra e o
+> conteúdo para fora da janela — o mesmo defeito que o `height: 100vh` do
+> Layout existe para evitar.
 
 ### Apagar uma pessoa apaga a mídia por fora
 

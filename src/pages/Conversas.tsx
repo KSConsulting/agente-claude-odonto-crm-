@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import ListaConversas from '../components/ListaConversas'
 import JanelaConversa from '../components/JanelaConversa'
 import PainelLead from '../components/PainelLead'
-import AvisoWhatsAppCaiu from '../components/AvisoWhatsAppCaiu'
 import {
   listarConversas, carregarMensagens, enviarMensagem,
   assumirConversa, devolverConversa, marcarComoLidas,
@@ -161,8 +160,6 @@ export default function Conversas() {
     // tela ficam na linha de baixo. `minHeight: 0` no meio é o que deixa elas
     // rolarem por dentro em vez de esticar a página.
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
-      <AvisoWhatsAppCaiu />
-
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
       <ListaConversas
         conversas={conversas}
