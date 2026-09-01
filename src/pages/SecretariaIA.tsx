@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, FileText, X,
-  ChevronDown, ChevronUp, Lock,
+  ChevronDown, ChevronUp, Lock, CircleAlert,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
@@ -80,6 +80,20 @@ const botao = (fundo: string): React.CSSProperties => ({
   transition: 'background 0.2s',
 })
 
+/**
+ * O Salvar da pagina inteira -- e so ele.
+ *
+ * Maior que os outros de proposito: e a acao que faz valer tudo o que foi
+ * mexido acima, e estava do mesmo tamanho do "Adicionar" de um numero de
+ * teste. Botao que fecha a tarefa nao pode ter o peso de botao de campo.
+ */
+const botaoGrande = (fundo: string): React.CSSProperties => ({
+  display: 'flex', alignItems: 'center', gap: 9, padding: '13px 30px',
+  borderRadius: 11, border: 'none', background: fundo, color: '#fff',
+  cursor: 'pointer', fontSize: 14.5, fontWeight: 700, fontFamily: FONTE,
+  transition: 'background 0.2s', whiteSpace: 'nowrap', flexShrink: 0,
+})
+
 function Aviso({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
@@ -91,6 +105,17 @@ function Aviso({ children }: { children: React.ReactNode }) {
       <div>{children}</div>
     </div>
   )
+}
+
+/**
+ * `['o modelo', 'os números']` vira `o modelo e os números`.
+ *
+ * Com vírgula até o penúltimo e "e" no último, como se fala. Montar isso com
+ * `join(', ')` daria "o modelo, os números", que soa como lista de compras.
+ */
+function listar(itens: string[]): string {
+  if (itens.length <= 1) return itens[0] ?? ''
+  return `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`
 }
 
 function Erro({ texto }: { texto: string }) {
@@ -286,6 +311,25 @@ export default function SecretariaIA() {
         : 'Respondendo a qualquer número que mandar mensagem.',
     }
   }
+
+  // ── O que foi mexido e ainda não foi salvo ────────────────────────────────
+  //
+  // A comparação é contra `cfg`, que é a ÚLTIMA LINHA GRAVADA — e não contra
+  // um "sujo/limpo" que alguém precise lembrar de ligar em cada `onChange`.
+  // Assim, mexer e voltar ao valor original NÃO conta como alteração, e o
+  // `setCfg(data)` do salvar zera tudo sozinho.
+  //
+  // `prompt` e `nome_agente` ficam de fora: são só leitura. O `ativo` também,
+  // porque grava no clique.
+  const alteracoes: string[] = []
+  if (cfg) {
+    if (modelo !== cfg.modelo) alteracoes.push('o modelo')
+    if (modoTeste !== cfg.modo_teste) alteracoes.push('o modo de teste')
+    if (numeros.join(',') !== (cfg.numeros_teste ?? []).join(',')) {
+      alteracoes.push('os números de teste')
+    }
+  }
+  const alterado = alteracoes.length > 0
 
   const situacao = situacaoDoAgente()
 
@@ -663,19 +707,6 @@ export default function SecretariaIA() {
         )}
       </div>
 
-      {/* ---------------- Salvar ---------------- */}
-      <div style={{ ...cartao, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <button onClick={salvar} disabled={salvando} style={botao(salvo ? '#1A7A48' : '#1E6E8C')}>
-          {salvo ? <Check size={14} /> : <Save size={14} />}
-          {salvo ? 'Salvo!' : salvando ? 'Salvando...' : 'Salvar'}
-        </button>
-        <span style={{ fontSize: 12.5, color: '#6B818C' }}>
-          Vale para o modelo, o modo de teste e os números. O ligar/desligar, logo abaixo,
-          não passa por aqui — ele vale no clique.
-        </span>
-        <Erro texto={erro} />
-      </div>
-
       {/* ---------------- Ligar e desligar ----------------
 
           NO FIM DA PÁGINA, DE PROPÓSITO. No topo, junto do painel de estado, o
@@ -740,9 +771,83 @@ export default function SecretariaIA() {
       </div>
 
       {/* ---------------- Zona de perigo ----------------
-          Por último, e depois do botão Salvar, de propósito: nada aqui passa
-          por "Salvar", e ninguém deve topar com isso a caminho de outra coisa. */}
+          Por último, de propósito: nada aqui passa por "Salvar", e ninguém
+          deve topar com isso a caminho de outra coisa. */}
       <ApagarPessoa />
+
+      {/* ---------------- Salvar ----------------
+
+          NO FIM DE TUDO, E GRUDADO NO RODAPÉ ENQUANTO HOUVER PENDÊNCIA.
+
+          Ele morava no meio da página, do tamanho do "Adicionar" de um número
+          de teste: quem trocasse o modelo lá em cima e não rolasse até ele
+          saía da página achando que tinha trocado. Nada dizia o contrário —
+          a tela já mostrava o valor novo, porque o estado local muda na hora.
+
+          `position: sticky` com `bottom`, e não `fixed`: fixo precisaria saber
+          onde a barra lateral termina (e ela encolhe), e viveria dentro do
+          `ModalPortal` pelo problema do `transform`. Sticky fica na coluna do
+          conteúdo sozinho, e como é o ÚLTIMO elemento, ele desgruda no fim da
+          rolagem em vez de dar salto.
+
+          E ele não é um card: é uma barra, com sombra. A forma diferente é o
+          que diz "isto é da página inteira" — senão, colado embaixo de
+          "Apagar uma pessoa", pareceria salvar aquilo. */}
+      <div style={{
+        position: alterado ? 'sticky' : 'static',
+        bottom: 16, zIndex: 5,
+        display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+        padding: '16px 20px', borderRadius: 14,
+        background: alterado ? '#EAF3F6' : '#fff',
+        border: `1px solid ${alterado ? '#1E6E8C' : '#DCE6EA'}`,
+        boxShadow: alterado ? '0 6px 20px rgba(22, 35, 43, 0.13)' : 'none',
+        transition: 'background 0.2s, border-color 0.2s, box-shadow 0.2s',
+      }}>
+        <button
+          onClick={salvar}
+          disabled={salvando || !alterado}
+          style={{
+            ...botaoGrande(salvo ? '#1A7A48' : alterado ? '#1E6E8C' : '#B8CBD3'),
+            cursor: salvando || !alterado ? 'default' : 'pointer',
+          }}
+        >
+          {salvo ? <Check size={17} /> : <Save size={17} />}
+          {salvo ? 'Salvo!' : salvando ? 'Salvando...' : 'Salvar'}
+        </button>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {alterado ? (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                fontSize: 13.5, fontWeight: 700, color: '#1E6E8C',
+              }}>
+                <CircleAlert size={15} style={{ flexShrink: 0 }} />
+                Você mudou {listar(alteracoes)}, e ainda não salvou.
+              </div>
+              <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 3, lineHeight: 1.55 }}>
+                Enquanto não clicar em Salvar, a {nomeAgente} continua atendendo do jeito
+                antigo. Sair da página agora perde a alteração.
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                fontSize: 13.5, fontWeight: 700, color: '#16232B',
+              }}>
+                <Check size={15} color="#1A7A48" style={{ flexShrink: 0 }} />
+                Tudo salvo.
+              </div>
+              <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 3, lineHeight: 1.55 }}>
+                Este botão vale para o modelo, o modo de teste e os números. Ligar, desligar
+                e apagar uma pessoa valem no clique, sem passar por aqui.
+              </div>
+            </>
+          )}
+          <Erro texto={erro} />
+        </div>
+      </div>
     </div>
   )
 }

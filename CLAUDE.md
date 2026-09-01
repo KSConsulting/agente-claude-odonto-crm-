@@ -706,9 +706,9 @@ Os cards seguem quatro perguntas, nesta ordem:
 | 2 | **A secretária** — nome, modelo **e** prompt | Quem é ela, quem pensa por ela, e o que ela diz |
 | 3 | **Conexão do WhatsApp** | Por onde ela fala |
 | 4 | **Modo de teste** | Para quem ela responde |
-| 5 | **Salvar** | — |
-| 6 | **Ligar e desligar** | O interruptor |
-| 7 | **Apagar uma pessoa** | A zona de perigo |
+| 5 | **Ligar e desligar** | O interruptor |
+| 6 | **Apagar uma pessoa** | A zona de perigo |
+| 7 | **Salvar** — a barra | Falta alguma coisa? |
 
 **Nome, modelo e prompt moram no mesmo card.** Estavam espalhados em três
 cards, com a conexão e o modo teste no meio — e respondem à mesma pergunta:
@@ -770,6 +770,44 @@ os `5.6` não são "bloqueados", são de outra API.
 > **Modelo que existe na documentação e não responde nesta conta é um card que
 > promete e falha.** A lista de `src/lib/modelosIA.ts` carrega essa data — quem
 > for acrescentar um modelo, chame antes.
+
+### O Salvar não é um card, é uma barra — e ela gruda no rodapé
+
+Ele morava no meio da página, entre "Modo de teste" e "Ligar e desligar", e do
+tamanho do "Adicionar" de um número de teste. **Quem trocasse o modelo lá em
+cima e não rolasse até ele saía da página achando que tinha trocado** — e nada
+dizia o contrário, porque a tela já mostrava o valor novo: o estado local muda
+no clique, só o banco é que não.
+
+Quatro decisões, e nenhuma é tamanho de botão:
+
+| Decisão | Por quê |
+|---|---|
+| **Por último, depois até da zona de perigo** | É a última coisa da página, e a sequência da leitura termina nela |
+| **Mas com forma de barra, não de card** | Colado embaixo de "Apagar uma pessoa", um card pareceria salvar *aquilo*. Sombra e altura diferentes dizem "isto é da página inteira" |
+| **`position: sticky`, não `fixed`** | `fixed` precisaria saber onde a barra lateral termina — e ela encolhe. E viveria dentro do `ModalPortal`, pelo problema do `transform`. `sticky` fica na coluna do conteúdo sozinho |
+| **E é o ÚLTIMO elemento do DOM** | Sticky no meio da página desgrudaria com um salto ao chegar no fim do elemento-pai. Como último, ele desce suave e assenta |
+
+**Ele gruda só quando há o que salvar.** Sem pendência, `position: static` e a
+barra fica quieta no fim: uma linha branca dizendo "Tudo salvo", com o botão
+apagado. Barra pinçada no rodapé o tempo todo é um pedaço de tela cobrado para
+sempre por um aviso que quase nunca vale.
+
+**E ela diz o que mudou, não que "algo" mudou.** *"Você mudou o modelo e o modo
+de teste, e ainda não salvou"* — porque quem chega na barra depois de mexer em
+três cards não lembra em quais. A frase é montada por `listar()`, com vírgula
+até o penúltimo e "e" no último.
+
+> **A pendência é calculada contra o que está gravado, e não com um sinalizador
+> de "sujo".** `alteracoes` compara `modelo`, `modo_teste` e `numeros_teste`
+> com o `cfg` que veio do banco. Duas consequências boas de graça: mexer e
+> voltar ao valor original **deixa de contar** como alteração, e o
+> `setCfg(data)` do salvar zera tudo sozinho — não há um `setSujo(false)` para
+> alguém esquecer num `onChange` novo.
+
+> ⚠️ **O que NÃO passa pelo Salvar continua não passando.** Ligar/desligar e
+> apagar uma pessoa gravam no clique, e a barra diz isso na frase de repouso.
+> Sem essa linha, a barra vermelha do desligar pareceria depender dela.
 
 ### O interruptor fica no fim da página, e não no painel de estado
 
