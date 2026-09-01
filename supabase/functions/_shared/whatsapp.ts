@@ -145,6 +145,16 @@ export interface Ponte {
   desconectar(): Promise<boolean>
 
   /**
+   * A configuração de webhook da ponte, para saber se ela avisa ESTA função.
+   *
+   * ⚠️ A URL volta **inteira, com o segredo dentro** quando ele viaja na query.
+   * Ela nunca pode chegar na tela: só o veredito de `avaliarWebhook()` sai
+   * daqui. Mostrar "webhook: https://…?segredo=abc" entregaria o segredo a
+   * qualquer pessoa com login — o mesmo erro que os 4 dígitos da chave evitam.
+   */
+  webhook(): Promise<WebhookLido | null>
+
+  /**
    * Como esta ponte está configurada — para a tela mostrar quando algo quebra.
    *
    * ⚠️ A chave sai com **quatro caracteres, e nunca mais**: padrão de cartão e
@@ -166,4 +176,63 @@ export function soDigitos(jid: string): string {
 /** A resposta de quem não respondeu. As duas pontes caem aqui do mesmo jeito. */
 export function foraDoAr(estado: Estado = 'indisponivel'): Conexao {
   return { estado, numero: null, perfil: null, foto: null }
+}
+
+// ---------------------------------------------------------------------------
+// O webhook está apontado para cá?
+//
+// ── A TERCEIRA CONDIÇÃO ────────────────────────────────────────────────────
+//
+// Atender depende de três coisas: o agente ligado, o WhatsApp conectado e o
+// webhook apontado para esta função. O card da Secretária aprendeu a segunda
+// depois de 01/09 — antes disso afirmou "está atendendo" por horas com a ponte
+// fora do ar.
+//
+// A terceira era o mesmo buraco. Com a sessão de pé e o webhook desligado, o
+// card diz **"Conectado"**, em verde, e o paciente recebe silêncio: nada chega
+// no banco, nada aparece em Conversas, a Letícia nunca fica sabendo. Painel que
+// afirma o que não sabe é pior que painel vazio.
+// ---------------------------------------------------------------------------
+
+/** O que a ponte respondeu sobre o webhook dela. `null` = não deu para perguntar. */
+export interface WebhookLido {
+  url: string | null
+  ativo: boolean
+}
+
+/**
+ * - `apontado`     — está avisando esta função. **Nada aparece na tela.**
+ * - `outro`        — tem webhook, mas para outro lugar. Para nós é igual a nenhum,
+ *                    e é o caso mais provável de quem já usava a instância.
+ * - `ausente`      — desligado ou sem URL.
+ * - `desconhecido` — não deu para perguntar. A tela **cala a boca**: acusar um
+ *                    problema que talvez não exista é o erro que estamos
+ *                    tentando não repetir, ao contrário.
+ */
+export type VeredictoWebhook = 'apontado' | 'outro' | 'ausente' | 'desconhecido'
+
+/**
+ * A comparação mora aqui, e não dentro de cada ponte, para haver **uma** regra.
+ *
+ * Compara só origem e caminho: o segredo viaja na query em quem não aceita
+ * cabeçalho customizado (é o caso da uazapi), e duas URLs iguais com querys
+ * diferentes continuam sendo o mesmo destino.
+ */
+export function avaliarWebhook(
+  lido: WebhookLido | null,
+  nossaUrl: string,
+): VeredictoWebhook {
+  if (!lido) return 'desconhecido'
+  if (!lido.ativo || !lido.url) return 'ausente'
+  try {
+    const dele = new URL(lido.url)
+    const nosso = new URL(nossaUrl)
+    const caminho = (u: URL) => u.pathname.replace(/\/+$/, '')
+    return dele.origin === nosso.origin && caminho(dele) === caminho(nosso)
+      ? 'apontado'
+      : 'outro'
+  } catch {
+    // URL que nem parseia não está apontada para nós.
+    return 'outro'
+  }
 }

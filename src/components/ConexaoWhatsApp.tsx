@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Smartphone, RefreshCw, LogOut, ServerCrash, Check } from 'lucide-react'
+import { Smartphone, RefreshCw, LogOut, ServerCrash, Check, Unplug } from 'lucide-react'
 import CampoTelefone from './CampoTelefone'
 import ConfirmDeleteModal from './ConfirmDeleteModal'
 import { conectar, desconectar, nomeDoProvedor, type Conexao } from '../lib/whatsappConexao'
@@ -220,6 +220,37 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
           <RefreshCw size={13} /> Verificar
         </button>
       </div>
+
+      {/* ---------------- O webhook: a terceira condição ----------------
+
+          Só aparece quando há problema — mesmo princípio da faixa vermelha de
+          Conversas. `desconhecido` não mostra nada: não deu para perguntar, e
+          acusar o que não se sabe é o erro que estamos evitando, ao contrário.
+
+          E nunca dizemos PARA ONDE ele aponta, só SE aponta: a URL carrega o
+          `WEBHOOK_SEGREDO` dentro dela.                                     */}
+      {(conexao?.webhook === 'ausente' || conexao?.webhook === 'outro') && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12,
+          background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 11,
+          padding: '12px 14px',
+        }}>
+          <Unplug size={17} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#B45309' }}>
+              Conectado, mas nada chega aqui
+            </div>
+            <div style={{ fontSize: 12, color: '#B45309', lineHeight: 1.6, marginTop: 3 }}>
+              {conexao.webhook === 'outro'
+                ? <>A {nomeDoProvedor(provedor)} está avisando <strong>outro endereço</strong>, e não este sistema.</>
+                : <>A {nomeDoProvedor(provedor)} <strong>não está configurada para avisar</strong> este sistema quando chega mensagem.</>}
+              {' '}Mensagem que o paciente mandar fica no WhatsApp e não aparece em
+              Conversas — a {AGENTE_NOME} nem fica sabendo. Resolve no painel da{' '}
+              {nomeDoProvedor(provedor)}, apontando o webhook para cá.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---------------- Ações ---------------- */}
       {estado === 'conectado' && (

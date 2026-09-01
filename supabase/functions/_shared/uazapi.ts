@@ -22,6 +22,7 @@
 import {
   foraDoAr, soDigitos,
   type Conexao, type Estado, type Midia, type Ponte, type Recebimento,
+  type WebhookLido,
 } from './whatsapp.ts'
 
 const URL_BASE = (Deno.env.get('UAZAPI_API_URL') ?? '').replace(/\/+$/, '')
@@ -288,10 +289,29 @@ function identificacao() {
   }
 }
 
+/**
+ * `GET /webhook` devolve uma **lista** — a uazapi aceita mais de um destino.
+ *
+ * Vale o primeiro que estiver ligado e com URL; se nenhum estiver, o primeiro
+ * da lista serve para dizer "existe, mas desligado". Lista vazia é `ausente`.
+ *
+ * A uazapi não tem campo de cabeçalho customizado, então o `WEBHOOK_SEGREDO`
+ * viaja na query da própria URL. É por isso que `avaliarWebhook()` compara só
+ * origem e caminho.
+ */
+async function webhook(): Promise<WebhookLido | null> {
+  const r = await chamar<{ url?: string; enabled?: boolean }[]>('/webhook', undefined, 'GET')
+  if (!Array.isArray(r)) return null
+  const w = r.find((x) => x?.enabled && x?.url) ?? r[0]
+  if (!w) return { url: null, ativo: false }
+  return { url: w.url ?? null, ativo: w.enabled === true }
+}
+
 export const UAZAPI: Ponte = {
   nome: 'uazapi',
   configurada,
   lerWebhook,
+  webhook,
   digitando,
   enviarTexto,
   baixarMidia,

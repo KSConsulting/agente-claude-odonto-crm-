@@ -59,7 +59,24 @@ export interface Conexao {
   instancia: string | null
   /** Os QUATRO últimos caracteres da chave. Serve para identificar, não para usar. */
   chaveFinal: string | null
+
+  /**
+   * A ponte avisa ESTE sistema quando chega mensagem?
+   *
+   * A TERCEIRA condição para atender, depois do agente ligado e do WhatsApp
+   * conectado. Sem ela o card diz "Conectado", em verde, e o paciente recebe
+   * silêncio — nada chega no banco, nada aparece em Conversas.
+   *
+   * `desconhecido` é o servidor não ter respondido: a tela **cala a boca** em
+   * vez de acusar um problema que talvez não exista.
+   *
+   * ⚠️ A URL do webhook **nunca** vem para cá: ela carrega o segredo dentro. O
+   * servidor manda só o veredito.
+   */
+  webhook: VeredictoWebhook
 }
+
+export type VeredictoWebhook = 'apontado' | 'outro' | 'ausente' | 'desconhecido'
 
 /**
  * O nome de cada ponte **como se escreve na tela**.
@@ -101,7 +118,7 @@ async function comSessao(caminho: string, init?: RequestInit): Promise<Response>
 export async function lerConexao(): Promise<Conexao> {
   const cair = (estado: EstadoConexao): Conexao => ({
     provedor: 'evolution', estado, numero: null, perfil: null, foto: null,
-    servidor: null, instancia: null, chaveFinal: null,
+    servidor: null, instancia: null, chaveFinal: null, webhook: 'desconhecido',
   })
 
   try {
@@ -117,6 +134,7 @@ export async function lerConexao(): Promise<Conexao> {
       servidor: d.servidor ?? null,
       instancia: d.instancia ?? null,
       chaveFinal: d.chaveFinal ?? null,
+      webhook: (d.webhook ?? 'desconhecido') as VeredictoWebhook,
     }
   } catch {
     return cair('indisponivel')

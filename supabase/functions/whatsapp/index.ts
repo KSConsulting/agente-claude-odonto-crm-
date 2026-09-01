@@ -31,6 +31,7 @@ import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
 import { ponteAtiva } from '../_shared/pontes.ts'
+import { avaliarWebhook } from '../_shared/whatsapp.ts'
 import type { MensagemRecebida, Ponte } from '../_shared/whatsapp.ts'
 
 const SEGREDO = Deno.env.get('WEBHOOK_SEGREDO') ?? ''
@@ -369,13 +370,24 @@ async function rotaConexao(req: Request): Promise<Response> {
   if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
 
   const ponte = await ponteAtiva()
+
+  // Em paralelo: são dois servidores lentos quando algo está errado, e em
+  // série a tela esperaria o dobro justo na hora em que precisa avisar.
+  const [estado, config] = await Promise.all([
+    ponte.estadoDaConexao(),
+    ponte.webhook(),
+  ])
+
   // A identificação vem das secrets da função, nunca do banco — e por isso só
   // sai por aqui, atrás da sessão. Ver `identificacao()` na porta.
+  //
+  // Do webhook sai o VEREDITO, nunca a URL: ela carrega o segredo dentro.
   return json({
     ok: true,
     provedor: ponte.nome,
     ...ponte.identificacao(),
-    ...(await ponte.estadoDaConexao()),
+    ...estado,
+    webhook: avaliarWebhook(config, `${URL_SUPABASE}/functions/v1/whatsapp`),
   })
 }
 

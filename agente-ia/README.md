@@ -835,6 +835,37 @@ Atender depende de duas coisas, e a tela conhecia uma. Daí saíram três peças
 | O card de estado | Secretária de IA | Passou a exigir **as duas** condições. Sem WhatsApp, diz "Ligada, mas o WhatsApp está desconectado" |
 | Seção "Conexão do WhatsApp" | Secretária de IA | Provedor, quem está conectado, reconectar e desconectar |
 | Faixa vermelha | Conversas | Aparece **só** quando cai. É lá que a recepção passa o dia |
+| Aviso de webhook | Secretária de IA | A **terceira** condição — ver abaixo |
+
+### A terceira condição: o webhook
+
+Conectar resolve um lado — o sistema falando com o WhatsApp. O webhook é o
+outro: como a ponte avisa o sistema de que chegou mensagem.
+
+Isso apareceu na estreia da uazapi, em 01/09: sessão pareada, card **verde
+escrito "Conectado"**, e silêncio absoluto. O webhook dela nunca tinha sido
+ligado, então nada chegava no banco — e a tela afirmava que estava tudo bem.
+A mesma falha de horas antes, com outra roupa.
+
+`/conexao` agora pergunta à ponte ativa e devolve um veredito:
+
+| Ponte | Como se pergunta |
+|---|---|
+| Evolution | `GET webhook/find/{instancia}` — devolve `url`, `enabled` e os cabeçalhos |
+| uazapi | `GET /webhook` — devolve uma **lista**, porque ela aceita mais de um destino |
+
+| Veredito | O card |
+|---|---|
+| `apontado` | **nada** — aviso só existe quando há problema |
+| `outro` | avisa: tem webhook, mas para outro endereço. É o caso mais provável de quem já usava a instância |
+| `ausente` | avisa: desligado ou sem URL |
+| `desconhecido` | **nada** — não deu para perguntar, e acusar o que não se sabe é o mesmo erro ao contrário |
+
+> ⚠️ **A URL nunca chega na tela.** Ela leva o `WEBHOOK_SEGREDO` dentro — na
+> uazapi obrigatoriamente, já que ela não tem campo de cabeçalho customizado e
+> o segredo precisa viajar na query. Por isso `avaliarWebhook()` compara só
+> **origem e caminho** (query diferente continua sendo o mesmo destino) e o que
+> sai da função é o veredito, nunca o endereço.
 
 ### `desconectado` ≠ `indisponivel`
 

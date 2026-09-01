@@ -585,10 +585,26 @@ seria palpite. O `whatsapp/index.ts` não conhece nenhuma das duas.
 > ele. **Só o webhook do provedor ativo deve apontar para a nossa função**, e
 > isso é um passo manual no painel de cada uma.
 
-> **O card de estado precisa das duas condições.** Atender depende do agente
-> ligado **e** do WhatsApp conectado. Até 01/09 o card só conhecia a primeira,
-> e por isso afirmou "está atendendo" por horas com a ponte fora do ar. Painel
-> que afirma o que não sabe é pior que painel vazio.
+> **Atender depende de TRÊS condições, e o card demorou a aprender as duas
+> últimas.** O agente ligado, o WhatsApp conectado **e o webhook apontado para
+> a nossa função**. Até 01/09 o card só conhecia a primeira, e afirmou "está
+> atendendo" por horas com a ponte fora do ar.
+>
+> A terceira era o mesmo buraco, e apareceu na estreia da uazapi: sessão
+> pareada, card **verde escrito "Conectado"**, e silêncio absoluto — porque o
+> webhook dela nunca tinha sido ligado. Hoje `/conexao` pergunta à ponte
+> (`webhook/find/{instancia}` na Evolution, `GET /webhook` na uazapi) e o card
+> avisa quando não aponta para cá.
+>
+> Painel que afirma o que não sabe é pior que painel vazio.
+
+> ⚠️ **O veredito sai; a URL nunca.** Ela carrega o `WEBHOOK_SEGREDO` dentro —
+> na uazapi obrigatoriamente, porque ela não aceita cabeçalho customizado e o
+> segredo viaja na query. Escrever a URL na tela entregaria o segredo a
+> qualquer pessoa com login, que é o erro que os 4 dígitos da chave evitam. Por
+> isso `avaliarWebhook()` compara **origem e caminho** e devolve só
+> `apontado` / `outro` / `ausente` / `desconhecido` — e `desconhecido` não
+> mostra nada, porque acusar o que não se sabe é o mesmo erro ao contrário.
 
 O aviso de queda também aparece em **Conversas**, em faixa vermelha que só
 existe quando há problema — mesmo princípio do `AvisoBaixaConsulta`. É lá que a

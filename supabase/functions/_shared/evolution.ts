@@ -11,6 +11,7 @@
 import {
   foraDoAr, soDigitos,
   type Conexao, type Estado, type Midia, type Ponte, type Recebimento,
+  type WebhookLido,
 } from './whatsapp.ts'
 
 const URL_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '')
@@ -321,10 +322,25 @@ function lerWebhook(corpo: Record<string, unknown>): Recebimento {
   }
 }
 
+/**
+ * A Evolution guarda o webhook por instância, com cabeçalhos próprios — é onde
+ * o `x-webhook-segredo` vive.
+ *
+ * ⚠️ Instância sem webhook nenhum devolve 404, e o `buscar` transforma isso em
+ * `null` — ou seja, em `desconhecido` e não em `ausente`. Erra para o lado de
+ * não afirmar, que é o lado certo: a tela cala a boca em vez de acusar.
+ */
+async function webhook(): Promise<WebhookLido | null> {
+  const r = await buscar<{ url?: string; enabled?: boolean }>(`webhook/find/${INSTANCIA}`)
+  if (!r) return null
+  return { url: r.url ?? null, ativo: r.enabled !== false }
+}
+
 export const EVOLUTION: Ponte = {
   nome: 'evolution',
   configurada,
   lerWebhook,
+  webhook,
   digitando,
   enviarTexto,
   baixarMidia,
