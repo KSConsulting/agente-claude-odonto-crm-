@@ -297,10 +297,11 @@ export default function SecretariaIA() {
           meses, e a mudança vale para toda conversa em andamento. */}
       <div style={cartao}>
         <div style={titulo}>Nome da secretária</div>
+        <p style={{ ...legenda, marginBottom: 6 }}>
+          Escolha o nome que a secretária usará para se apresentar aos pacientes.
+        </p>
         <p style={legenda}>
-          É assim que ela se apresenta ao paciente no WhatsApp, e é o nome que a
-          equipe vê nas telas do sistema. Um nome só, nos dois lugares: o prompt
-          dela lê deste mesmo campo.
+          Esse nome também será usado dentro do sistema para identificar sua secretária.
         </p>
 
         <input
@@ -323,10 +324,9 @@ export default function SecretariaIA() {
         }}>
           <Bot size={16} color="#1E6E8C" style={{ flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 12.5, color: '#1E6E8C', lineHeight: 1.6 }}>
-            <strong>Para trocar o nome, peça a uma IA no projeto.</strong> Abra a
-            pasta do sistema no Claude Code, no Codex ou na IDE que você usar, e
-            peça a troca. O nome aparece nas telas e dentro do prompt — a IA
-            acerta os dois de uma vez, e é por isso que não se troca por aqui.
+            <strong>Quer trocar o nome da secretária?</strong><br />
+            Abra a pasta do sistema no Claude Code, no Codex ou na IDE que você usar,
+            e peça a troca. O nome aparece nas telas e dentro do prompt.
           </div>
         </div>
       </div>
