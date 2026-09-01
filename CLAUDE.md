@@ -209,7 +209,7 @@ src/
 │   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
 │   ├── FiltroPeriodo.tsx       a lista de períodos + o botão "Personalizado"
 │   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
-│   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha no topo do sistema — só depois de 4 min caído
+│   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha no topo do sistema — só depois de 1 min caído
 │   ├── ApagarPessoa.tsx        zona de perigo: apaga uma pessoa inteira
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
@@ -879,7 +879,7 @@ e era justamente ali que a linha não existia.
 > meio segundo da verificação automática — o sintoma exato de botão morto, uma
 > vez a cada tantas.
 
-### O aviso de queda é do sistema, e demora quatro minutos
+### O aviso de queda é do sistema, e demora um minuto
 
 A faixa vermelha vive no [`Layout.tsx`](src/components/Layout.tsx), acima da
 barra lateral — não dentro de uma página. Ela morava em **Conversas**, apostando
@@ -887,12 +887,22 @@ que a recepção passa o dia ali; a aposta não é ruim, mas quem estivesse na
 Agenda, no CRM ou no Dashboard não via nada. Como casca, ela alcança quem quer
 que esteja logado, na tela em que estiver.
 
-**Ela só nasce depois de quatro minutos de queda contínua**
+**Ela só nasce depois de um minuto de queda contínua**
 (`ESPERA_ANTES_DE_AVISAR`, em
-[`whatsappConexao.ts`](src/lib/whatsappConexao.ts)). A ponte pisca — servidor
-que reinicia, rede que oscila, sessão que cai e volta —, e uma faixa que
-aparece a cada piscada é uma faixa que a equipe aprende a ignorar. Quando ela
-aparece, é problema de verdade.
+[`whatsappConexao.ts`](src/lib/whatsappConexao.ts)) — o mesmo valor de
+`INTERVALO_PADRAO`, ou seja, **duas leituras ruins seguidas**. A ponte pisca —
+servidor que reinicia, rede que oscila, sessão que cai e volta —, e uma faixa
+que aparece a cada piscada é uma faixa que a equipe aprende a ignorar.
+
+> **Eram quatro minutos, e o número desceu.** O medo de alarme falso é o certo,
+> mas o custo do outro lado é maior e chega antes: enquanto a faixa espera,
+> ninguém na clínica sabe que o WhatsApp parou — e cada minuto ali é um paciente
+> escrevendo para o vazio. Piscada que dura um minuto inteiro é rara; queda de
+> verdade que dura quatro, não.
+>
+> ⚠️ **O prazo não pode ficar abaixo de `INTERVALO_PADRAO`.** Menor que a
+> cadência, ele não espera nada: a primeira leitura ruim já o estoura, e a faixa
+> volta a nascer de qualquer oscilação.
 
 | Detalhe | Por quê |
 |---|---|
@@ -900,7 +910,7 @@ aparece, é problema de verdade.
 | O prazo tem `setTimeout` próprio | Sem ele, a faixa nasceria na consulta seguinte ao vencimento: até um minuto atrasada, por uma diferença de milissegundos |
 | O componente guarda o **instante** em que o prazo tocou, não um "já venceu" | A queda seguinte tem um `caidaDesde` mais novo, e a conta volta a ser falsa sozinha. Com um booleano, a segunda queda apareceria na hora |
 | `conectando` não conta como queda | Alguém está pareando naquele instante; zerar o relógio ali é o certo |
-| `caidaDesde` fica no `localStorage` | **Sem isso o aviso quase nunca aparece.** Quem vê que caiu dá F5 para conferir — e o relógio voltava ao zero. Quem recarrega a cada dois minutos nunca chega aos quatro |
+| `caidaDesde` fica no `localStorage` | **Sem isso o aviso quase nunca aparece.** Quem vê que caiu dá F5 para conferir — e o relógio voltava ao zero, junto com a espera inteira |
 | Dois relógios, e vale o mais adiantado | O `setTimeout` é pontual mas dispara uma vez só; o `verificadoEm` muda a cada consulta e sozinho já garante a faixa, no máximo um minuto depois da hora. Um cobre a falha do outro |
 
 > ⚠️ **`minHeight: 0` na linha que contém a barra lateral.** A faixa entrou como

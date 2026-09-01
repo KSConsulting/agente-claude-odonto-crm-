@@ -24,10 +24,11 @@ import {
  *
  * ── E POR QUE ELA DEMORA ───────────────────────────────────────────────────
  *
- * Quatro minutos de queda contínua (`ESPERA_ANTES_DE_AVISAR`) antes de
- * aparecer. A ponte pisca — servidor que reinicia, rede que oscila, sessão que
- * cai e volta —, e uma faixa que aparece a cada piscada é uma faixa que a
- * equipe aprende a ignorar. Quando esta aqui aparecer, é problema de verdade.
+ * Um minuto de queda contínua (`ESPERA_ANTES_DE_AVISAR`) antes de aparecer — o
+ * mesmo intervalo da verificação, ou seja, duas leituras ruins seguidas. A
+ * ponte pisca, e uma faixa que aparece a cada piscada é uma faixa que a equipe
+ * aprende a ignorar; mas esperar demais é deixar a clínica sem saber que o
+ * WhatsApp parou, com paciente escrevendo para o vazio.
  *
  * **Silenciosa quando está tudo bem**, e silenciosa enquanto verifica: piscar
  * "caiu" a cada carregamento de página, antes da primeira resposta, seria
@@ -57,7 +58,7 @@ export default function AvisoWhatsAppCaiu() {
   // Guardar o INSTANTE, e não um "já venceu" booleano, é o que dispensa
   // desligar a faixa na mão: a queda seguinte tem um `caidaDesde` mais novo
   // que este `agora`, e a conta volta a ser falsa sozinha. Sem isso, a segunda
-  // queda apareceria na hora, sem esperar os quatro minutos.
+  // queda apareceria na hora, sem esperar o minuto.
   const [agora, setAgora] = useState(0)
 
   useEffect(() => {

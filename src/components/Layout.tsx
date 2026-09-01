@@ -36,7 +36,7 @@ import { definirNomeDoAgente } from '../lib/agente'
  * A faixa morava dentro de Conversas, apostando que a recepção passa o dia ali
  * — quem estivesse na Agenda ou no CRM não via nada. Aqui, ela alcança quem
  * quer que esteja logado. Ela some sozinha quando está tudo bem, e só aparece
- * depois de quatro minutos de queda contínua.
+ * depois de um minuto de queda contínua.
  */
 export default function Layout() {
   useEffect(() => {

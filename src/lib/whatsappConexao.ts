@@ -183,31 +183,30 @@ export const INTERVALO_PADRAO = 60_000
 /**
  * Quanto tempo a conexão precisa ficar caída antes de virar aviso na tela.
  *
- * **Quatro minutos, e o número não é medo de exagerar — é o contrário.** A
- * ponte pisca: o servidor reinicia, a rede oscila, o WhatsApp derruba a sessão
- * por um instante e volta. Avisar na primeira leitura ruim encheria o topo do
- * sistema de faixa vermelha em queda que se resolve sozinha — e faixa que
- * aparece à toa é faixa que ninguém lê no dia em que ela importa.
+ * **Um minuto — e ele é o piso, não um número escolhido no meio da faixa.**
+ * ⚠️ O prazo **não pode ser menor que `INTERVALO_PADRAO`**: abaixo da cadência
+ * ele não espera nada, porque a primeira leitura ruim já o estouraria. Igual à
+ * cadência, são **duas leituras ruins seguidas** antes de a faixa nascer.
  *
- * ⚠️ **Tem que ser maior que `INTERVALO_PADRAO`**, senão não espera nada: a
- * primeira leitura ruim já estouraria o prazo. Com um minuto de intervalo, são
- * quatro leituras ruins seguidas antes de a faixa nascer.
- *
- * A contagem começa na primeira leitura ruim de **cada carregamento da
- * página** — recarregar zera. É proposital: a aba fechada não observa nada, e
- * afirmar "está caído há 4 minutos" sem ter olhado seria inventar.
+ * Começou em quatro minutos, pelo medo certo: a ponte pisca — o servidor
+ * reinicia, a rede oscila, o WhatsApp derruba a sessão por um instante e volta
+ * —, e faixa que aparece à toa é faixa que ninguém lê no dia em que ela
+ * importa. Só que o custo do outro lado é maior e é imediato: enquanto a faixa
+ * espera, ninguém na clínica sabe que o WhatsApp parou, e cada minuto ali é um
+ * paciente escrevendo para o vazio. Piscada que dura um minuto inteiro é rara;
+ * queda de verdade que dura quatro, não.
  */
-export const ESPERA_ANTES_DE_AVISAR = 4 * 60_000
+export const ESPERA_ANTES_DE_AVISAR = 60_000
 
 /**
  * Onde o começo da queda fica guardado entre carregamentos da página.
  *
  * ⚠️ **SEM ISTO O AVISO QUASE NUNCA APARECE**, e o motivo é o comportamento
  * mais natural do mundo: a pessoa vê que caiu, dá F5 para conferir, e o relógio
- * volta ao zero. Quem recarrega a cada dois minutos nunca chega aos quatro.
+ * volta ao zero — junto com a espera inteira, toda vez.
  *
  * A versão anterior guardava só em memória, e a justificativa parecia boa — "a
- * aba fechada não observa nada, afirmar que está caído há 4 minutos sem ter
+ * aba fechada não observa nada, afirmar que está caído há um minuto sem ter
  * olhado seria inventar". Só que o efeito prático era um aviso que não avisa.
  *
  * `localStorage` porque a informação é **desta máquina e deste navegador**: é o
