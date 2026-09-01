@@ -336,7 +336,7 @@ export default function Profissionais() {
             Os dentistas da clínica.
           </p>
           <p style={{ fontSize: 13, color: '#6B818C', marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
-            Cadastrar alguém aqui já cria a agenda dessa pessoa — a cor escolhida é a cor com que ela aparece no calendário.
+            Cadastre os profissionais que realizam atendimentos na clínica. Cada profissional terá sua própria agenda para organizar consultas e horários.
           </p>
         </div>
 

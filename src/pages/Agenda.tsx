@@ -339,7 +339,10 @@ export default function Agenda() {
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>Agenda</h1>
           </div>
           <p style={{ fontSize: 16.5, fontWeight: 500, color: '#3A5560', marginTop: 10, marginBottom: 0, lineHeight: 1.45 }}>
-            As agendas de todos os profissionais, no mesmo calendário.
+            Todos os agendamentos da clínica em um só lugar.
+          </p>
+          <p style={{ fontSize: 13, color: '#6B818C', marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
+            Visualize e organize as consultas de todos os profissionais em um único calendário.
           </p>
         </div>
 

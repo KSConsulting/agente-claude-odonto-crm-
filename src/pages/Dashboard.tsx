@@ -410,7 +410,7 @@ export default function Dashboard() {
       <div className="fade-in-3" style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <KpiCard icon={Users} label="Novos Contatos" value={novosContatos} description="Pessoas que entraram em contato no período" delay="3" />
         <KpiCard icon={Calendar} label="Consultas Agendadas" value={consultasAgendadas} description="Total de consultas marcadas no período" delay="4" />
-        <KpiCard icon={TrendingUp} label="Taxa de Conversão" value={taxaConversao} suffix="%" description="Contatos que viraram consulta agendada" delay="5" />
+        <KpiCard icon={TrendingUp} label="Taxa de Conversão" value={taxaConversao} suffix="%" description="Percentual de novos contatos que agendaram uma consulta" delay="5" />
       </div>
 
       {/* Chart 1: Line Chart */}

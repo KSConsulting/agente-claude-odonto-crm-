@@ -48,8 +48,8 @@ interface ModeConfig {
 const CONFIG: Record<PessoasMode, ModeConfig> = {
   leads: {
     titulo: 'Contatos (Leads)',
-    subtitulo: 'Pessoas que ainda não compareceram a nenhuma consulta.',
-    explicacao: 'Estão conversando, aguardando retorno ou já com horário marcado. Quando o status virar “Consulta Realizada”, a pessoa passa sozinha para a outra página.',
+    subtitulo: 'Pessoas que ainda não foram atendidas na clínica.',
+    explicacao: 'Aqui você encontra as pessoas que entraram em contato com a clínica, estão em atendimento ou possuem uma consulta agendada.',
     outraPagina: { rota: '/clientes', label: 'Ver Pacientes (Clientes)' },
     icone: Users,
     corIcone: '#1E6E8C',
@@ -61,8 +61,8 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
   },
   clientes: {
     titulo: 'Pacientes (Clientes)',
-    subtitulo: 'Pessoas que já realizaram pelo menos uma consulta.',
-    explicacao: 'Viraram cliente da clínica. Quem agendou mas ainda não foi atendido continua na outra página, como contato.',
+    subtitulo: 'Pessoas que já foram atendidas na clínica.',
+    explicacao: 'Aqui você encontra todos os pacientes que já realizaram pelo menos um atendimento na clínica, com acesso às suas informações e histórico.',
     outraPagina: { rota: '/leads', label: 'Ver Contatos (Leads)' },
     icone: UserCheck,
     corIcone: '#1A7A48',

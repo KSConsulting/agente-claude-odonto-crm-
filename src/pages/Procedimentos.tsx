@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, ClipboardList, FileText, DoorOpen, CalendarCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { AGENTE_POR_EXTENSO, AGENTE_NOME } from '../lib/agente'
+import { AGENTE_NOME } from '../lib/agente'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import EditorProcedimento from '../components/EditorProcedimento'
 import PortaDeEntrada from '../components/PortaDeEntrada'
@@ -139,11 +139,12 @@ export default function Procedimentos() {
             <span style={{ background: '#EAF3F6', color: '#1E6E8C', borderRadius: 20, fontSize: 12.5, fontWeight: 700, padding: '2px 10px' }}>{items.length}</span>
           </div>
           <p style={{ fontSize: 16.5, fontWeight: 500, color: '#3A5560', marginTop: 10, marginBottom: 0, lineHeight: 1.45 }}>
-            O que a clínica faz.
+            O que a clínica oferece.
           </p>
           <p style={{ fontSize: 13, color: '#6B818C', marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
-            Este é o catálogo que a {AGENTE_POR_EXTENSO} usa para reconhecer o que o
-            paciente procura. Desligar um procedimento tira ele da conversa sem apagar o texto.
+            Cadastre aqui os procedimentos oferecidos pela clínica. A {AGENTE_NOME} usa
+            essas informações para entender o que cada paciente procura e responder
+            corretamente. Você pode ativar ou desativar um procedimento a qualquer momento.
           </p>
         </div>
 

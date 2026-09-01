@@ -444,7 +444,7 @@ export default function Configuracoes() {
       {/* Page header */}
       <div className="fade-in-1" style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>Configurações</h1>
-        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>Seu perfil, os dados da clínica e a grade de atendimento.</p>
+        <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>Gerencie suas informações e os dados da clínica.</p>
       </div>
 
       {/* Tabs */}

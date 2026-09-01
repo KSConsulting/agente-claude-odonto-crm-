@@ -415,8 +415,11 @@ export default function CRM() {
         <div className="fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#16232B', margin: 0 }}>CRM</h1>
-            <p style={{ fontSize: 13, color: '#6B818C', marginTop: 4 }}>
-              {leads.length} lead{leads.length !== 1 ? 's' : ''} no funil • Arraste para mover entre colunas
+            <p style={{ fontSize: 16.5, fontWeight: 500, color: '#3A5560', marginTop: 10, marginBottom: 0, lineHeight: 1.45 }}>
+              Acompanhe cada contato até ele se tornar paciente.
+            </p>
+            <p style={{ fontSize: 13, color: '#6B818C', marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
+              Visualize em qual etapa do atendimento cada pessoa está.
             </p>
           </div>
         </div>
