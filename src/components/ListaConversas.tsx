@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Search, UserCheck, MessageSquareDashed, CalendarCheck, CalendarX } from 'lucide-react'
 import { formatarParaExibicao } from '../lib/telefones'
 import { previaDaMensagem, quandoCurto, temConsultaMarcada, quandoAgendada } from '../lib/conversas'
-import { AGENTE_TITULO, AGENTE_POR_EXTENSO } from '../lib/agente'
+import { AGENTE_TITULO, useAgente } from '../lib/agente'
 import type { ConversaResumo } from '../types'
 
 /**
@@ -38,6 +38,7 @@ interface Props {
 }
 
 export default function ListaConversas({ conversas, selecionada, onSelecionar, carregando }: Props) {
+  const { nome: nomeAgente, porExtenso: agentePorExtenso } = useAgente()
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('todas')
 
@@ -66,7 +67,7 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
   const vazioTexto = termo
     ? 'Tente outro nome ou número.'
     : filtro === 'agendadas'
-      ? 'Ninguém com consulta marcada por aqui ainda. Quando a Letícia marcar, a etiqueta verde aparece na conversa.'
+      ? `Ninguém com consulta marcada por aqui ainda. Quando a ${nomeAgente} marcar, a etiqueta verde aparece na conversa.`
       : filtro === 'nao_lidas'
         ? 'Nada esperando resposta. Tudo lido.'
         : 'Assim que alguém mandar mensagem no WhatsApp da clínica, a conversa aparece aqui.'
@@ -83,7 +84,7 @@ export default function ListaConversas({ conversas, selecionada, onSelecionar, c
           Conversas
         </h1>
         <p style={{ fontSize: 12, color: '#6B818C', margin: '0 0 13px' }}>
-          O WhatsApp da clínica, com o que a {AGENTE_POR_EXTENSO} respondeu.
+          O WhatsApp da clínica, com o que a {agentePorExtenso} respondeu.
         </p>
 
         <div style={{ position: 'relative' }}>

@@ -326,6 +326,18 @@ export interface ConfiguracoesAgente {
    * autentica.
    */
   provedor_whatsapp: 'evolution' | 'uazapi'
+  /**
+   * Como o Agente de IA se chama (migração `0019`).
+   *
+   * **Uma fonte, dois leitores**: as telas (pelo `useAgente()` de
+   * `src/lib/agente.ts`) e o prompt (pelo marcador `{{NOME_AGENTE}}`). Antes
+   * eram dois sistemas que não se falavam, e renomear exigia editar os dois.
+   *
+   * ⚠️ Isto é o NOME, não o cargo. "Secretária IA" e "Secretária de IA"
+   * continuam constantes no código — trocar "Letícia" por "Sofia" não renomeia
+   * a página. O banco garante não-vazio (`not null` + `CHECK` de 1 a 40).
+   */
+  nome_agente: string
   atualizado_por: string | null
   created_at: string
   updated_at: string

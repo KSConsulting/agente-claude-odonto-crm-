@@ -4,7 +4,7 @@ import CampoTelefone from './CampoTelefone'
 import ConfirmDeleteModal from './ConfirmDeleteModal'
 import { preverExclusao, apagarPessoa, resumoDoEstrago, type Previsao } from '../lib/apagarPessoa'
 import { formatarParaExibicao } from '../lib/telefones'
-import { AGENTE_NOME } from '../lib/agente'
+import { useAgente } from '../lib/agente'
 
 /**
  * "Apagar uma pessoa" — a zona de perigo da página Secretária de IA.
@@ -29,6 +29,7 @@ import { AGENTE_NOME } from '../lib/agente'
 const FONTE = "'Plus Jakarta Sans', sans-serif"
 
 export default function ApagarPessoa() {
+  const { nome: nomeAgente } = useAgente()
   const [numero, setNumero] = useState('')
   const [valido, setValido] = useState(false)
   const [previsao, setPrevisao] = useState<Previsao | null>(null)
@@ -87,7 +88,7 @@ export default function ApagarPessoa() {
       <p style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.6, margin: '6px 0 16px' }}>
         Apaga <strong>tudo</strong> de quem tem este número: a ficha, a conversa inteira,
         as consultas — inclusive as já realizadas — e os arquivos que ela mandou.
-        Depois disso a {AGENTE_NOME} não a reconhece mais, e começa uma conversa nova
+        Depois disso a {nomeAgente} não a reconhece mais, e começa uma conversa nova
         se ela voltar. <strong>Não tem volta.</strong>
       </p>
 

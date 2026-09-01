@@ -172,9 +172,19 @@ export async function montarFicha(
   return linhas.join('\n')
 }
 
+/**
+ * O nome quando a linha de configuração não existe — não quando ela está vazia.
+ *
+ * A coluna é `not null` com `CHECK` de tamanho mínimo (migração `0019`), então
+ * "vazio" é impossível. Isto cobre só o banco sem nenhuma linha, e existe para
+ * a agente nunca se apresentar como "undefined" a um paciente.
+ */
+const NOME_PADRAO = 'Letícia'
+
 export async function montarPrompt(
   promptBase?: string | null,
   ficha?: string,
+  nomeAgente?: string | null,
 ): Promise<string> {
   const cfg = await selecionar<{ fuso_horario: string | null }>(
     'configuracoes_clinica?select=fuso_horario&limit=1',
@@ -192,6 +202,11 @@ export async function montarPrompt(
   const texto = promptBase && promptBase.trim() ? promptBase : PROMPT_OFICIAL
 
   return texto
+    // ⚠️ `replaceAll`, e não `replace`: o nome aparece DUAS vezes no prompt (na
+    // identidade e no exemplo de apresentação da Etapa 1). Com `replace`, a
+    // segunda continuaria sendo o literal `{{NOME_AGENTE}}` — e a agente se
+    // apresentaria ao paciente com o marcador na cara.
+    .replaceAll('{{NOME_AGENTE}}', (nomeAgente ?? '').trim() || NOME_PADRAO)
     .replace('{{DATA_HOJE}}', frescoDaData(fuso))
     .replace('{{INFORMACOES_CLINICA}}', emLinhas(clinica) || 'Sem dados cadastrados.')
     .replace('{{PROCEDIMENTOS}}', emLinhas(procedimentos) || 'Nenhum procedimento ativo.')

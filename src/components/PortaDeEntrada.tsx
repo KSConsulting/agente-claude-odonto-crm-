@@ -1,6 +1,6 @@
 import { DoorOpen, Clock, Pencil, TriangleAlert, Tag } from 'lucide-react'
 import { formatarReais } from '../lib/procedimentos'
-import { AGENTE_NOME } from '../lib/agente'
+import { useAgente } from '../lib/agente'
 import type { ServicoClinica } from '../types'
 
 /**
@@ -35,6 +35,7 @@ interface Props {
 }
 
 export default function PortaDeEntrada({ porta, onEditar }: Props) {
+  const { nome: nomeAgente } = useAgente()
   if (!porta) {
     return (
       <div className="fade-in-2" style={{
@@ -48,7 +49,7 @@ export default function PortaDeEntrada({ porta, onEditar }: Props) {
             Nenhum procedimento está marcado como a avaliação
           </div>
           <div style={{ fontSize: 12.5, color: '#B91C1C', lineHeight: 1.6, marginTop: 4 }}>
-            Sem porta de entrada, a {AGENTE_NOME} marca qualquer tratamento direto —
+            Sem porta de entrada, a {nomeAgente} marca qualquer tratamento direto —
             inclusive os que precisam do dentista olhar antes.
           </div>
         </div>
@@ -79,7 +80,7 @@ export default function PortaDeEntrada({ porta, onEditar }: Props) {
             {porta.descricao}
           </p>
           <div style={{ fontSize: 12, color: '#6B818C', lineHeight: 1.6, marginTop: 8 }}>
-            É o que a {AGENTE_NOME} marca no lugar de todo procedimento com{' '}
+            É o que a {nomeAgente} marca no lugar de todo procedimento com{' '}
             <strong style={{ color: '#16232B' }}>&ldquo;Passa pela avaliação&rdquo;</strong> ligado.
             O que a pessoa procura fica registrado junto, e aparece na Agenda.
           </div>
@@ -110,7 +111,7 @@ export default function PortaDeEntrada({ porta, onEditar }: Props) {
 
       {gratuita && (
         <div style={{ fontSize: 12, color: '#1A7A48', background: '#E8F8EF', border: '1px solid #B7E7CB', borderRadius: 8, padding: '8px 11px', marginTop: 11, lineHeight: 1.6 }}>
-          Gratuita não é só um preço zerado: é a frase que a {AGENTE_NOME} usa quando
+          Gratuita não é só um preço zerado: é a frase que a {nomeAgente} usa quando
           alguém trava no valor. Sem ela, a resposta vira &ldquo;o valor a gente vê na
           avaliação&rdquo;, que soa como desconversa.
         </div>

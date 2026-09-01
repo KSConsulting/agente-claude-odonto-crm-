@@ -654,13 +654,14 @@ Nada dentro dele é comentário, instrução para humano ou anotação. Tudo o q
 estiver ali, a Letícia lê como ordem. Explicação sobre o prompt vem para este
 README — nunca para dentro do arquivo.
 
-### Os cinco marcadores
+### Os seis marcadores
 
-Cinco trechos são preenchidos pelo sistema a cada mensagem, lendo o banco na
-hora. É o que mantém o agente sempre atualizado sem ninguém reescrever nada:
+Seis trechos são preenchidos pelo sistema, lendo o banco na hora. É o que
+mantém o agente sempre atualizado sem ninguém reescrever nada:
 
 | Marcador | Vem de | Muda quando |
 |---|---|---|
+| `{{NOME_AGENTE}}` | `configuracoes_agente.nome_agente` | Alguém troca o nome dela na tela |
 | `{{INFORMACOES_CLINICA}}` | `informacoes_clinica_agente` | Alguém edita a aba Clínica |
 | `{{PROCEDIMENTOS}}` | `procedimentos_clinica_agente` | Alguém liga/desliga um procedimento |
 | `{{PROFISSIONAIS}}` | `profissionais_clinica_agente` | Alguém muda um dentista ou uma jornada |
@@ -668,10 +669,20 @@ hora. É o que mantém o agente sempre atualizado sem ninguém reescrever nada:
 | `{{FICHA_DO_PACIENTE}}` | `montarFicha()` | A cada mensagem, e por pessoa |
 
 A tabela está **na ordem em que aparecem no arquivo**, e essa ordem não é
-estética: os três primeiros são iguais para todo mundo e os dois últimos mudam
+estética: os quatro primeiros são iguais para todo mundo e os dois últimos mudam
 a cada conversa. O cache de prompt reaproveita o **prefixo comum** entre
 chamadas — subir a data ou a ficha joga fora o desconto do texto inteiro, de
 todas as conversas de uma vez. **Não mova as duas últimas seções para cima.**
+
+> **O `{{NOME_AGENTE}}` fica no topo e isso não fere a regra do cache.** Ele
+> muda uma vez por instalação, não a cada conversa — é conteúdo estável, e é aí
+> que ele tem que estar. A regra é sobre dado **volátil**, não sobre marcador.
+
+> ⚠️ **Ele é substituído com `replaceAll`, e os outros com `replace`.** O nome
+> aparece **duas** vezes no prompt: na identidade e no exemplo de apresentação
+> da Etapa 1. Com `replace`, a segunda continuaria sendo o literal
+> `{{NOME_AGENTE}}` — e a agente se apresentaria ao paciente com o marcador na
+> cara.
 
 Efeito prático: **desligar um procedimento na página Procedimentos tira ele da boca da
 Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.

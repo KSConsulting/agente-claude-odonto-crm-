@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { AGENTE_ROTULO } from './agente'
+import { rotuloDoAgente } from './agente'
 import type {
   ConversaResumo, MensagemWhatsapp, TipoMensagem, AutorMensagem,
   LeadClinica, Consulta, Profissional,
@@ -144,7 +144,7 @@ export function previaDaMensagem(tipo: TipoMensagem, conteudo: string | null): s
 
 const AUTORES: Record<AutorMensagem, string> = {
   paciente: 'Paciente',
-  agente: AGENTE_ROTULO,
+  agente: rotuloDoAgente(),
   atendente: 'Atendente da clínica',
 }
 

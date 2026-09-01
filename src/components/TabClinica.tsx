@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Save, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { ConfiguracoesClinica, InformacaoClinica } from '../types'
+import { useAgente } from '../lib/agente'
 
 /**
  * Aba "Clínica" de Configurações: endereço, bairro, cidade, UF, CEP e os links
@@ -68,6 +69,7 @@ const VAZIO: Formulario = {
 }
 
 export default function TabClinica() {
+  const { nome: nomeAgente } = useAgente()
   const [clinica, setClinica] = useState<ConfiguracoesClinica | null>(null)
   const [form, setForm] = useState<Formulario>(VAZIO)
   const [linhas, setLinhas] = useState<string[]>([])
@@ -186,7 +188,7 @@ export default function TabClinica() {
               placeholder="Ex: Sorriso Pleno"
               style={inputStyle} onFocus={foco} onBlur={desfoco} />
             <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 5, lineHeight: 1.5 }}>
-              Aparece na barra lateral do sistema e é como a Letícia se apresenta ao paciente.
+              Aparece na barra lateral do sistema e é como a {nomeAgente} se apresenta ao paciente.
             </div>
           </div>
 

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { formatarParaExibicao } from '../lib/telefones'
 import { urlDaMidia, hora, diaPorExtenso, nomeDoAutor } from '../lib/conversas'
-import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
+import { useAgente } from '../lib/agente'
 import type { ConversaResumo, MensagemWhatsapp, AutorMensagem } from '../types'
 
 /**
@@ -168,6 +168,7 @@ export default function JanelaConversa({
   conversa, mensagens, carregando, enviando, erro, onEnviar, onAssumir, onDevolver,
   painelAberto, onAlternarPainel,
 }: Props) {
+  const { nome: nomeAgente, porExtenso: agentePorExtenso } = useAgente()
   const [texto, setTexto] = useState('')
   const fim = useRef<HTMLDivElement | null>(null)
 
@@ -186,7 +187,7 @@ export default function JanelaConversa({
           Escolha uma conversa
         </div>
         <div style={{ fontSize: 12.5, color: '#6B818C', maxWidth: 320, lineHeight: 1.6 }}>
-          Aqui você lê o que a {AGENTE_POR_EXTENSO} respondeu e, quando precisar, assume a
+          Aqui você lê o que a {agentePorExtenso} respondeu e, quando precisar, assume a
           conversa para falar você mesmo.
         </div>
       </div>
@@ -248,7 +249,7 @@ export default function JanelaConversa({
               cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#16232B',
               fontFamily: FONTE, flexShrink: 0,
             }}>
-            <Undo2 size={13} /> Devolver para a {AGENTE_NOME}
+            <Undo2 size={13} /> Devolver para a {nomeAgente}
           </button>
         ) : (
           <button onClick={onAssumir}
@@ -283,10 +284,10 @@ export default function JanelaConversa({
         {assumida ? <UserCheck size={12} /> : <Bot size={12} />}
         {assumida
           ? <span>
-              <strong>Você está atendendo.</strong> A {AGENTE_NOME} não responde nesta
+              <strong>Você está atendendo.</strong> A {nomeAgente} não responde nesta
               conversa{conversa.assumido_por_nome ? ` — assumida por ${conversa.assumido_por_nome}` : ''}.
             </span>
-          : <span><strong>A {AGENTE_POR_EXTENSO} está atendendo.</strong> Assuma a conversa para responder você mesmo.</span>}
+          : <span><strong>A {agentePorExtenso} está atendendo.</strong> Assuma a conversa para responder você mesmo.</span>}
       </div>
 
       {/* Mensagens */}
@@ -371,7 +372,7 @@ export default function JanelaConversa({
           }}>
             <span style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.55 }}>
               Para escrever para esta pessoa, <strong>assuma a conversa</strong> — assim
-              a {AGENTE_NOME} para de responder e vocês dois não falam ao mesmo tempo.
+              a {nomeAgente} para de responder e vocês dois não falam ao mesmo tempo.
             </span>
             <button onClick={onAssumir}
               style={{

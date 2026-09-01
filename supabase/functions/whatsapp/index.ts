@@ -234,8 +234,8 @@ async function processar(
   if (podeResponder !== true) return
 
   // ---- Pensar ------------------------------------------------------------
-  const cfg = await selecionar<{ modelo: string; prompt: string | null }>(
-    'configuracoes_agente?select=modelo,prompt&limit=1',
+  const cfg = await selecionar<{ modelo: string; prompt: string | null; nome_agente: string }>(
+    'configuracoes_agente?select=modelo,prompt,nome_agente&limit=1',
   )
   const clinica = await selecionar<{ fuso_horario: string | null }>(
     'configuracoes_clinica?select=fuso_horario&limit=1',
@@ -245,7 +245,7 @@ async function processar(
   // A ficha sai do lead RECÉM-LIDO (`atual`), não do que chegou no começo da
   // execução: nos 8 segundos de espera a Letícia pode ter gravado o nome.
   const ficha = await montarFicha(lead.id, atual[0] ?? lead, fuso)
-  const sistema = await montarPrompt(cfg[0]?.prompt, ficha)
+  const sistema = await montarPrompt(cfg[0]?.prompt, ficha, cfg[0]?.nome_agente)
   const mensagens = await montarHistorico(lead.id, imagem)
   const ctx: Contexto = { leadId: lead.id, whatsapp, fuso }
 

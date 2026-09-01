@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, ClipboardList, FileText, DoorOpen, CalendarCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { AGENTE_NOME } from '../lib/agente'
+import { useAgente } from '../lib/agente'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import EditorProcedimento from '../components/EditorProcedimento'
 import PortaDeEntrada from '../components/PortaDeEntrada'
@@ -41,6 +41,7 @@ interface ProcedimentoRowState {
 }
 
 export default function Procedimentos() {
+  const { nome: nomeAgente } = useAgente()
   // A edição abre um editor próprio: a descrição completa não cabe num campo
   // de duas linhas espremido dentro do card.
   const [editando, setEditando] = useState<ServicoClinica | null>(null)
@@ -142,7 +143,7 @@ export default function Procedimentos() {
             O que a clínica oferece.
           </p>
           <p style={{ fontSize: 13, color: '#6B818C', marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
-            Cadastre aqui os procedimentos oferecidos pela clínica. A {AGENTE_NOME} usa
+            Cadastre aqui os procedimentos oferecidos pela clínica. A {nomeAgente} usa
             essas informações para entender o que cada paciente procura e responder
             corretamente. Você pode ativar ou desativar um procedimento a qualquer momento.
           </p>
@@ -170,7 +171,7 @@ export default function Procedimentos() {
                 onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
               <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6, lineHeight: 1.55 }}>
                 Esta é a descrição curta, a do catálogo. O texto detalhado —
-                o que a {AGENTE_NOME} conta quando o paciente pergunta — se escreve
+                o que a {nomeAgente} conta quando o paciente pergunta — se escreve
                 depois, em Editar.
               </div>
             </div>
@@ -195,8 +196,8 @@ export default function Procedimentos() {
       {items.length > 0 && (
         <div className="fade-in-2" style={{ fontSize: 12.5, color: '#6B818C', marginBottom: 12 }}>
           {ativos === items.length
-            ? <>Todos os {items.length} estão ativos e no catálogo da {AGENTE_NOME}.</>
-            : <><strong style={{ color: '#16232B', fontWeight: 700 }}>{ativos}</strong> {ativos === 1 ? 'ativo' : 'ativos'} no catálogo da {AGENTE_NOME}, {items.length - ativos} {items.length - ativos === 1 ? 'desligado' : 'desligados'}.</>}
+            ? <>Todos os {items.length} estão ativos e no catálogo da {nomeAgente}.</>
+            : <><strong style={{ color: '#16232B', fontWeight: 700 }}>{ativos}</strong> {ativos === 1 ? 'ativo' : 'ativos'} no catálogo da {nomeAgente}, {items.length - ativos} {items.length - ativos === 1 ? 'desligado' : 'desligados'}.</>}
         </div>
       )}
 
@@ -223,7 +224,7 @@ export default function Procedimentos() {
             <ClipboardList size={34} strokeWidth={1.2} color="#B9C8CE" style={{ marginBottom: 10 }} />
             <div style={{ fontSize: 14, fontWeight: 600, color: '#16232B' }}>Nenhum procedimento cadastrado</div>
             <div style={{ fontSize: 13, color: '#6B818C', marginTop: 6, lineHeight: 1.6, maxWidth: 400, marginInline: 'auto' }}>
-              Sem catálogo, a {AGENTE_NOME} não tem como reconhecer o que o paciente
+              Sem catálogo, a {nomeAgente} não tem como reconhecer o que o paciente
               está pedindo — nem como falar do que a clínica faz.
             </div>
             <button onClick={() => setShowNew(true)}
@@ -284,8 +285,8 @@ export default function Procedimentos() {
 
                     <div
                       title={temDetalhe
-                        ? `A ${AGENTE_NOME} busca este texto quando o paciente quer saber mais.`
-                        : `Sem texto detalhado: se perguntarem, a ${AGENTE_NOME} responde com a descrição acima.`}
+                        ? `A ${nomeAgente} busca este texto quando o paciente quer saber mais.`
+                        : `Sem texto detalhado: se perguntarem, a ${nomeAgente} responde com a descrição acima.`}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 'auto', paddingTop: 4, fontSize: 11.5, fontWeight: 600, color: temDetalhe ? '#1E6E8C' : '#9AAEB6' }}
                     >
                       <FileText size={12} />
@@ -297,7 +298,7 @@ export default function Procedimentos() {
                   <div style={{ borderTop: '1px solid #EDF2F4', padding: '10px 14px 10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
 
                     <button onClick={() => handleToggleAtivo(item)}
-                      title={p.ativo ? 'Desativar — sai do catálogo da Letícia' : 'Ativar — volta para o catálogo da Letícia'}
+                      title={p.ativo ? `Desativar — sai do catálogo da ${nomeAgente}` : `Ativar — volta para o catálogo da ${nomeAgente}`}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONTE, minWidth: 0 }}>
                       <span style={{ width: 34, height: 19, borderRadius: 10, background: p.ativo ? '#1E6E8C' : '#DCE6EA', position: 'relative', transition: 'background 0.2s', flexShrink: 0, display: 'block' }}>
                         <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: p.ativo ? 18 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', display: 'block' }} />

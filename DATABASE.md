@@ -87,6 +87,10 @@ ordem**:
     `consultas`, a função `reais()`, a view de procedimentos com fluxo e valor,
     e `agenda_marcar` recusando o que passa antes pela avaliação. Ver a
     [seção 4.6](#46-servicos_clinica).
+19. `supabase/migrations/0019_nome_do_agente.sql` — `nome_agente` em
+    `configuracoes_agente`: o nome do Agente de IA vira **dado**, lido pelas
+    telas e pelo marcador `{{NOME_AGENTE}}` do prompt. Uma fonte, dois
+    leitores.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -1129,6 +1133,24 @@ da chave.
 > único sintoma foi silêncio no WhatsApp. Saber qual provedor está ativo é o que
 > diz em qual painel ir olhar — "WhatsApp desconectado", sozinho, não responde
 > essa pergunta.
+
+#### `nome_agente` (migração `0019`)
+
+Como o Agente de IA se chama. Antes vivia em **dois sistemas que não se
+falavam** — `src/lib/agente.ts` (as telas) e `agente-ia/prompt.md` (a conversa)
+—, e renomear exigia editar os dois torcendo para nenhum ficar para trás.
+
+Agora é uma coluna, e os dois leem dela: as telas pelo `useAgente()`, o prompt
+pelo marcador `{{NOME_AGENTE}}`.
+
+> ⚠️ **É o NOME, não o cargo.** "Secretária IA" (o crachá) e "Secretária de IA"
+> (o nome da página) continuam constantes no código: trocar "Letícia" por
+> "Sofia" não deve renomear a tela.
+
+`not null` com padrão `'Letícia'` e `CHECK` de 1 a 40 caracteres depois do
+`trim`. Vazio não é um estado que valha a pena existir — a agente se apresenta
+em toda primeira mensagem, e nulo obrigaria todo leitor a ter um fallback
+próprio, até um deles esquecer e ela se apresentar como "undefined".
 
 Regra do projeto: mudou o `CHECK`, mude `src/types/index.ts` no mesmo commit.
 

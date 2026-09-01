@@ -91,7 +91,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **dezoito arquivos, nesta ordem**:
+A migração é aplicada em **dezenove arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -110,7 +110,9 @@ trigger que promove o lead a Paciente) e `0016_ultima_consulta.sql` (a coluna
 calculada `ultima_consulta`, que a tela Pacientes mostra) e
 `0017_provedor_whatsapp.sql` (qual ponte com o WhatsApp está ativa) e
 `0018_avaliacao_e_precos.sql` (a avaliação como porta de entrada, o preço
-que pode ser dito, e o que o paciente procura gravado na consulta).
+que pode ser dito, e o que o paciente procura gravado na consulta) e
+`0019_nome_do_agente.sql` (o nome do agente vira dado, lido pelas telas e pelo
+prompt).
 
 Os pontos que mais causam erro:
 
@@ -458,17 +460,40 @@ IA, `UserCheck` para a pessoa) e aparece sempre que o autor muda.
 
 ### O Agente de IA tem dois nomes, e isso é proposital
 
-| Onde | Como aparece | Definido em |
-|---|---|---|
-| Nas telas da equipe | **Secretária IA · Letícia** | [`src/lib/agente.ts`](src/lib/agente.ts) |
-| Na conversa com o paciente | **Letícia**, e só | [`agente-ia/prompt.md`](agente-ia/prompt.md) |
+| Onde | Como aparece |
+|---|---|
+| Nas telas da equipe | **Secretária IA · Letícia** — o crachá antes do nome |
+| Na conversa com o paciente | **Letícia**, e só |
 
 A equipe precisa saber de relance que quem respondeu foi a IA, e não uma colega.
 O paciente, não: o prompt proíbe — em regra inegociável — que ela diga ser
 assistente virtual, inteligência artificial, bot, robô ou sistema.
 
-**São dois públicos e dois contratos.** Mexer em `agente.ts` muda a tela; mudar
-como ela se apresenta no WhatsApp é mexer no prompt. Um não é o outro.
+**São dois públicos e dois contratos.** Mas são o mesmo **nome**.
+
+### O nome é dado; o cargo é código
+
+Até a migração `0019` os dois lados guardavam o nome separado —
+`src/lib/agente.ts` e `agente-ia/prompt.md` —, e renomear exigia editar dois
+sistemas que não se falavam, torcendo para nenhum ficar para trás.
+
+Agora:
+
+| O quê | Onde mora | Por quê |
+|---|---|---|
+| **O nome** (`Letícia`) | `configuracoes_agente.nome_agente` | Cada clínica escolhe o seu. Em código, seria um deploy por clínica |
+| **O cargo** (`Secretária IA`) | [`src/lib/agente.ts`](src/lib/agente.ts) | É o que ela faz, não como se chama |
+| **O nome da página** (`Secretária de IA`) | idem | Trocar "Letícia" por "Sofia" não deve renomear a tela |
+
+As telas leem pelo `useAgente()` — um `useSyncExternalStore` alimentado uma vez
+por sessão pelo [`Layout.tsx`](src/components/Layout.tsx), que é o único
+componente por onde toda tela autenticada passa. O prompt lê pelo marcador
+`{{NOME_AGENTE}}`.
+
+> ⚠️ **Frase nova que fale dela usa `useAgente()`, nunca a palavra.** Treze
+> frases da interface tinham "Letícia" digitado à mão, e elas continuariam
+> falando de uma pessoa que não existe mais no dia em que a clínica renomeasse.
+> Meia renomeação é pior que nenhuma.
 
 ### Lista ou card, e o que decide
 

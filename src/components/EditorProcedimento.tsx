@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { X, Save, Check, Stethoscope, DoorOpen } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { lerPreco, precoParaCampo } from '../lib/procedimentos'
+import { useAgente } from '../lib/agente'
 import type { ServicoClinica } from '../types'
 import ModalPortal from './ModalPortal'
 
@@ -60,6 +61,7 @@ interface Props {
 }
 
 export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: Props) {
+  const { nome: nomeAgente } = useAgente()
   const [nome, setNome] = useState(procedimento.nome)
   const [curta, setCurta] = useState(procedimento.descricao ?? '')
   const [longa, setLonga] = useState(procedimento.descricao_longa ?? '')
@@ -135,7 +137,7 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#16232B' }}>Editar procedimento</div>
                 <div style={{ fontSize: 12, color: '#6B818C' }}>
-                  O que você salvar vale para a Letícia na conversa seguinte.
+                  O que você salvar vale para a {nomeAgente} na conversa seguinte.
                 </div>
               </div>
             </div>
@@ -153,7 +155,7 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
               <input value={nome} onChange={(e) => setNome(e.target.value)}
                 style={campo} onFocus={foco} onBlur={desfoco} />
               <div style={ajuda}>
-                É o nome que a Letícia usa ao falar com o paciente. Nada de marca
+                É o nome que a {nomeAgente} usa ao falar com o paciente. Nada de marca
                 registrada — prefira a descrição genérica.
               </div>
             </div>
@@ -177,7 +179,7 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: '#1E6E8C', lineHeight: 1.6 }}>
                   <DoorOpen size={15} style={{ flexShrink: 0, marginTop: 2 }} />
                   <span>
-                    Este é a <strong>porta de entrada</strong> da clínica. É o que a Letícia
+                    Este é a <strong>porta de entrada</strong> da clínica. É o que a {nomeAgente}
                     marca no lugar de todo procedimento que exige avaliação — e por isso
                     ele mesmo não passa por uma.
                   </span>
@@ -205,8 +207,8 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
                     </span>
                     <span style={{ fontSize: 11.5, color: '#6B818C', lineHeight: 1.55, display: 'block', marginTop: 2 }}>
                       {exige
-                        ? 'A Letícia marca a avaliação e registra este procedimento como o que o paciente procura. Ela nunca agenda este nome direto.'
-                        : 'A Letícia agenda este procedimento direto, sem passar pelo dentista antes.'}
+                        ? `A ${nomeAgente} marca a avaliação e registra este procedimento como o que o paciente procura. Ela nunca agenda este nome direto.`
+                        : `A ${nomeAgente} agenda este procedimento direto, sem passar pelo dentista antes.`}
                     </span>
                   </span>
                 </button>
@@ -274,7 +276,7 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
                 marginTop: 6, alignItems: 'flex-start',
               }}>
                 <div style={{ ...ajuda, marginTop: 0, flex: 1 }}>
-                  Esta frase vai junto de <strong>toda mensagem</strong> que a Letícia
+                  Esta frase vai junto de <strong>toda mensagem</strong> que a {nomeAgente}
                   responde, ao lado dos outros procedimentos. Mantenha curta.
                 </div>
                 <span style={{
@@ -311,7 +313,7 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
                 marginTop: 6, alignItems: 'flex-start',
               }}>
                 <div style={{ ...ajuda, marginTop: 0, flex: 1 }}>
-                  A Letícia busca este texto <strong>só quando o paciente quer saber mais</strong>.
+                  A {nomeAgente} busca este texto <strong>só quando o paciente quer saber mais</strong>.
                   Sugestões do que incluir: {SUGESTAO.toLowerCase()}
                   <br />
                   <strong>Sem preço</strong>, e sem nada que substitua a avaliação do dentista.
@@ -330,7 +332,7 @@ export default function EditorProcedimento({ procedimento, onSalvo, onFechar }: 
                   border: '1px solid #FDE68A', borderRadius: 9, fontSize: 12,
                   color: '#92400E', lineHeight: 1.55,
                 }}>
-                  Texto longo. A Letícia responde em até 50 palavras, então daqui
+                  Texto longo. A {nomeAgente} responde em até 50 palavras, então daqui
                   para cima ela para de escolher o que dizer e passa a resumir por
                   conta própria. Os procedimentos da clínica têm cerca de 430
                   caracteres.

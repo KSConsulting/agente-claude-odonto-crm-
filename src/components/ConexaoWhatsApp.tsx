@@ -4,7 +4,7 @@ import CampoTelefone from './CampoTelefone'
 import ConfirmDeleteModal from './ConfirmDeleteModal'
 import { conectar, desconectar, nomeDoProvedor, type Conexao } from '../lib/whatsappConexao'
 import { formatarParaExibicao } from '../lib/telefones'
-import { AGENTE_NOME } from '../lib/agente'
+import { useAgente } from '../lib/agente'
 
 /**
  * A seção "Conexão do WhatsApp", na página Secretária de IA.
@@ -62,6 +62,7 @@ interface Props {
 }
 
 export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTrocarProvedor }: Props) {
+  const { nome: nomeAgente } = useAgente()
   const [numero, setNumero] = useState('')
   const [valido, setValido] = useState(false)
   const [pareando, setPareando] = useState(false)
@@ -139,7 +140,7 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
 
       <div style={{ fontSize: 15, fontWeight: 700, color: '#16232B' }}>Conexão do WhatsApp</div>
       <p style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.6, margin: '4px 0 16px' }}>
-        A ponte entre o WhatsApp da clínica e o sistema. Sem ela, nada chega na {AGENTE_NOME} —
+        A ponte entre o WhatsApp da clínica e o sistema. Sem ela, nada chega na {nomeAgente} —
         nem para ela responder, nem para a equipe ver.
       </p>
 
@@ -245,7 +246,7 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
                 ? <>A {nomeDoProvedor(provedor)} está avisando <strong>outro endereço</strong>, e não este sistema.</>
                 : <>A {nomeDoProvedor(provedor)} <strong>não está configurada para avisar</strong> este sistema quando chega mensagem.</>}
               {' '}Mensagem que o paciente mandar fica no WhatsApp e não aparece em
-              Conversas — a {AGENTE_NOME} nem fica sabendo. Resolve no painel da{' '}
+              Conversas — a {nomeAgente} nem fica sabendo. Resolve no painel da{' '}
               {nomeDoProvedor(provedor)}, apontando o webhook para cá.
             </div>
           </div>
@@ -360,7 +361,7 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
           itemName="a conexão do WhatsApp"
           title="Desconectar o WhatsApp?"
           message={
-            <>A {AGENTE_NOME} para de receber e de responder <strong>na hora</strong>, e a equipe
+            <>A {nomeAgente} para de receber e de responder <strong>na hora</strong>, e a equipe
             deixa de ver mensagens novas. Para voltar, é preciso parear o celular de novo.</>
           }
           confirmLabel="Desconectar"

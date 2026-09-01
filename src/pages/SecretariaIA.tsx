@@ -5,7 +5,7 @@ import {
 import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
 import { formatarParaExibicao } from '../lib/telefones'
-import { AGENTE_NOME, AGENTE_POR_EXTENSO } from '../lib/agente'
+import { useAgente, definirNomeDoAgente } from '../lib/agente'
 import ConexaoWhatsApp from '../components/ConexaoWhatsApp'
 import ApagarPessoa from '../components/ApagarPessoa'
 import { useConexao, conexaoDePe } from '../lib/whatsappConexao'
@@ -80,6 +80,7 @@ function Erro({ texto }: { texto: string }) {
 }
 
 export default function SecretariaIA() {
+  const { nome: nomeAgente, porExtenso: agentePorExtenso } = useAgente()
   const [cfg, setCfg] = useState<ConfiguracoesAgente | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -91,6 +92,8 @@ export default function SecretariaIA() {
   const [modoTeste, setModoTeste] = useState(true)
   const [numeros, setNumeros] = useState<string[]>([])
   const [prompt, setPrompt] = useState<string | null>(null)
+  const [nomeEditado, setNomeEditado] = useState('')
+  const [salvandoNome, setSalvandoNome] = useState(false)
 
   const { conexao, recarregar: recarregarConexao } = useConexao()
 
@@ -108,6 +111,7 @@ export default function SecretariaIA() {
           setModoTeste(c.modo_teste)
           setNumeros(c.numeros_teste ?? [])
           setPrompt(c.prompt)
+          setNomeEditado(c.nome_agente)
         }
         setCarregando(false)
       })
@@ -134,6 +138,30 @@ export default function SecretariaIA() {
     if (error) { setErro('Não consegui trocar o provedor.'); return }
     setCfg({ ...cfg, provedor_whatsapp: novo as ConfiguracoesAgente['provedor_whatsapp'] })
     recarregarConexao()
+  }
+
+  /**
+   * Grava o nome na hora, fora do "Salvar" geral.
+   *
+   * É a mesma escolha do liga/desliga e do seletor de provedor: coisas que
+   * mudam a identidade do agente não são rascunho no meio de um formulário.
+   * E o atrito aqui é o aviso que aparece antes — não um campo travado.
+   */
+  async function salvarNome() {
+    if (!cfg) return
+    const limpo = nomeEditado.trim()
+    if (!limpo || limpo === cfg.nome_agente) return
+    setSalvandoNome(true)
+    setErro('')
+    const { error } = await supabase.from('configuracoes_agente')
+      .update({ nome_agente: limpo }).eq('id', cfg.id)
+    setSalvandoNome(false)
+    if (error) { setErro('Não consegui salvar o nome. Tente de novo.'); return }
+    setCfg({ ...cfg, nome_agente: limpo })
+    // A tela inteira acompanha na hora: o `useAgente()` de todo componente
+    // reage a esta chamada. Sem ela, metade da interface ficaria com o nome
+    // velho até alguém recarregar a página.
+    definirNomeDoAgente(limpo)
   }
 
   async function salvar() {
@@ -214,14 +242,14 @@ export default function SecretariaIA() {
     if (!ativo) {
       return {
         cor: '#6B818C', fundo: '#F2F6F7', borda: '#DCE6EA',
-        titulo: `A ${AGENTE_POR_EXTENSO} está desligada`,
+        titulo: `A ${agentePorExtenso} está desligada`,
         detalhe: 'As mensagens continuam sendo registradas, mas ninguém recebe resposta.',
       }
     }
     if (!conexao || conexao.estado === 'verificando') {
       return {
         cor: '#6B818C', fundo: '#F2F6F7', borda: '#DCE6EA',
-        titulo: `A ${AGENTE_POR_EXTENSO} está ligada`,
+        titulo: `A ${agentePorExtenso} está ligada`,
         detalhe: 'Verificando a conexão com o WhatsApp...',
       }
     }
@@ -234,7 +262,7 @@ export default function SecretariaIA() {
     }
     return {
       cor: '#1A7A48', fundo: '#E8F8EF', borda: '#A7D8C0',
-      titulo: `A ${AGENTE_POR_EXTENSO} está atendendo`,
+      titulo: `A ${agentePorExtenso} está atendendo`,
       detalhe: modoTeste
         ? `Respondendo só aos ${numeros.length} número(s) de teste.`
         : 'Respondendo a qualquer número que mandar mensagem.',
@@ -285,6 +313,56 @@ export default function SecretariaIA() {
         <Erro texto={erro} />
       </div>
 
+      {/* ---------------- O nome dela ----------------
+
+          Fica no topo porque é a identidade: tudo abaixo é como ela se
+          comporta. E é editável de propósito — campo que mostra e não deixa
+          mexer é porta com placa dizendo "use a outra porta". */}
+      <div style={cartao}>
+        <div style={titulo}>Nome</div>
+        <p style={legenda}>
+          Como ela se chama nas telas da equipe <strong>e</strong> na conversa com o
+          paciente. Antes isso morava em dois lugares que não se falavam; agora é um
+          campo só, e o prompt lê daqui.
+        </p>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <input
+            value={nomeEditado}
+            onChange={(e) => setNomeEditado(e.target.value)}
+            maxLength={40}
+            placeholder="Letícia"
+            style={{
+              padding: '9px 12px', borderRadius: 9, border: '1px solid #DCE6EA',
+              fontSize: 13.5, fontFamily: FONTE, color: '#16232B',
+              background: '#fff', outline: 'none', minWidth: 220,
+            }}
+          />
+          {nomeEditado.trim() && nomeEditado.trim() !== cfg.nome_agente && (
+            <button
+              onClick={() => { void salvarNome() }}
+              disabled={salvandoNome}
+              style={{ ...botao('#1E6E8C'), cursor: salvandoNome ? 'wait' : 'pointer' }}>
+              <Save size={14} /> {salvandoNome ? 'Salvando...' : 'Salvar nome'}
+            </button>
+          )}
+        </div>
+
+        {/* O atrito. Trocar o nome no meio da operação confunde quem fala com
+            ela há meses — mas a decisão é da clínica, e o aviso basta. */}
+        {nomeEditado.trim() && nomeEditado.trim() !== cfg.nome_agente && (
+          <div style={{
+            marginTop: 12, background: '#FFFBEB', border: '1px solid #FDE68A',
+            borderRadius: 10, padding: '10px 13px',
+            fontSize: 12.5, color: '#B45309', lineHeight: 1.6,
+          }}>
+            Os pacientes conhecem ela como <strong>{cfg.nome_agente}</strong>. A partir
+            do próximo salvamento ela se apresenta como <strong>{nomeEditado.trim()}</strong>,
+            inclusive para quem está no meio de uma conversa.
+          </div>
+        )}
+      </div>
+
       {/* ---------------- Conexão do WhatsApp ---------------- */}
       {/* Fica logo depois do card de estado de propósito: quando o card avisa
           que o WhatsApp caiu, o conserto está na linha de baixo. */}
@@ -299,7 +377,7 @@ export default function SecretariaIA() {
       <div style={cartao}>
         <div style={titulo}>Modo teste</div>
         <p style={legenda}>
-          Com o modo teste ligado, a {AGENTE_NOME} só responde aos números desta lista. As
+          Com o modo teste ligado, a {nomeAgente} só responde aos números desta lista. As
           mensagens de qualquer outra pessoa continuam aparecendo no sistema, mas ficam
           sem resposta — para a equipe atender à mão.
         </p>
@@ -393,7 +471,7 @@ export default function SecretariaIA() {
         {MODELOS.find((m) => m.valor === modelo)?.anthropic && (
           <Aviso>
             Os modelos Claude exigem a <code style={{ fontFamily: MONO }}>ANTHROPIC_API_KEY</code>{' '}
-            configurada nos secrets do Supabase. Sem ela, a Letícia para de responder — e
+            configurada nos secrets do Supabase. Sem ela, a {nomeAgente} para de responder — e
             o erro só aparece no log da função.
           </Aviso>
         )}
@@ -403,7 +481,7 @@ export default function SecretariaIA() {
       <div style={cartao}>
         <div style={titulo}>Prompt</div>
         <p style={legenda}>
-          Quem a Letícia é: tom de voz, fluxo de atendimento e regras. O prompt oficial
+          Quem a {nomeAgente} é: tom de voz, fluxo de atendimento e regras. O prompt oficial
           vive no arquivo <code style={{ fontFamily: MONO }}>agente-ia/prompt.md</code>,
           versionado no Git. Editar aqui cria uma versão personalizada, que passa a valer
           no lugar dele.
