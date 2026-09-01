@@ -68,7 +68,7 @@ está no ar:
 |---|---|
 | [`prompt.md`](prompt.md) | O prompt **oficial**. Versionado no Git, com histórico de cada mudança |
 | Banco de dados | O que está **rodando agora** |
-| Aba de Configurações | Mostra qual dos dois está ativo, permite ajuste rápido, e traz o botão **"voltar ao prompt oficial"** |
+| Página **Secretária de IA** (menu do usuário) | Mostra qual dos dois está ativo, permite ajuste rápido, e traz o botão **"voltar ao prompt oficial"** |
 
 Ajuste de 30 segundos se resolve pela tela. Mudança séria se faz no arquivo,
 com revisão e histórico.
@@ -248,10 +248,11 @@ Três decisões que ficaram de pé:
     da função porque a chave da Evolution é de servidor: no navegador, ela iria
     para o bundle, e quem tem essa chave manda mensagem por aquele WhatsApp.
 
-### Etapa 5 — Aba "Agente de IA"
+### Etapa 5 — Tela "Secretária de IA"
 
-Dentro de Configurações: escolher o modelo, editar o prompt, ligar e desligar o
-agente — sem republicar nada.
+No menu do usuário, e não em Configurações: escolher o modelo, editar o prompt,
+ligar e desligar o agente — sem republicar nada. Depois ela ganhou também a
+seção da conexão com o WhatsApp e a zona de perigo (seção 8.5).
 
 ### Etapa 6 — Documentação e verificação
 
@@ -271,6 +272,7 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `supabase/functions/_shared/llm.ts` | 3 | Fala com Claude e GPT pela mesma porta — é o que permite trocar de modelo |
 | `supabase/functions/_shared/evolution.ts` | 3 | Envia mensagem, "digitando…", baixa áudio e foto. E o estado da conexão: consultar, parear, desconectar |
 | `supabase/functions/_shared/prompt.ts` | 3 | Monta o prompt: identidade + dados da clínica + data de hoje + histórico |
+| `supabase/functions/_shared/tempo.ts` | 3 | Texto de data vira instante no fuso da clínica. Cópia deliberada da API — ver seção 7 |
 | `src/pages/Conversas.tsx` | 4 | A página, em duas colunas |
 | `supabase/migrations/0013_conversas_lista.sql` | 4 | A view `conversas_lista`: última mensagem, não lidas e quem assumiu |
 | `src/components/ListaConversas.tsx` | 4 | Coluna esquerda: busca, prévia, não lidas, quem assumiu |
@@ -304,7 +306,7 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `src/App.tsx` | 4 | A rota `/conversas` |
 | `src/components/Sidebar.tsx` | 4 | Item novo na navegação |
 | `src/types/index.ts` | 2 | Tipos das mensagens e da configuração do agente |
-| `src/pages/Configuracoes.tsx` | 5 | Registrar a aba nova e abrir o editor de procedimento |
+| `src/pages/Procedimentos.tsx` | 5 | Abre o editor de procedimento — o catálogo saiu de Configurações e virou página |
 | `src/components/ConfirmDeleteModal.tsx` | 5 | Passou a nascer dentro do `ModalPortal` |
 | `src/pages/LeadDetail.tsx` | 4 | Botão "ver conversa" na ficha |
 | `DATABASE.md` | 6 | Tabela nova, políticas e Storage |

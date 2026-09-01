@@ -486,6 +486,7 @@ cards — não como aba, e não em Configurações.
 | **Seção, não aba** | A página inteira é um assunto só: a secretária. Aba separa **temas diferentes** (é o caso de Configurações: Perfil, Clínica, Horários). Aba aqui esconderia o estado da conexão, que é justamente o que precisa ser visto sem clicar |
 | **Nome: "Conexão do WhatsApp"** | É o que a coisa é para quem usa. "Evolution API" é nome de fornecedor, e o rótulo teria que mudar junto com ele |
 | **Mas o provedor aparece dentro** | Quando cai, é ele que diz **em qual painel ir olhar**. "WhatsApp desconectado", sozinho, não responde isso |
+| **Servidor, instância e 4 dígitos da chave, dentro dela** | São as perguntas de quando quebra: em qual painel entrar, qual instância é a nossa, e se a chave é a que se pensa que é. Quatro caracteres de trinta e cinco **identificam** sem servir para usar — padrão de cartão e de Stripe |
 | **Nesta página, não em Configurações** | A conexão é o telefone da secretária. Separar as duas coisas seria esconder de quem cuida dela |
 
 **`desconectado` e `indisponivel` são estados diferentes, e a diferença é a
