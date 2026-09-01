@@ -695,6 +695,15 @@ mortas: as colunas `*_chatwoot` de `crm_clinica_dados` e a tabela
 
 Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.
 
+> ⚠️ **O lead nasce sem nome, e o `pushName` não entra.** A Evolution manda o
+> nome do perfil do WhatsApp em todo webhook; ele é **ignorado de propósito**. O
+> perfil é o apelido que a pessoa escolheu, não quem vai sentar na cadeira — o
+> telefone do marido, "Casa da Sogra", o número dividido entre duas pessoas. E o
+> estrago não era só o nome errado no CRM: com a ficha já preenchida, a Letícia
+> lia "já sei o nome" e **nunca perguntava**, então ninguém corrigia. O nome vem
+> da conversa, por `atualizar_ficha`, e de mais lugar nenhum. Até ela perguntar,
+> as telas mostram o número formatado.
+
 O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
 horário comercial, distribuição por dia da semana e taxa de conversão do funil.
 

@@ -146,7 +146,7 @@ async function rotaWebhook(req: Request): Promise<Response> {
   if (!whatsapp) return json({ ok: true, ignorado: 'sem_numero' })
 
   const conteudo = leConteudo(dados)
-  const lead = await acharOuCriarLead(whatsapp, dados?.pushName)
+  const lead = await acharOuCriarLead(whatsapp)
 
   const criadas = await inserir<{ id: string }>('mensagens_whatsapp', {
     lead_id: lead.id,
@@ -563,7 +563,23 @@ async function criadaEm(mensagemId: string): Promise<string> {
   return linhas[0]?.criada_em ?? new Date(0).toISOString()
 }
 
-async function acharOuCriarLead(whatsapp: string, nome?: string): Promise<Lead> {
+/**
+ * O lead nasce SEM NOME, sempre.
+ *
+ * A Evolution manda o `pushName` — o nome do perfil do WhatsApp — em todo
+ * webhook, e é tentador aproveitar. **Não aproveite.** O perfil é o apelido que
+ * a pessoa escolheu, não quem vai sentar na cadeira: o telefone é do marido e
+ * quem se consulta é a esposa, o perfil é "Casa da Sogra", duas pessoas dividem
+ * o mesmo número.
+ *
+ * E o estrago não era só o nome errado no CRM: a ficha chegava preenchida, a
+ * Letícia lia "já sei o nome" e **nunca perguntava** — então o palpite nunca
+ * era corrigido por ninguém.
+ *
+ * O nome vem da conversa, pela ferramenta `atualizar_ficha`. Só de lá. Até ela
+ * perguntar, as telas mostram o número formatado, que é verdade.
+ */
+async function acharOuCriarLead(whatsapp: string): Promise<Lead> {
   const achados = await selecionar<Lead>(
     `crm_clinica?select=${CAMPOS_LEAD}&whatsapp_lead=eq.${whatsapp}&limit=1`,
   )
@@ -571,7 +587,7 @@ async function acharOuCriarLead(whatsapp: string, nome?: string): Promise<Lead> 
 
   const criados = await inserir<Lead>('crm_clinica', {
     whatsapp_lead: whatsapp,
-    nome_lead: nome?.trim() || null,
+    nome_lead: null,
     status: 'iniciou_conversa',
   }, true)
   if (criados.length) return criados[0]

@@ -171,6 +171,29 @@ vez, ao tudo junto — como uma pessoa faria.
 É o mesmo efeito que um Redis daria, resolvido dentro da própria função. Redis
 entra depois, se o volume justificar.
 
+### O lead nasce sem nome — e o `pushName` não entra
+
+A Evolution manda o **nome do perfil do WhatsApp** (`pushName`) em todo webhook.
+Ele é ignorado. O nome do paciente vem **da conversa**, gravado pela ferramenta
+`atualizar_ficha`, e de mais lugar nenhum.
+
+Aproveitar o `pushName` parece de graça e não é. O perfil é o apelido que a
+pessoa escolheu, não quem vai sentar na cadeira:
+
+- o telefone é do marido, e quem se consulta é a esposa
+- o perfil é "Casa da Sogra 🏠", "Jô 💅" ou o nome da empresa
+- duas pessoas dividem o mesmo número
+
+> **E o pior nem era o nome errado no CRM.** A ficha chegava preenchida, então a
+> Letícia lia "já sei o nome" — [`prompt.md`](prompt.md), Etapa 1 — e **nunca
+> perguntava**. O palpite entrava calado e ninguém tinha chance de corrigir.
+> Descoberto num teste de 01/09, em que o nome dito na conversa foi ignorado em
+> favor do nome do perfil.
+
+Enquanto ela não pergunta, o campo fica vazio — e as telas mostram o **número
+formatado** no lugar do nome, que é a verdade. Nenhuma delas quebra com nome
+nulo: `ListaConversas`, `JanelaConversa` e `PainelLead` já caem no número.
+
 ---
 
 ## 3. Decisões tomadas
