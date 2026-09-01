@@ -28,7 +28,7 @@ import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
 import {
   digitando, enviarTexto, baixarMidia, numeroDoJid, fotoDoPerfil,
-  estadoDaConexao, iniciarConexao, desconectar,
+  estadoDaConexao, iniciarConexao, desconectar, identificacao,
 } from '../_shared/evolution.ts'
 
 const SEGREDO = Deno.env.get('WEBHOOK_SEGREDO') ?? ''
@@ -390,9 +390,12 @@ async function rotaConexao(req: Request): Promise<Response> {
     return json({
       ok: true, provedor, estado: 'nao_implementado',
       numero: null, perfil: null, foto: null,
+      servidor: null, instancia: null, chaveFinal: null,
     })
   }
-  return json({ ok: true, provedor, ...(await estadoDaConexao()) })
+  // A identificação vem das secrets da função, nunca do banco — e por isso só
+  // sai por aqui, atrás da sessão. Ver `identificacao()` em evolution.ts.
+  return json({ ok: true, provedor, ...identificacao(), ...(await estadoDaConexao()) })
 }
 
 async function rotaConectar(req: Request): Promise<Response> {

@@ -225,3 +225,31 @@ export async function iniciarConexao(
 export async function desconectar(): Promise<boolean> {
   return await buscar<unknown>(`instance/logout/${INSTANCIA}`, 'DELETE') !== null
 }
+
+/**
+ * Como esta ponte está configurada — para a tela mostrar.
+ *
+ * Responde três perguntas que só aparecem quando algo quebra: **em qual painel
+ * entrar** (servidor), **qual das instâncias é a nossa** (instância) e **se a
+ * chave configurada é a que se pensa que é** (os quatro últimos caracteres).
+ *
+ * ⚠️ QUATRO CARACTERES, E NUNCA MAIS. É o padrão de cartão, AWS e Stripe, e
+ * pela mesma razão: quatro de trinta e poucos servem para **identificar**, não
+ * para usar. A chave inteira nunca sai daqui — quem a tem manda mensagem pelo
+ * WhatsApp da clínica.
+ *
+ * O endereço, ao contrário, não é segredo: o que protege a API é a chave, não o
+ * host ser desconhecido. Vai inteiro, porque um pedaço cortado não serviria
+ * para copiar no navegador.
+ */
+export function identificacao(): {
+  servidor: string | null
+  instancia: string | null
+  chaveFinal: string | null
+} {
+  return {
+    servidor: URL_BASE ? URL_BASE.replace(/^https?:\/\//i, '') : null,
+    instancia: INSTANCIA || null,
+    chaveFinal: CHAVE.length >= 4 ? CHAVE.slice(-4) : null,
+  }
+}

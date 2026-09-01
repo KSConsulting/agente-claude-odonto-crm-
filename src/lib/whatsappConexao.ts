@@ -50,6 +50,15 @@ export interface Conexao {
   numero: string | null
   perfil: string | null
   foto: string | null
+
+  // Como a ponte está configurada. Vem das secrets da Edge Function, nunca do
+  // banco — três respostas que só interessam quando algo quebra.
+  /** Host da API, sem protocolo. Não é segredo: quem protege é a chave. */
+  servidor: string | null
+  /** Qual das instâncias do servidor é a nossa. */
+  instancia: string | null
+  /** Os QUATRO últimos caracteres da chave. Serve para identificar, não para usar. */
+  chaveFinal: string | null
 }
 
 /**
@@ -90,8 +99,10 @@ async function comSessao(caminho: string, init?: RequestInit): Promise<Response>
 
 /** Estado atual. Nunca lança: falha de rede também é uma resposta ('indisponivel'). */
 export async function lerConexao(): Promise<Conexao> {
-  const cair = (estado: EstadoConexao): Conexao =>
-    ({ provedor: 'evolution', estado, numero: null, perfil: null, foto: null })
+  const cair = (estado: EstadoConexao): Conexao => ({
+    provedor: 'evolution', estado, numero: null, perfil: null, foto: null,
+    servidor: null, instancia: null, chaveFinal: null,
+  })
 
   try {
     const r = await comSessao('/conexao')
@@ -103,6 +114,9 @@ export async function lerConexao(): Promise<Conexao> {
       numero: d.numero ?? null,
       perfil: d.perfil ?? null,
       foto: d.foto ?? null,
+      servidor: d.servidor ?? null,
+      instancia: d.instancia ?? null,
+      chaveFinal: d.chaveFinal ?? null,
     }
   } catch {
     return cair('indisponivel')

@@ -152,9 +152,38 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
           </option>
         ))}
       </select>
-      <p style={{ fontSize: 11.5, color: '#6B818C', margin: '6px 0 16px' }}>
+      <p style={{ fontSize: 11.5, color: '#6B818C', margin: '6px 0 14px' }}>
         Um provedor por vez. As chaves de acesso ficam no servidor, nunca nesta tela.
       </p>
+
+      {/* ---------------- Como está configurado ----------------
+          Referência para quando dá problema, não coisa de olhar todo dia — por
+          isso cinza e miúdo. Cada linha responde uma pergunta: em qual painel
+          entrar, qual instância é a nossa, e se a chave é a que se pensa. */}
+      {(conexao?.servidor || conexao?.instancia || conexao?.chaveFinal) && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px',
+          fontSize: 11.5, color: '#6B818C', marginBottom: 16,
+          paddingBottom: 14, borderBottom: '1px solid #EDF2F4',
+        }}>
+          {conexao.servidor && (<>
+            <span>Servidor</span>
+            <span style={{ fontFamily: MONO, color: '#16232B', wordBreak: 'break-all' }}>
+              {conexao.servidor}
+            </span>
+          </>)}
+          {conexao.instancia && (<>
+            <span>Instância</span>
+            <span style={{ fontFamily: MONO, color: '#16232B' }}>{conexao.instancia}</span>
+          </>)}
+          {conexao.chaveFinal && (<>
+            <span>Chave</span>
+            <span style={{ fontFamily: MONO, color: '#16232B' }} title="Os quatro últimos caracteres. Serve para conferir qual chave está configurada.">
+              ····{conexao.chaveFinal}
+            </span>
+          </>)}
+        </div>
+      )}
 
       {/* ---------------- Estado ---------------- */}
       <div style={{

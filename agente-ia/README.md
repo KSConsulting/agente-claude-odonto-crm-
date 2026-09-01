@@ -711,6 +711,30 @@ como reserva, porque nem toda conta aceita o código.
 e exigem sessão do Supabase — mesmo motivo da `/foto`. Quem tem a chave da
 Evolution manda mensagem por aquele WhatsApp.
 
+### A tela mostra como está configurado
+
+Três linhas cinzas acima do estado, e cada uma responde uma pergunta que só
+aparece quando algo quebra:
+
+| Campo | Responde |
+|---|---|
+| **Servidor** `sua-evolution.exemplo.…` | Em qual painel entrar. Foi a pergunta de 01/09 |
+| **Instância** `clinica-principal` | Qual das instâncias do servidor é a nossa |
+| **Chave** `····949B` | Se a chave configurada é a que se pensa que é — útil depois de um `agente:secrets` |
+
+Os três saem de `identificacao()`, em `evolution.ts`, e vêm das **secrets da
+função** — nunca do banco. Só saem pela rota `/conexao`, que exige sessão.
+
+> ⚠️ **Quatro caracteres da chave, e nunca mais.** É o padrão de cartão, AWS e
+> Stripe, pela mesma razão: quatro de trinta e cinco servem para **identificar**,
+> não para usar.
+>
+> O endereço, ao contrário, vai inteiro e sem problema: quem protege a API é a
+> chave, não o host ser desconhecido — e um pedaço cortado não serviria para
+> copiar no navegador. Ele **não vira link**: a Evolution anuncia o manager dela
+> em `http://`, e link que rebaixa de https para http é mau hábito para deixar
+> no código.
+
 ---
 
 ## 9. Custos
