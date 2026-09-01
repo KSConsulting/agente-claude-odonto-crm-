@@ -11,8 +11,9 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 > no banco** — não procure o arquivo, não escreva código contra a tabela.
 >
 > **O agente está no ar e respondendo** — ligado, em modo teste, só para os
-> números cadastrados. Ligar, desligar, trocar o modelo e editar o prompt já são
-> pela tela: **menu do usuário → Secretária de IA**.
+> números cadastrados. Ligar, desligar e trocar o modelo já são pela tela:
+> **menu do usuário → Secretária de IA**. O prompt aparece lá, mas **só para
+> ler** — quem edita é a IA da IDE, no [`prompt.md`](prompt.md).
 >
 > A tela **Conversas** existe em `/conversas`: a equipe lê o que a Letícia
 > respondeu, assume a conversa quando precisa e responde pelo mesmo WhatsApp.
@@ -71,10 +72,16 @@ está no ar:
 |---|---|
 | [`prompt.md`](prompt.md) | O prompt **oficial**. Versionado no Git, com histórico de cada mudança |
 | Banco de dados | O que está **rodando agora** |
-| Página **Secretária de IA** (menu do usuário) | Mostra qual dos dois está ativo, permite ajuste rápido, e traz o botão **"voltar ao prompt oficial"** |
+| Página **Secretária de IA** (menu do usuário) | **Mostra**, e só: qual dos dois está no ar, e o texto inteiro atrás de um "Ver o prompt" |
 
-Ajuste de 30 segundos se resolve pela tela. Mudança séria se faz no arquivo,
-com revisão e histórico.
+**A tela não edita o prompt** — decisão de produto, desde 01/09/2026, e a mesma
+do nome da agente. O que ela editava criava uma versão **que não ia para o Git**:
+no dia em que alguém precisasse entender por que a Letícia mudou de
+comportamento, não haveria histórico nenhum, e o `prompt.md` continuaria
+descrevendo uma agente que não existe mais.
+
+Toda mudança se faz no arquivo, pela IA da IDE — que lê este repositório antes
+de escrever. O [`GUIA-DO-PROMPT.md`](GUIA-DO-PROMPT.md) é o roteiro.
 
 ---
 
@@ -394,7 +401,7 @@ mostra — a mesma fonte, para nunca divergirem.
 |---|---|
 | `ativo` | Liga e desliga o agente inteiro. **Nasce `false`** |
 | `modelo` | Qual IA está atendendo |
-| `prompt` | `null` = está rodando o [`prompt.md`](prompt.md). Preenchido = alguém editou pela tela |
+| `prompt` | `null` = está rodando o [`prompt.md`](prompt.md). Preenchido = versão personalizada no banco — a tela **não** grava mais aqui; sobrou de antes de 01/09/2026, ou veio por SQL |
 | `modo_teste` | **Nasce `true`.** Ver abaixo |
 | `numeros_teste` | Os números que o agente pode responder no modo teste |
 
@@ -1045,8 +1052,9 @@ API oficial da Meta.
 ### Nenhum prompt nasce pronto
 
 As primeiras 20 ou 30 conversas reais vão mostrar onde a Letícia trava, responde
-demais ou insiste na hora errada. Ajustar faz parte — e a partir da etapa 5 isso
-é feito pela tela, sem depender de código.
+demais ou insiste na hora errada. Ajustar faz parte — e se faz no
+[`prompt.md`](prompt.md), pela IA da IDE, com `npm run agente:deploy` depois.
+A tela mostra o que está no ar; ela não edita.
 
 ### A Letícia não pode dar diagnóstico
 

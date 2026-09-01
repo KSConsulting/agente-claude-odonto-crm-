@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, RotateCcw, FileText, X,
+  Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, FileText, X,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
@@ -106,6 +107,9 @@ export default function SecretariaIA() {
   const [novoNumero, setNovoNumero] = useState('')
   const [novoValido, setNovoValido] = useState(false)
   const [buscandoOficial, setBuscandoOficial] = useState(false)
+  // O prompt é longo e quase nunca é o que a pessoa veio ver. Nasce fechado, e
+  // o oficial só é buscado quando ela abre — não em todo carregamento da página.
+  const [promptAberto, setPromptAberto] = useState(false)
 
   useEffect(() => {
     supabase.from('configuracoes_agente').select('*').limit(1).single()
@@ -154,7 +158,9 @@ export default function SecretariaIA() {
         modelo,
         modo_teste: modoTeste,
         numeros_teste: numeros,
-        prompt: prompt && prompt.trim() ? prompt : null,
+        // `prompt` NÃO entra aqui. A tela só mostra; quem edita é a IA da IDE,
+        // pelo `agente-ia/prompt.md`. Gravar daqui reabriria a porta que a
+        // decisão de produto fechou — e sem passar pelo Git.
       })
       .eq('id', cfg.id).select().single()
     setSalvando(false)
@@ -162,6 +168,16 @@ export default function SecretariaIA() {
     setCfg(data as ConfiguracoesAgente)
     setSalvo(true)
     setTimeout(() => setSalvo(false), 2000)
+  }
+
+  /**
+   * Abre ou fecha o prompt. Na primeira abertura sem prompt personalizado,
+   * busca o oficial — que mora na função publicada, não nesta tela.
+   */
+  async function alternarPrompt() {
+    if (promptAberto) { setPromptAberto(false); return }
+    setPromptAberto(true)
+    if (prompt === null) await carregarOficial()
   }
 
   /** Busca o prompt oficial na Edge Function — a tela não guarda cópia. */
@@ -295,7 +311,7 @@ export default function SecretariaIA() {
         <Erro texto={erro} />
       </div>
 
-      {/* ---------------- A secretária: nome e modelo ----------------
+      {/* ---------------- A secretária: nome, modelo e prompt ----------------
 
           ⚠️ SÓ LEITURA, POR DECISÃO DO PRODUTO. A coluna `nome_agente` é
           gravável e a tela poderia editá-la; o campo é inerte de propósito,
@@ -382,6 +398,80 @@ export default function SecretariaIA() {
             o erro só aparece no log da função.
           </Aviso>
         )}
+
+        {/* ---- Prompt, no mesmo card ----
+
+            SÓ LEITURA, pela mesma decisão do nome logo acima: quem edita é a IA
+            da IDE, que lê o repositório inteiro antes de escrever e grava no
+            `prompt.md`, que é versionado. Editar por aqui criava uma versão que
+            **não ia para o Git** — e o dia em que alguém precisasse entender por
+            que ela mudou de comportamento, não haveria histórico nenhum.
+
+            E NASCE FECHADO. São umas duzentas linhas: aberto, ele empurrava
+            todo o resto da página para fora da tela, e quase nunca é o que a
+            pessoa veio ver. */}
+        <div style={{ height: 1, background: '#EDF2F4', margin: '20px 0' }} />
+
+        <div style={subtitulo}>Prompt</div>
+        <p style={legenda}>
+          Quem a {nomeAgente} é: tom de voz, fluxo de atendimento e regras.
+        </p>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px',
+          background: usandoOficial ? '#E8F8EF' : '#FFFBEB',
+          border: `1px solid ${usandoOficial ? '#A7D8C0' : '#FDE68A'}`,
+          borderRadius: 9, fontSize: 12.5, marginBottom: 14,
+          color: usandoOficial ? '#1A7A48' : '#92400E',
+        }}>
+          <FileText size={15} style={{ flexShrink: 0 }} />
+          <span>
+            {usandoOficial
+              ? <>No ar agora: <strong>o prompt oficial</strong>, direto do arquivo.</>
+              : <>No ar agora: <strong>um prompt personalizado</strong>, gravado no banco.</>}
+          </span>
+        </div>
+
+        <button
+          onClick={() => { void alternarPrompt() }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: 0,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 13, fontWeight: 700, color: '#1E6E8C', fontFamily: FONTE,
+          }}
+        >
+          {promptAberto ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          {promptAberto ? 'Ocultar o prompt' : 'Ver o prompt'}
+        </button>
+
+        {promptAberto && (
+          <div style={{
+            marginTop: 12, padding: '14px 16px', borderRadius: 9,
+            border: '1px solid #DCE6EA', background: '#F7FAFB',
+            fontSize: 12.5, fontFamily: MONO, color: '#16232B',
+            lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            maxHeight: 440, overflowY: 'auto',
+          }}>
+            {buscandoOficial
+              ? 'Carregando o prompt...'
+              : prompt ?? 'Não consegui carregar o prompt. A função está publicada?'}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 14,
+          background: '#EAF3F6', border: '1px solid #CFE2E9', borderRadius: 10,
+          padding: '11px 13px',
+        }}>
+          <Bot size={16} color="#1E6E8C" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12.5, color: '#1E6E8C', lineHeight: 1.6 }}>
+            <strong>Quer mudar o que a {nomeAgente} fala?</strong><br />
+            Abra a pasta do sistema no Claude Code, no Codex ou na IDE que você usar,
+            e peça a mudança. O prompt é editado no arquivo{' '}
+            <code style={{ fontFamily: MONO }}>agente-ia/prompt.md</code>, que fica
+            registrado no Git — assim dá para saber o que mudou, quando e por quê.
+          </div>
+        </div>
       </div>
 
       {/* ---------------- Conexão do WhatsApp ---------------- */}
@@ -474,69 +564,6 @@ export default function SecretariaIA() {
         )}
       </div>
 
-      {/* ---------------- Prompt ---------------- */}
-      <div style={cartao}>
-        <div style={titulo}>Prompt</div>
-        <p style={legenda}>
-          Quem a {nomeAgente} é: tom de voz, fluxo de atendimento e regras. O prompt oficial
-          vive no arquivo <code style={{ fontFamily: MONO }}>agente-ia/prompt.md</code>,
-          versionado no Git. Editar aqui cria uma versão personalizada, que passa a valer
-          no lugar dele.
-        </p>
-
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px',
-          background: usandoOficial ? '#E8F8EF' : '#FFFBEB',
-          border: `1px solid ${usandoOficial ? '#A7D8C0' : '#FDE68A'}`,
-          borderRadius: 9, fontSize: 12.5, marginBottom: 16,
-          color: usandoOficial ? '#1A7A48' : '#92400E',
-        }}>
-          <FileText size={15} style={{ flexShrink: 0 }} />
-          <span>
-            {usandoOficial
-              ? <>No ar agora: <strong>o prompt oficial</strong>, direto do arquivo.</>
-              : <>No ar agora: <strong>um prompt personalizado</strong>, editado nesta tela.</>}
-          </span>
-        </div>
-
-        <textarea
-          value={prompt ?? ''}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Vazio = usando o prompt oficial. Clique em “Carregar o oficial” para partir dele."
-          rows={16}
-          style={{
-            width: '100%', padding: '12px 14px', borderRadius: 9,
-            border: '1px solid #DCE6EA', fontSize: 12.5, fontFamily: MONO,
-            color: '#16232B', outline: 'none', background: '#fff',
-            boxSizing: 'border-box', lineHeight: 1.6, resize: 'vertical',
-          }}
-        />
-
-        <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <button onClick={carregarOficial} disabled={buscandoOficial}
-            style={{
-              ...botao('#fff'), color: '#1E6E8C', border: '1px solid #DCE6EA',
-              cursor: buscandoOficial ? 'wait' : 'pointer',
-            }}>
-            <FileText size={14} />
-            {buscandoOficial ? 'Carregando...' : 'Carregar o oficial para editar'}
-          </button>
-
-          {!usandoOficial && (
-            <button onClick={() => setPrompt(null)}
-              style={{ ...botao('#fff'), color: '#6B818C', border: '1px solid #DCE6EA' }}>
-              <RotateCcw size={14} /> Voltar ao oficial
-            </button>
-          )}
-        </div>
-
-        <Aviso>
-          Mexer aqui muda o comportamento dela na <strong>mensagem seguinte</strong>. Um
-          prompt personalizado <strong>não vai para o Git</strong> — para uma mudança que
-          deva ficar registrada, edite o <code style={{ fontFamily: MONO }}>prompt.md</code>.
-        </Aviso>
-      </div>
-
       {/* ---------------- Salvar ---------------- */}
       <div style={{ ...cartao, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button onClick={salvar} disabled={salvando} style={botao(salvo ? '#1A7A48' : '#1E6E8C')}>
@@ -544,7 +571,7 @@ export default function SecretariaIA() {
           {salvo ? 'Salvo!' : salvando ? 'Salvando...' : 'Salvar'}
         </button>
         <span style={{ fontSize: 12.5, color: '#6B818C' }}>
-          Vale para modo teste, números, modelo e prompt. O ligar/desligar, logo abaixo,
+          Vale para o modelo, o modo de teste e os números. O ligar/desligar, logo abaixo,
           não passa por aqui — ele vale no clique.
         </span>
         <Erro texto={erro} />

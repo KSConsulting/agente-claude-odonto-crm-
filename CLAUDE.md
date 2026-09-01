@@ -223,7 +223,7 @@ src/
     ├── Clientes.tsx            invólucro: <PessoasPage mode="clientes" />
     ├── LeadDetail.tsx          ficha do lead + consultas + anotações
     ├── Procedimentos.tsx       o catálogo da clínica
-    ├── SecretariaIA.tsx        o Agente de IA: modelo, prompt, liga/desliga
+    ├── SecretariaIA.tsx        o Agente de IA: modelo, prompt (só leitura), liga/desliga
     ├── TokenApi.tsx            chaves de acesso e o contrato da API
     └── Configuracoes.tsx       perfil, clínica, horários e o fuso
 ```
@@ -702,17 +702,33 @@ Os cards seguem quatro perguntas, nesta ordem:
 | # | Card | Responde |
 |---|---|---|
 | 1 | **Estado** | Está funcionando agora? |
-| 2 | **A secretária** — nome **e** modelo | Quem é ela, e quem pensa por ela |
+| 2 | **A secretária** — nome, modelo **e** prompt | Quem é ela, quem pensa por ela, e o que ela diz |
 | 3 | **Conexão do WhatsApp** | Por onde ela fala |
 | 4 | **Modo de teste** | Para quem ela responde |
-| 5 | **Prompt** | O que ela diz |
-| 6 | **Salvar** | — |
-| 7 | **Ligar e desligar** | O interruptor |
-| 8 | **Apagar uma pessoa** | A zona de perigo |
+| 5 | **Salvar** | — |
+| 6 | **Ligar e desligar** | O interruptor |
+| 7 | **Apagar uma pessoa** | A zona de perigo |
 
-**Nome e modelo moram no mesmo card.** Estavam separados por três cards, com a
-conexão e o modo teste no meio — e respondem à mesma pergunta: *com quem estou
-lidando?* O nome é a identidade, o modelo é a cabeça.
+**Nome, modelo e prompt moram no mesmo card.** Estavam espalhados em três
+cards, com a conexão e o modo teste no meio — e respondem à mesma pergunta:
+*com quem estou lidando?* O nome é a identidade, o modelo é a cabeça, o prompt
+é o que ela sabe dizer.
+
+> **O prompt nasce fechado, atrás de um "Ver o prompt".** São umas duzentas
+> linhas: aberto, empurrava a página inteira para fora da tela — e quase nunca
+> é o que a pessoa veio ver. Só ao abrir ele é buscado na função publicada;
+> fechado, não custa uma requisição sequer.
+
+**E ele é só leitura, como o nome — pelo mesmo motivo, com um agravante.** A
+tela editava o prompt e gravava em `configuracoes_agente.prompt`, criando uma
+versão **que não ia para o Git**. No dia em que alguém precisasse entender por
+que a Letícia mudou de comportamento, não haveria histórico nenhum — e o
+`prompt.md` continuaria descrevendo uma agente que não existe mais. Hoje o card
+mostra qual dos dois está no ar, e manda editar pelo
+[`prompt.md`](agente-ia/prompt.md).
+
+> A coluna continua gravável, e um valor antigo continua valendo — a tela só
+> não escreve mais nela. Para voltar ao oficial, é `prompt = null`, pela IDE.
 
 ### O interruptor fica no fim da página, e não no painel de estado
 
