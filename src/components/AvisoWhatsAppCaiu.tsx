@@ -16,14 +16,15 @@ import { useConexao, nomeDoProvedor } from '../lib/whatsappConexao'
  * nem enquanto verifica: faixa que vive na tela é faixa que ninguém lê no dia
  * em que ela importa. Mesmo princípio do `AvisoBaixaConsulta`.
  *
- * Verifica a cada 60s, e não a cada 30 como a página da Secretária: aqui é
- * vigia de fundo, e lá é quem está mexendo na conexão.
+ * A cadência é a mesma da página da Secretária (`INTERVALO_PADRAO`). Já foi
+ * diferente — 60s aqui, 30s lá —, e a diferença nunca teve razão de ser: as
+ * duas fazem a mesma pergunta ao mesmo servidor.
  */
 
 const FONTE = "'Plus Jakarta Sans', sans-serif"
 
 export default function AvisoWhatsAppCaiu() {
-  const { conexao } = useConexao(60_000)
+  const { conexao } = useConexao()
 
   // `verificando` também não aparece: piscar "caiu" a cada carregamento de
   // página, antes da primeira resposta, seria alarme falso todo dia.

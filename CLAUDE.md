@@ -642,6 +642,25 @@ seria palpite. O `whatsapp/index.ts` não conhece nenhuma das duas.
 > `apontado` / `outro` / `ausente` / `desconhecido` — e `desconhecido` não
 > mostra nada, porque acusar o que não se sabe é o mesmo erro ao contrário.
 
+**A cadência da verificação é uma constante, e a frase sai dela.** As duas
+telas que olham a conexão perguntam a cada minuto (`INTERVALO_PADRAO`, em
+[`src/lib/whatsappConexao.ts`](src/lib/whatsappConexao.ts)). Foram 30s aqui e
+60s em Conversas, sem razão; e o "a cada 30 segundos" do rodapé estava digitado
+à mão, livre para discordar do valor de verdade — hoje é `cadenciaEmPalavras()`.
+
+**Botão que não muda a tela parece botão quebrado.** O "Verificar" sempre
+funcionou, mas o estado quase nunca muda entre uma consulta e a seguinte, e a
+tela ficava igual. Agora o ícone gira, o botão tranca enquanto consulta, e o
+rodapé dá o "Verificado agora" de dois segundos e meio — o mesmo `saved`
+temporário do resto da base. E ele aparece em **todos** os estados: quem clica
+três vezes seguidas é quem está com o servidor fora do ar esperando ele voltar,
+e era justamente ali que a linha não existia.
+
+> E a trava de "uma consulta por vez" **devolve a que está em voo** em vez de
+> descartar o pedido. Descartando, o clique sumia sem rastro sempre que caía no
+> meio segundo da verificação automática — o sintoma exato de botão morto, uma
+> vez a cada tantas.
+
 O aviso de queda também aparece em **Conversas**, em faixa vermelha que só
 existe quando há problema — mesmo princípio do `AvisoBaixaConsulta`. É lá que a
 recepção passa o dia, e é lá que a queda seria notada primeiro.

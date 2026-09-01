@@ -168,27 +168,72 @@ export async function desconectar(): Promise<void> {
 }
 
 /**
+ * De quanto em quanto tempo a tela pergunta se a ponte está de pé.
+ *
+ * **Um minuto, e o mesmo para as duas telas que olham.** Foram 30s aqui e 60s
+ * na faixa de Conversas, sem que nada justificasse a diferença — e dois números
+ * para a mesma pergunta são a garantia de que um dia alguém mude só um.
+ *
+ * Cada verificação são duas chamadas à ponte (estado + webhook). O preço de
+ * esticar é a queda demorar até um minuto para aparecer na tela; para uma queda
+ * que importa, um minuto não é nada.
+ */
+export const INTERVALO_PADRAO = 60_000
+
+/**
+ * `a cada 1 minuto`, para a frase embaixo do botão.
+ *
+ * Sai do intervalo de verdade porque a versão digitada à mão já mentiu: a tela
+ * dizia "30 segundos" enquanto o valor era outro. Número que aparece em dois
+ * lugares só fica certo por acaso.
+ */
+export function cadenciaEmPalavras(ms: number): string {
+  const segundos = Math.round(ms / 1000)
+  if (segundos < 60) return `a cada ${segundos} segundos`
+  const minutos = Math.round(segundos / 60)
+  return minutos === 1 ? 'a cada 1 minuto' : `a cada ${minutos} minutos`
+}
+
+/**
  * Acompanha a conexão, com atualização automática.
  *
  * **Só consulta com a aba visível.** Cada verificação é uma chamada à ponte;
  * manter isso rodando em aba esquecida em segundo plano é gastar à toa. Ao
  * voltar para a aba, consulta na hora — quem volta quer o estado de agora, não
  * o de meia hora atrás.
+ *
+ * ── QUEM CHEGA NO MEIO ESPERA; NÃO É DESCARTADO ────────────────────────────
+ *
+ * Uma verificação de cada vez, porque servidor fora demora até o timeout e sem
+ * trava as consultas se empilhariam justo quando ele está lento. Mas a trava
+ * **devolve a que está em voo** em vez de sair calada: era assim que o clique
+ * no "Verificar" sumia sem deixar rastro — caía exatamente no meio segundo em
+ * que a consulta automática estava rodando, e a tela ficava igual.
  */
-export function useConexao(intervaloMs = 30_000) {
+export function useConexao(intervaloMs = INTERVALO_PADRAO) {
   const [conexao, setConexao] = useState<Conexao | null>(null)
-  const ocupado = useRef(false)
+  const [verificando, setVerificando] = useState(false)
+  const [verificadoEm, setVerificadoEm] = useState<Date | null>(null)
+  const emVoo = useRef<Promise<void> | null>(null)
 
-  const recarregar = useCallback(async () => {
-    // Servidor fora demora até o timeout. Sem esta trava, as consultas se
-    // empilhariam uma sobre a outra justamente quando ele está lento.
-    if (ocupado.current) return
-    ocupado.current = true
-    try {
-      setConexao(await lerConexao())
-    } finally {
-      ocupado.current = false
-    }
+  const recarregar = useCallback((): Promise<void> => {
+    if (emVoo.current) return emVoo.current
+
+    const tarefa = (async () => {
+      setVerificando(true)
+      try {
+        setConexao(await lerConexao())
+        // Falhou também é ter verificado: `lerConexao` nunca lança, devolve
+        // 'indisponivel'. O horário é de quando perguntamos, não de quando deu
+        // certo — é a informação que a pessoa quer ao clicar de novo.
+        setVerificadoEm(new Date())
+      } finally {
+        setVerificando(false)
+      }
+    })().finally(() => { emVoo.current = null })
+
+    emVoo.current = tarefa
+    return tarefa
   }, [])
 
   useEffect(() => {
@@ -206,5 +251,5 @@ export function useConexao(intervaloMs = 30_000) {
     }
   }, [recarregar, intervaloMs])
 
-  return { conexao, recarregar }
+  return { conexao, recarregar, verificando, verificadoEm, intervaloMs }
 }

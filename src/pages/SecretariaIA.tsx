@@ -93,7 +93,9 @@ export default function SecretariaIA() {
   const [numeros, setNumeros] = useState<string[]>([])
   const [prompt, setPrompt] = useState<string | null>(null)
 
-  const { conexao, recarregar: recarregarConexao } = useConexao()
+  const {
+    conexao, recarregar: recarregarConexao, verificando, verificadoEm, intervaloMs,
+  } = useConexao()
 
   const [novoNumero, setNovoNumero] = useState('')
   const [novoValido, setNovoValido] = useState(false)
@@ -134,7 +136,7 @@ export default function SecretariaIA() {
       .update({ provedor_whatsapp: novo }).eq('id', cfg.id)
     if (error) { setErro('Não consegui trocar o provedor.'); return }
     setCfg({ ...cfg, provedor_whatsapp: novo as ConfiguracoesAgente['provedor_whatsapp'] })
-    recarregarConexao()
+    void recarregarConexao()
   }
 
   async function salvar() {
@@ -337,6 +339,9 @@ export default function SecretariaIA() {
       <ConexaoWhatsApp
         conexao={conexao}
         recarregar={recarregarConexao}
+        verificando={verificando}
+        verificadoEm={verificadoEm}
+        intervaloMs={intervaloMs}
         provedor={cfg.provedor_whatsapp ?? 'evolution'}
         onTrocarProvedor={trocarProvedor}
       />

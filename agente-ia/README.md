@@ -894,11 +894,30 @@ problema está em outra máquina.
 ### Detalhes que não são detalhe
 
 **Timeout de 8 segundos** em toda chamada de conexão. Servidor fora do ar deixa
-um `fetch` pendurado mais de 20s; a tela consulta a cada 30s, então sem prazo
-ela viveria em "verificando…" justo quando precisa avisar que caiu.
+um `fetch` pendurado mais de 20s; a tela consulta em intervalos curtos, então
+sem prazo ela viveria em "verificando…" justo quando precisa avisar que caiu.
 
-**Só consulta com a aba visível**, e a cada 30s (60s na faixa de Conversas, que
-é vigia de fundo). Cada verificação é uma chamada à ponte.
+**Só consulta com a aba visível**, e a cada minuto — `INTERVALO_PADRAO`, em
+[`src/lib/whatsappConexao.ts`](../src/lib/whatsappConexao.ts). Cada verificação
+são duas chamadas à ponte (estado + webhook), e por isso ela é uma constante e
+não um número digitado em cada tela: foram 30s na Secretária e 60s na faixa de
+Conversas, sem que nada justificasse a diferença. A frase "verificado
+automaticamente a cada 1 minuto" também sai dela, por `cadenciaEmPalavras()` —
+digitada à mão, ela já mentiu.
+
+**Uma verificação de cada vez, e quem chega no meio espera.** A trava existe
+porque servidor fora do ar demora até o timeout e as consultas se empilhariam
+justo quando ele está lento — mas ela **devolve a que está em voo** em vez de
+descartar o pedido. Descartando, o clique no botão "Verificar" sumia sem deixar
+rastro sempre que caía no meio de uma consulta automática.
+
+**O botão "Verificar" precisa dizer que verificou.** Entre um clique e o
+seguinte o estado quase nunca muda, então a tela ficava idêntica — e tela
+idêntica é indistinguível de botão morto. Hoje o ícone gira enquanto a consulta
+acontece, o botão tranca, e o rodapé mostra "Verificado agora" por dois
+segundos e meio antes de voltar para o horário da última. Essa linha aparece em
+**todos** os estados: quem clica três vezes seguidas é quem está esperando o
+servidor voltar, e era exatamente ali que ela não existia.
 
 **`logout`, nunca `delete`.** O primeiro derruba a sessão e deixa a instância de
 pé para parear de novo; o segundo apagaria a instância e o histórico junto. Não

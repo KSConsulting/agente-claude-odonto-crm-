@@ -111,8 +111,8 @@ export async function fotoDoPerfil(numero: string): Promise<string | null> {
 //
 // ⚠️ TIMEOUT CURTO, E É O PONTO PRINCIPAL DAQUI. Quando o servidor da Evolution
 // cai, um `fetch` sem prazo fica pendurado mais de 20 segundos. A tela consulta
-// a cada 30s, então sem isso ela viveria travada em "verificando…" justamente
-// no momento em que precisa avisar que caiu.
+// a cada minuto, então sem isso ela viveria travada em "verificando…"
+// justamente no momento em que precisa avisar que caiu.
 // ---------------------------------------------------------------------------
 
 /** Prazo para o servidor responder. Passou disso, tratamos como fora do ar. */

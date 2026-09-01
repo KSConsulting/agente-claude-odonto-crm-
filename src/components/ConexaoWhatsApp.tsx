@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Smartphone, RefreshCw, LogOut, ServerCrash, Check, Unplug } from 'lucide-react'
 import CampoTelefone from './CampoTelefone'
 import ConfirmDeleteModal from './ConfirmDeleteModal'
-import { conectar, desconectar, nomeDoProvedor, type Conexao } from '../lib/whatsappConexao'
+import {
+  conectar, desconectar, nomeDoProvedor, cadenciaEmPalavras, type Conexao,
+} from '../lib/whatsappConexao'
 import { formatarParaExibicao } from '../lib/telefones'
 import { useAgente } from '../lib/agente'
 
@@ -55,13 +57,23 @@ const botaoBase: React.CSSProperties = {
 
 interface Props {
   conexao: Conexao | null
-  recarregar: () => void
+  /** Resolve quando a consulta terminou — inclusive se pegou carona numa em voo. */
+  recarregar: () => Promise<void>
+  /** Há consulta acontecendo agora. Gira o ícone e tranca o botão. */
+  verificando: boolean
+  /** Quando foi a última — de sucesso ou não. Nulo antes da primeira. */
+  verificadoEm: Date | null
+  /** De quanto em quanto tempo a tela pergunta sozinha. Vira frase, não fica solto. */
+  intervaloMs: number
   provedor: string
   /** Troca o provedor ativo. Grava na hora — não passa por "Salvar". */
   onTrocarProvedor: (novo: string) => Promise<void>
 }
 
-export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTrocarProvedor }: Props) {
+export default function ConexaoWhatsApp({
+  conexao, recarregar, verificando, verificadoEm, intervaloMs,
+  provedor, onTrocarProvedor,
+}: Props) {
   const { nome: nomeAgente } = useAgente()
   const [numero, setNumero] = useState('')
   const [valido, setValido] = useState(false)
@@ -72,9 +84,31 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
   const [confirmando, setConfirmando] = useState(false)
   const [erro, setErro] = useState('')
 
+  // O "deu certo" de sempre da base: estado curto, limpo por setTimeout.
+  const [conferido, setConferido] = useState(false)
+  const relogio = useRef<number | null>(null)
+  useEffect(() => () => { if (relogio.current) clearTimeout(relogio.current) }, [])
+
   const estado = conexao?.estado ?? 'verificando'
   const v = VISUAL[estado] ?? VISUAL.verificando
   const foraDoAr = estado === 'indisponivel'
+  const cadencia = cadenciaEmPalavras(intervaloMs)
+
+  /**
+   * O clique no "Verificar".
+   *
+   * O botão sempre funcionou; o que faltava era **dizer isso**. Como o estado
+   * quase nunca muda entre uma consulta e a seguinte, a tela ficava idêntica —
+   * e tela idêntica é indistinguível de botão morto. Daí o "Verificado agora"
+   * por dois segundos e meio: é a única prova que a pessoa tem.
+   */
+  async function verificarAgora() {
+    setErro('')
+    await recarregar()
+    setConferido(true)
+    if (relogio.current) clearTimeout(relogio.current)
+    relogio.current = window.setTimeout(() => { setConferido(false) }, 2500)
+  }
 
   async function gerarPareamento() {
     setOcupado(true)
@@ -132,11 +166,29 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
     return 'Consultando o servidor...'
   }
 
+  /** A linha do rodapé: quando foi a última vez, e de quanto em quanto tempo. */
+  function fraseDaVerificacao(): string {
+    if (conferido) return 'Verificado agora.'
+    if (verificando && !verificadoEm) return 'Verificando...'
+    if (!verificadoEm) return `Verificado automaticamente ${cadencia}.`
+    const hora = verificadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    return `Verificado às ${hora} · automaticamente ${cadencia}.`
+  }
+
   return (
     <div style={{
       background: '#fff', border: '1px solid #DCE6EA', borderRadius: 14,
       padding: '20px 22px', marginBottom: 18, fontFamily: FONTE,
     }}>
+
+      {/* O ícone gira enquanto a consulta acontece. Bloco local, como as media
+          queries do resto da base: o `index.css` guarda o que é da aplicação
+          inteira, e girar um botão não é. */}
+      <style>{`
+        @keyframes girarIcone { to { transform: rotate(360deg) } }
+        .girando { animation: girarIcone 0.9s linear infinite }
+        @media (prefers-reduced-motion: reduce) { .girando { animation: none } }
+      `}</style>
 
       <div style={{ fontSize: 15, fontWeight: 700, color: '#16232B' }}>Conexão do WhatsApp</div>
       <p style={{ fontSize: 12.5, color: '#6B818C', lineHeight: 1.6, margin: '4px 0 16px' }}>
@@ -211,14 +263,15 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
         </div>
 
         <button
-          onClick={recarregar}
+          onClick={() => { void verificarAgora() }}
+          disabled={verificando}
           title="Verificar agora"
           style={{
             ...botaoBase, padding: '7px 12px', border: '1px solid #DCE6EA',
             background: '#fff', color: '#6B818C', fontWeight: 600, fontSize: 12,
-            cursor: 'pointer', flexShrink: 0,
+            cursor: verificando ? 'wait' : 'pointer', flexShrink: 0,
           }}>
-          <RefreshCw size={13} /> Verificar
+          <RefreshCw size={13} className={verificando ? 'girando' : undefined} /> Verificar
         </button>
       </div>
 
@@ -343,9 +396,23 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
         </div>
       )}
 
-      {estado === 'conectado' && !pareando && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#6B818C', marginTop: 10 }}>
-          <Check size={12} color="#1A7A48" /> Verificado automaticamente a cada 30 segundos.
+      {/* ---------------- A última verificação ----------------
+
+          Antes esta linha só aparecia com a conexão de pé — e era justamente
+          onde ela menos fazia falta. Quem clica em "Verificar" três vezes
+          seguidas é quem está com o servidor fora do ar esperando ele voltar,
+          e era ali que a tela não dizia nada.
+
+          O horário sai do `verificadoEm`, e não da cadência: entre um clique e
+          outro o estado quase nunca muda, então é ele que prova que a pergunta
+          foi feita de novo.                                                  */}
+      {!pareando && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 11.5, color: '#6B818C', marginTop: 10,
+        }}>
+          <Check size={12} color={conferido || estado === 'conectado' ? '#1A7A48' : '#6B818C'} />
+          {fraseDaVerificacao()}
         </div>
       )}
 
