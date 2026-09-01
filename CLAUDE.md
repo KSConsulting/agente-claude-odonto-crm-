@@ -83,7 +83,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **quinze arquivos, nesta ordem**:
+A migração é aplicada em **dezesseis arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -98,14 +98,20 @@ agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
 `0013_conversas_lista.sql` (a view que sustenta a tela Conversas) e
 `0014_conversas_agendamento.sql` (o `data_agendamento` nessa view, para a
 etiqueta "Agendada") e `0015_baixa_da_consulta.sql` (o status `faltou` e o
-trigger que promove o lead a Paciente).
+trigger que promove o lead a Paciente) e `0016_ultima_consulta.sql` (a coluna
+calculada `ultima_consulta`, que a tela Pacientes mostra).
 
 Os pontos que mais causam erro:
 
 1. **`crm_clinica` é uma VIEW**, não uma tabela. A tabela física é
-   `crm_clinica_dados`. A view acrescenta `minutos_ultima_mensagem`, calculado
-   na leitura. Escrita funciona normalmente (view auto-atualizável), mas **nunca
-   grave na coluna calculada**.
+   `crm_clinica_dados`. A view acrescenta duas colunas calculadas na leitura,
+   `minutos_ultima_mensagem` e `ultima_consulta`. Escrita funciona normalmente
+   (view auto-atualizável), mas **nunca grave nas colunas calculadas** — e
+   **nunca acrescente `join` a ela**: dois itens no FROM a tornam
+   somente-leitura e derrubam todo o cadastro do sistema. Por isso
+   `ultima_consulta` é subconsulta escalar, e não `join lateral` como na
+   `conversas_lista`. Confira com `select is_updatable from
+   information_schema.views where table_name='crm_clinica'`.
 2. **Os valores de `status` vivem em dois lugares:** o `CHECK` no banco e os
    tipos `LeadStatus` / `ConsultaStatus` em [`src/types/index.ts`](src/types/index.ts).
    Alterou um, altere o outro — nada sincroniza isso automaticamente.

@@ -112,6 +112,16 @@ export interface LeadClinica {
   valor_pago_acumulado: number | null
   minutos_ultima_mensagem: number | null
   /**
+   * A última consulta que a pessoa REALIZOU (migração 0016).
+   *
+   * Calculada na leitura, como `minutos_ultima_mensagem` — **nunca grave nela**.
+   * Só conta `realizada`: consulta cancelada ou com falta não é visita.
+   *
+   * É o que a tela Pacientes mostra no lugar de `data_agendamento`, que ali
+   * seria sempre vazia (virar paciente zera a próxima consulta).
+   */
+  ultima_consulta: string | null
+  /**
    * Ligado, o Agente de IA salva a mensagem e **não responde** nesta conversa.
    * É o botão "Assumir conversa" da tela Conversas.
    */

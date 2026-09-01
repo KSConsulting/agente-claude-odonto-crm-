@@ -76,6 +76,9 @@ ordem**:
     `consultas` e o trigger que **promove o lead a Paciente** quando a consulta
     vira `realizada`. Fecha o funil, que até aqui não fechava. Ver
     [seção 5](#5-status-do-funil).
+16. `supabase/migrations/0016_ultima_consulta.sql` — a coluna calculada
+    `ultima_consulta` em `crm_clinica`, para a tela Pacientes. Subconsulta
+    escalar, **não** join: a view é escrita pela aplicação. Ver a seção 3.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -224,6 +227,7 @@ crm_clinica_dados   →   tabela física (guarda os dados)
 crm_clinica         →   view que a aplicação usa
                           = todas as colunas da tabela
                           + minutos_ultima_mensagem (calculado na leitura)
+                          + ultima_consulta         (calculado na leitura)
 ```
 
 ### Por quê
@@ -244,17 +248,25 @@ job agendado e sem escrita periódica no banco.
 ### Definição
 
 ```sql
-create view public.crm_clinica
+create or replace view public.crm_clinica
 with (security_invoker = true)
 as
   select
-    d.*,
+    -- ... todas as colunas de crm_clinica_dados, uma a uma ...
     case
       when d.ultima_mensagem is null then null
       else floor(extract(epoch from (now() - d.ultima_mensagem)) / 60)::integer
-    end as minutos_ultima_mensagem
+    end as minutos_ultima_mensagem,
+
+    -- migração 0016
+    (select max(c.data_consulta) from public.consultas c
+      where c.lead_id = d.id and c.status = 'realizada') as ultima_consulta
   from public.crm_clinica_dados d;
 ```
+
+> A view **não usa mais `d.*`**. A expansão do `*` é congelada na criação, então
+> uma coluna nova na tabela não apareceria na view sem recriá-la; e
+> `create or replace` exige a lista literal para acrescentar colunas no fim.
 
 ### O que isso significa na prática
 
@@ -262,8 +274,24 @@ as
   (origem única, sem agregação), então `INSERT`, `UPDATE` e `DELETE` em
   `crm_clinica` funcionam igual a uma tabela. A aplicação e a automação não
   precisam saber que é uma view.
-- **Nunca escreva em `minutos_ultima_mensagem`.** É coluna calculada; gravar
-  nela causa erro.
+- **Nunca escreva nas colunas calculadas** (`minutos_ultima_mensagem` e
+  `ultima_consulta`). Gravar nelas causa erro.
+- **⚠️ NUNCA acrescente `join` a esta view.** É a armadilha mais cara aqui: uma
+  view só é auto-atualizável com **um único item no FROM**. Um `join lateral` —
+  que é como `conversas_lista` (4.18) resolve perguntas parecidas — a tornaria
+  somente-leitura, e **todo cadastro do sistema quebraria de uma vez**: contato,
+  paciente, edição de ficha e o Agente de IA escrevem por aqui.
+
+  `ultima_consulta` é **subconsulta escalar**, não join, exatamente por isso:
+  ela fica na lista de seleção e não toca o FROM. Ao mexer nesta view, confira
+  depois:
+
+  ```sql
+  select is_updatable from information_schema.views where table_name='crm_clinica';
+  -- YES = escrita preservada. NO = você acabou de derrubar o cadastro.
+  ```
+
+  (`conversas_lista` pode usar `join lateral` porque ninguém escreve nela.)
 - **`security_invoker = true` é obrigatório.** Sem esse parâmetro, views no
   Postgres rodam com os privilégios do dono e **furam o RLS**, expondo todos os
   leads a qualquer requisição. Se recriar a view, mantenha isso.
@@ -296,6 +324,7 @@ WhatsApp, ou um paciente cadastrado manualmente.
 | `inicio_atendimento` | `timestamptz` | sim | `now()` | Base do "Novos Contatos" |
 | `ultima_mensagem` | `timestamptz` | sim | — | Momento da última interação |
 | `minutos_ultima_mensagem` | `integer` | sim | *calculado* | **Só na view.** Somente leitura |
+| `ultima_consulta` | `timestamptz` | sim | *calculado* | **Só na view** (`0016`). A última consulta `realizada`. Somente leitura |
 | **Funil** ||||
 | `status` | `text` | **não** | `'iniciou_conversa'` | `CHECK` — ver seção 5 |
 | `follow_up_1` | `timestamptz` | sim | — | Quando o follow-up 1 foi enviado |
@@ -388,7 +417,7 @@ esse segundo vínculo que forma a agenda dele.
 | `data_consulta` | `timestamptz` | não | — | Quando começa |
 | `duracao_minutos` | `integer` | não | `60` | `CHECK` 1..600 |
 | `data_fim` | `timestamptz` | não | *trigger* | **Derivada.** Nunca grave nela |
-| `status` | `text` | não | `'agendada'` | `agendada` \| `realizada` \| `cancelada` |
+| `status` | `text` | não | `'agendada'` | `agendada` \| `realizada` \| `cancelada` \| `faltou` (`0015`). Só `agendada` bloqueia horário |
 | `origem` | `text` | não | `'equipe'` | `equipe` \| `agente_ia` |
 | `chave_externa` | `text` | sim | — | Idempotência da API. **UNIQUE** quando preenchida |
 | `valor_pago` | `numeric(10,2)` | sim | — | |

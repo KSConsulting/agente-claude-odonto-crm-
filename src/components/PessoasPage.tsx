@@ -33,6 +33,16 @@ interface ModeConfig {
   tipoPadrao: 'lead' | 'paciente'
   arquivo: string
   vazio: string
+  /**
+   * A última coluna da tabela, que NÃO é a mesma nas duas páginas.
+   *
+   * Em Contatos a pergunta é "quem tem consulta marcada?" → `data_agendamento`,
+   * a próxima. Em Pacientes essa coluna seria sempre vazia: virar paciente
+   * significa que a consulta aconteceu, e o trigger da `0015` zera
+   * `data_agendamento` quando não sobra nenhuma ativa. Lá a pergunta é outra —
+   * "quando essa pessoa esteve aqui?" — e quem responde é `ultima_consulta`.
+   */
+  colunaData: { titulo: string; campo: 'data_agendamento' | 'ultima_consulta'; vazio: string }
 }
 
 const CONFIG: Record<PessoasMode, ModeConfig> = {
@@ -47,6 +57,7 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
     tipoPadrao: 'lead',
     arquivo: 'contatos',
     vazio: 'Nenhum contato nesse período.',
+    colunaData: { titulo: 'Consulta Marcada', campo: 'data_agendamento', vazio: 'Sem consulta' },
   },
   clientes: {
     titulo: 'Pacientes (Clientes)',
@@ -59,6 +70,9 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
     tipoPadrao: 'paciente',
     arquivo: 'pacientes',
     vazio: 'Nenhum paciente nesse período.',
+    // Paciente sem data aqui é cadastro manual: "Novo Paciente" grava o status
+    // direto, sem criar consulta. Dizer isso é melhor que um traço mudo.
+    colunaData: { titulo: 'Última Consulta', campo: 'ultima_consulta', vazio: 'Cadastrado à mão' },
   },
 }
 
@@ -409,14 +423,14 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
   /* ── Export CSV ── */
   const exportCSV = () => {
     const rows = [
-      ['Nome', 'Telefone', 'Procedimento', 'Status', 'Início Atendimento', 'Data Consulta'],
+      ['Nome', 'Telefone', 'Procedimento', 'Status', 'Início Atendimento', cfg.colunaData.titulo],
       ...displayed.map((l) => [
         l.nome_lead ?? '',
         formatarParaExibicao(l.whatsapp_lead),
         l.procedimento_interesse ?? '',
         STATUS_LABELS[l.status],
         fmtDate(l.inicio_atendimento),
-        fmtDate(l.data_agendamento),
+        fmtDate(l[cfg.colunaData.campo]),
       ]),
     ]
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -438,14 +452,14 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
     doc.text(`Exportado em ${new Date().toLocaleString('pt-BR')}`, 14, 22)
     autoTable(doc, {
       startY: 28,
-      head: [['Nome', 'Telefone', 'Procedimento', 'Status', 'Início Atendimento', 'Data Consulta']],
+      head: [['Nome', 'Telefone', 'Procedimento', 'Status', 'Início Atendimento', cfg.colunaData.titulo]],
       body: displayed.map((l) => [
         l.nome_lead ?? '—',
         formatarParaExibicao(l.whatsapp_lead) || '—',
         l.procedimento_interesse ?? '—',
         STATUS_LABELS[l.status],
         fmtDate(l.inicio_atendimento),
-        fmtDate(l.data_agendamento),
+        fmtDate(l[cfg.colunaData.campo]),
       ]),
       // #1E6E8C e #F7FAFB — a paleta azul, em RGB
       headStyles: { fillColor: [30, 110, 140], fontSize: 9, fontStyle: 'bold' },
@@ -577,7 +591,7 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #DCE6EA', background: '#F7FAFB' }}>
-                  {['Nome / Telefone', 'Procedimento', 'Status', 'Início Atendimento', 'Data Consulta', ''].map((h, i) => (
+                  {['Nome / Telefone', 'Procedimento', 'Status', 'Início Atendimento', cfg.colunaData.titulo, ''].map((h, i) => (
                     <th key={i} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 12, fontWeight: 600, color: '#6B818C', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -595,7 +609,11 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
                     <td style={{ padding: '12px 16px', color: '#6B818C' }}>{lead.procedimento_interesse ?? '—'}</td>
                     <td style={{ padding: '12px 16px' }}><StatusBadge status={lead.status} /></td>
                     <td style={{ padding: '12px 16px', color: '#6B818C', whiteSpace: 'nowrap' }}>{fmtDate(lead.inicio_atendimento)}</td>
-                    <td style={{ padding: '12px 16px', color: '#6B818C', whiteSpace: 'nowrap' }}>{fmtDate(lead.data_agendamento)}</td>
+                    <td style={{ padding: '12px 16px', color: '#6B818C', whiteSpace: 'nowrap' }}>
+                      {lead[cfg.colunaData.campo]
+                        ? fmtDate(lead[cfg.colunaData.campo])
+                        : <span style={{ color: '#B9C8CE' }}>{cfg.colunaData.vazio}</span>}
+                    </td>
                     <td style={{ padding: '12px 16px' }}>
                       <button onClick={() => navigate(`/leads/${lead.id}`)}
                         style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#1E6E8C', fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.15s, border-color 0.15s', whiteSpace: 'nowrap' }}

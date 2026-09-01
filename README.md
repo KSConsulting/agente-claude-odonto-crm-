@@ -154,7 +154,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **quinze arquivos, nesta ordem** — cada um depende do anterior:
+São **dezesseis arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -171,6 +171,7 @@ São **quinze arquivos, nesta ordem** — cada um depende do anterior:
 13. [`supabase/migrations/0013_conversas_lista.sql`](supabase/migrations/0013_conversas_lista.sql)
 14. [`supabase/migrations/0014_conversas_agendamento.sql`](supabase/migrations/0014_conversas_agendamento.sql)
 15. [`supabase/migrations/0015_baixa_da_consulta.sql`](supabase/migrations/0015_baixa_da_consulta.sql)
+16. [`supabase/migrations/0016_ultima_consulta.sql`](supabase/migrations/0016_ultima_consulta.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
