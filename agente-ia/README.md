@@ -52,7 +52,7 @@ caminhos próprios. Esta é a lista completa, para ninguém procurar:
 | Onde | O que é |
 |---|---|
 | `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`) e a de apagar uma pessoa (`/apagar-pessoa`) |
-| `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, Evolution, montagem do prompt, conversão de fuso (`tempo.ts`) |
+| `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, as **duas pontes de WhatsApp**, montagem do prompt, conversão de fuso (`tempo.ts`) |
 | `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
 | `src/components/ListaConversas.tsx`<br>`src/components/JanelaConversa.tsx` | As duas colunas dessa tela |
@@ -118,7 +118,7 @@ revisar.
 | O cérebro do agente | Supabase Edge Function — 24h, sem servidor novo |
 | A memória e as mensagens | Postgres do próprio Supabase |
 | A tela de Conversas | O mesmo app React que já existe |
-| A conexão com o WhatsApp | **Evolution API — servidor próprio, ~R$ 40/mês** |
+| A conexão com o WhatsApp | **Evolution API ou uazapi — servidor próprio, ~R$ 40/mês** |
 
 A Evolution é a única peça de infraestrutura fora do que já se paga hoje.
 
@@ -206,7 +206,7 @@ Registradas com o motivo, para ninguém refazer a discussão daqui a três meses
 | Assunto | Decisão | Por quê |
 |---|---|---|
 | **Orquestração** | Sem n8n — tudo neste repositório | Menos peças, código versionado no Git, e o Supabase já roda 24h |
-| **WhatsApp** | Evolution API (não oficial) | Barata e rápida de testar. Único ponto que precisa de servidor próprio |
+| **WhatsApp** | Evolution API **ou** uazapi, à escolha da clínica | As duas são não oficiais. É o único ponto que precisa de servidor próprio, e ter duas evita ficar refém de uma |
 | **Memória** | Postgres do próprio Supabase | A memória do agente e a tela de Conversas leem a mesma tabela |
 | **Modelo de IA** | Selecionável na tela. Começando em **`gpt-4.1-mini`** | A clínica já tinha a chave da OpenAI. Anthropic fica para depois |
 | **Áudio** | Transcrito automaticamente | Paciente brasileiro manda áudio. Sem isso o agente trava na primeira mensagem |
@@ -301,7 +301,10 @@ não depois.
 | `supabase/migrations/0010_agente_conversas.sql` | 2 | Tabela de mensagens, colunas de pausa, configuração e bucket |
 | `supabase/functions/whatsapp/index.ts` | 3 | O cérebro: webhook da Evolution e envio manual do atendente |
 | `supabase/functions/_shared/llm.ts` | 3 | Fala com Claude e GPT pela mesma porta — é o que permite trocar de modelo |
-| `supabase/functions/_shared/evolution.ts` | 3 | Envia mensagem, "digitando…", baixa áudio e foto. E o estado da conexão: consultar, parear, desconectar |
+| `supabase/functions/_shared/whatsapp.ts` | — | **A porta**: a interface que as duas pontes implementam, e o tipo `Midia` |
+| `supabase/functions/_shared/pontes.ts` | — | Lê `provedor_whatsapp` e devolve a ponte ativa |
+| `supabase/functions/_shared/evolution.ts` | 3 | A ponte Evolution: envia, "digitando…", baixa mídia, lê o webhook e cuida da conexão |
+| `supabase/functions/_shared/uazapi.ts` | — | A ponte uazapi, com as mesmas obrigações |
 | `supabase/functions/_shared/prompt.ts` | 3 | Monta o prompt: identidade + dados da clínica + data de hoje + histórico |
 | `supabase/functions/_shared/prompt-oficial.ts` | 1 | O `prompt.md` embutido na função. **Gerado — não edite à mão** |
 | `agente-ia/gerar-prompt.mjs` | 1 | `npm run prompt`: transforma o `.md` no arquivo acima |
@@ -758,9 +761,65 @@ O que mudou:
 
 ## 8.5. A conexão com o WhatsApp
 
-A ponte com o WhatsApp é a **Evolution API** (v2.3.7), num servidor próprio. A
-uazapi está no plano; a coluna `provedor_whatsapp` (migração `0017`) já existe
-para dizer qual está ativa — **uma de cada vez**.
+São **duas pontes implementadas**, e a clínica escolhe na tela: a **Evolution
+API** (v2.3.7) e a **uazapi** (v2.1.9), cada uma num servidor próprio. Quem
+decide é a coluna `provedor_whatsapp` (migração `0017`), lida a cada
+requisição — **uma de cada vez**, e trocar vale na mensagem seguinte, sem
+republicar a função.
+
+### As duas pontes, e a porta entre elas
+
+`supabase/functions/_shared/whatsapp.ts` define a interface; `evolution.ts` e
+`uazapi.ts` implementam; `pontes.ts` lê a coluna e devolve a certa. O
+`whatsapp/index.ts` não conhece nenhuma das duas.
+
+A abstração **não** foi escrita junto com a `0017`, de propósito: com um
+provedor só ela seria inventada por palpite. Foi escrita contra as duas APIs
+reais, e três diferenças justificaram cada decisão dela:
+
+| | Evolution | uazapi |
+|---|---|---|
+| **O texto** | a árvore do Baileys (`message.conversation`, `extendedTextMessage.text`, `imageMessage.caption`…) | `text`, plano |
+| **Grupo** | só o sufixo do jid (`@g.us`) | `isGroup`, booleano |
+| **Mídia** | POST devolvendo base64 — o evento não traz o arquivo | `fileURL` pronto no evento |
+
+A terceira é a que moldou o tipo `Midia`: uma **referência opaca**, montada por
+quem leu o webhook e entendida pela mesma ponte na hora de baixar. O `index.ts`
+carrega o valor sem olhar dentro.
+
+> ⚠️ **O seletor manda em quem a gente chama, não em quem chama a gente.** O
+> webhook chega sem pedir licença. Com as duas configuradas e as duas apontadas
+> para a nossa função, a inativa continuaria entregando mensagem — e a resposta
+> sairia pelo número da outra, para um paciente que nunca escreveu para lá.
+>
+> Por isso quem lê o webhook é a ponte **ativa**, e o que ela não reconhece é
+> descartado **com motivo no log** (`webhook ignorado (uazapi): …`), nunca em
+> silêncio. **Só o webhook do provedor ativo deve apontar para a nossa
+> função** — isso é um passo manual, no painel de cada uma.
+
+> ⚠️ **`desconectar()` da uazapi é a única rota do arquivo não testada.**
+> Escrita por simetria com `/instance/connect`, que foi verificada. Testar
+> significaria derrubar a sessão do WhatsApp da clínica de verdade. O primeiro
+> clique no botão é o teste.
+
+### O que cada rota da uazapi faz
+
+Header `token` com o token **da instância** — o de admin não entra no sistema,
+porque nunca criamos instância.
+
+| Nossa função | uazapi |
+|---|---|
+| `enviarTexto` | `POST /send/text` — `{ number, text }`. O campo é `text`; `message` devolve 400 |
+| `digitando` | `POST /message/presence` — `{ number, presence: 'composing', delay }` |
+| `estadoDaConexao` | `GET /instance/status` — estado, dono, perfil e foto numa ida só |
+| `iniciarConexao` | `POST /instance/connect` — `paircode` e `qrcode` na resposta |
+| `desconectar` | `POST /instance/disconnect` — ⬜ não testada |
+| `fotoDoPerfil` | `POST /chat/details` — `{ number }`, a URL vem em `image` |
+| `baixarMidia` | o `fileURL` do próprio evento |
+
+A referência foi levantada **contra o servidor**, e não pela documentação:
+`docs.uazapi.com` monta a página por JavaScript e os markdown por trás dela são
+rascunho de template.
 
 ### O dia em que ela caiu, e o que isso mudou
 
@@ -822,7 +881,7 @@ aparece quando algo quebra:
 | **Instância** `clinica-principal` | Qual das instâncias do servidor é a nossa |
 | **Chave** `····949B` | Se a chave configurada é a que se pensa que é — útil depois de um `agente:secrets` |
 
-Os três saem de `identificacao()`, em `evolution.ts`, e vêm das **secrets da
+Os três saem de `identificacao()` da ponte ativa, e vêm das **secrets da
 função** — nunca do banco. Só saem pela rota `/conexao`, que exige sessão.
 
 > ⚠️ **Quatro caracteres da chave, e nunca mais.** É o padrão de cartão, AWS e

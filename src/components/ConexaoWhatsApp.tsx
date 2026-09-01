@@ -30,7 +30,7 @@ const VISUAL: Record<string, { cor: string; fundo: string; borda: string; rotulo
   conectando: { cor: '#D97706', fundo: '#FFFBEB', borda: '#FDE68A', rotulo: 'Conectando...' },
   desconectado: { cor: '#DC2626', fundo: '#FEF2F2', borda: '#FECACA', rotulo: 'Desconectado' },
   indisponivel: { cor: '#DC2626', fundo: '#FEF2F2', borda: '#FECACA', rotulo: 'Servidor fora do ar' },
-  nao_implementado: { cor: '#6B818C', fundo: '#F2F6F7', borda: '#DCE6EA', rotulo: 'Ainda sem suporte' },
+  nao_configurado: { cor: '#D97706', fundo: '#FFFBEB', borda: '#FDE68A', rotulo: 'Sem chave configurada' },
 }
 
 /**
@@ -116,8 +116,12 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
     if (estado === 'desconectado') {
       return 'A ponte está de pé, mas a sessão do WhatsApp caiu. Dá para religar aqui mesmo.'
     }
-    if (estado === 'nao_implementado') {
-      return `A ${nomeDoProvedor(provedor)} ainda não está implementada neste sistema.`
+    if (estado === 'nao_configurado') {
+      // Não é o servidor que caiu: é chave que falta. Mandar procurar defeito
+      // numa máquina quando o que faltou foi preencher um campo é o tipo de
+      // conselho errado que custa uma tarde.
+      return `A ${nomeDoProvedor(provedor)} está selecionada, mas as chaves dela não `
+        + `foram configuradas no servidor. Nada entra nem sai enquanto isso.`
     }
     return 'Consultando o servidor...'
   }

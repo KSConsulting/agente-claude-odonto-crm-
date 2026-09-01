@@ -4,7 +4,7 @@
  * Documentação: agente-ia/README.md
  *
  * AS ROTAS:
- *   POST /whatsapp                 webhook da Evolution (WEBHOOK_SEGREDO)
+ *   POST /whatsapp                 webhook da ponte ativa (WEBHOOK_SEGREDO)
  *   POST /whatsapp/enviar          envio manual do atendente (sessão)
  *   GET  /whatsapp/prompt-oficial  o prompt publicado, para a tela comparar (sessão)
  *   GET  /whatsapp/foto            foto de perfil de um número (sessão)
@@ -13,11 +13,11 @@
  *   POST /whatsapp/conexao/desconectar  encerra a sessão do WhatsApp (sessão)
  *   POST /whatsapp/apagar-pessoa   apaga TUDO de uma pessoa, mídia inclusive (sessão)
  *
- * PUBLICADA COM `--no-verify-jwt`, igual à `agenda/`: quem chama é a Evolution,
+ * PUBLICADA COM `--no-verify-jwt`, igual à `agenda/`: quem chama é a ponte,
  * que não tem sessão do Supabase. A autenticação é nossa. Reimplantar no padrão
  * derruba o webhook com um 401 que nem chega no nosso código.
  *
- * O WEBHOOK RESPONDE 200 NA HORA e faz o trabalho em segundo plano. A Evolution
+ * O WEBHOOK RESPONDE 200 NA HORA e faz o trabalho em segundo plano. A ponte
  * reenvia o que demora — e reenvio vira mensagem duplicada, ou pior, resposta
  * duplicada. Guardar a mensagem é rápido; pensar não.
  */
@@ -30,10 +30,8 @@ import { conversar, transcrever, type MensagemLLM, type Parte } from '../_shared
 import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
-import {
-  digitando, enviarTexto, baixarMidia, numeroDoJid, fotoDoPerfil,
-  estadoDaConexao, iniciarConexao, desconectar, identificacao,
-} from '../_shared/evolution.ts'
+import { ponteAtiva } from '../_shared/pontes.ts'
+import type { MensagemRecebida, Ponte } from '../_shared/whatsapp.ts'
 
 const SEGREDO = Deno.env.get('WEBHOOK_SEGREDO') ?? ''
 const URL_SUPABASE = Deno.env.get('SUPABASE_URL')!
@@ -81,7 +79,7 @@ interface Mensagem {
 // ---------------------------------------------------------------------------
 
 /**
- * A Evolution chama de servidor para servidor e não liga para CORS. A TELA
+ * A ponte chama de servidor para servidor e não liga para CORS. A TELA
  * chama do navegador — e sem estes cabeçalhos o preflight barra antes de a
  * requisição existir, com um erro que não aparece no log da função.
  */
@@ -114,7 +112,7 @@ Deno.serve(async (req) => {
 })
 
 // ---------------------------------------------------------------------------
-// Webhook da Evolution
+// Webhook da ponte ativa (Evolution ou uazapi — ver `_shared/whatsapp.ts`)
 // ---------------------------------------------------------------------------
 
 async function rotaWebhook(req: Request): Promise<Response> {
@@ -127,43 +125,39 @@ async function rotaWebhook(req: Request): Promise<Response> {
   const corpo = await req.json().catch(() => null)
   if (!corpo) return json({ ok: true, ignorado: 'corpo_invalido' })
 
-  if (corpo.event && String(corpo.event).toUpperCase().replace(/\./g, '_') !== 'MESSAGES_UPSERT') {
-    return json({ ok: true, ignorado: 'outro_evento' })
+  // Quem lê é a ponte ATIVA, e só ela. Se a outra continuar apontada para cá
+  // depois de uma troca de provedor, o formato dela não é reconhecido e a
+  // mensagem é descartada — o que é o certo: responder mandaria a resposta
+  // pelo número errado, para quem nunca escreveu para ele.
+  const ponte = await ponteAtiva()
+  const lido = ponte.lerWebhook(corpo)
+
+  if (lido.tipo === 'ignorar') {
+    // Com motivo, sempre. A ferida recorrente deste projeto é o silêncio:
+    // mensagem enviada, nenhuma resposta, nada no banco, nada no log.
+    console.log(`webhook ignorado (${ponte.nome}): ${lido.motivo}`)
+    return json({ ok: true, ignorado: lido.motivo })
   }
 
-  const dados = Array.isArray(corpo.data) ? corpo.data[0] : corpo.data
-  const chave = dados?.key ?? {}
-
-  // Mensagem que nós mesmos mandamos volta pelo webhook. Sem este corte, a
-  // Letícia responderia a si mesma, para sempre.
-  if (chave.fromMe) return json({ ok: true, ignorado: 'propria' })
-
-  const jid = String(chave.remoteJid ?? '')
-  // Grupo não é atendimento. Newsletter e status, muito menos.
-  if (!jid.endsWith('@s.whatsapp.net')) return json({ ok: true, ignorado: 'nao_e_conversa' })
-
-  const whatsapp = numeroDoJid(jid)
-  if (!whatsapp) return json({ ok: true, ignorado: 'sem_numero' })
-
-  const conteudo = leConteudo(dados)
-  const lead = await acharOuCriarLead(whatsapp)
+  const recebida = lido.mensagem
+  const lead = await acharOuCriarLead(recebida.whatsapp)
 
   const criadas = await inserir<{ id: string }>('mensagens_whatsapp', {
     lead_id: lead.id,
     autor: 'paciente',
-    tipo: conteudo.tipo,
-    conteudo: conteudo.texto,
-    id_externo: chave.id ?? null,
+    tipo: recebida.tipo,
+    conteudo: recebida.texto,
+    id_externo: recebida.idExterno,
     lida: false,
   }, true)
 
-  // Vazio = `id_externo` repetido: a Evolution reenviou. Já tratamos.
+  // Vazio = `id_externo` repetido: a ponte reenviou. Já tratamos.
   if (!criadas.length) return json({ ok: true, ignorado: 'duplicada' })
 
   const mensagemId = criadas[0].id
 
   // A partir daqui é demorado — o webhook não espera.
-  const trabalho = processar(lead, whatsapp, mensagemId, conteudo, dados)
+  const trabalho = processar(ponte, lead, mensagemId, recebida)
   if (typeof (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime
       ?.waitUntil === 'function') {
     ;(globalThis as { EdgeRuntime: { waitUntil(p: Promise<unknown>): void } })
@@ -179,24 +173,19 @@ async function rotaWebhook(req: Request): Promise<Response> {
 // O trabalho pesado
 // ---------------------------------------------------------------------------
 
-interface ConteudoRecebido {
-  tipo: string
-  texto: string | null
-  temMidia: boolean
-}
-
 async function processar(
+  ponte: Ponte,
   lead: Lead,
-  whatsapp: string,
   mensagemId: string,
-  conteudo: ConteudoRecebido,
-  dados: Record<string, unknown>,
+  recebida: MensagemRecebida,
 ): Promise<void> {
+  const whatsapp = recebida.whatsapp
+
   // ---- Mídia: baixar, guardar e transcrever -------------------------------
   let imagem: Parte | null = null
 
-  if (conteudo.temMidia) {
-    const midia = await baixarMidia(dados)
+  if (recebida.midia) {
+    const midia = await ponte.baixarMidia(recebida.midia)
     if (midia) {
       const bytes = Uint8Array.from(atob(midia.base64), (c) => c.charCodeAt(0))
       const extensao = (midia.tipoMime.split('/')[1] ?? 'bin').split(';')[0]
@@ -209,12 +198,12 @@ async function processar(
         console.error('storage:', e)
       }
 
-      if (conteudo.tipo === 'audio') {
+      if (recebida.tipo === 'audio') {
         const texto = await transcrever(bytes, midia.tipoMime)
         await atualizar('mensagens_whatsapp', `id=eq.${mensagemId}`, {
           conteudo: texto ?? '[áudio que não consegui entender]',
         })
-      } else if (conteudo.tipo === 'imagem') {
+      } else if (recebida.tipo === 'imagem') {
         imagem = { tipo: 'imagem', tipoMime: midia.tipoMime, base64: midia.base64 }
       }
     }
@@ -295,12 +284,12 @@ async function processar(
     // Uns 45 caracteres por segundo, entre 1,2s e 5s. Resposta instantânea é a
     // coisa que mais denuncia que não tem gente do outro lado.
     const pausa = Math.min(5000, Math.max(1200, parte.length * 22))
-    await digitando(whatsapp, pausa)
+    await ponte.digitando(whatsapp, pausa)
     await new Promise((r) => setTimeout(r, pausa))
 
     let idExterno: string | null = null
     try {
-      idExterno = await enviarTexto(whatsapp, parte)
+      idExterno = await ponte.enviarTexto(whatsapp, parte)
     } catch (e) {
       console.error('envio:', e)
       break
@@ -347,7 +336,7 @@ async function rotaPromptOficial(req: Request): Promise<Response> {
 /**
  * A foto de perfil de um número, para a tela Conversas.
  *
- * PRECISA PASSAR PELA FUNÇÃO. A chave da Evolution é de servidor: pedir a foto
+ * PRECISA PASSAR PELA FUNÇÃO. A chave da ponte é de servidor: pedir a foto
  * direto do navegador exigiria mandar a chave para o bundle, e quem tem essa
  * chave manda mensagem por aquele WhatsApp.
  *
@@ -361,57 +350,44 @@ async function rotaFoto(req: Request): Promise<Response> {
   const numero = (new URL(req.url).searchParams.get('whatsapp') ?? '').replace(/\D/g, '')
   if (!numero) return json({ ok: false, motivo: 'sem_numero' }, 400)
 
-  return json({ ok: true, url: await fotoDoPerfil(numero) })
+  return json({ ok: true, url: await (await ponteAtiva()).fotoDoPerfil(numero) })
 }
 
 // ---------------------------------------------------------------------------
 // A conexão com o WhatsApp — para a tela Secretária de IA
 //
-// A chave da Evolution é de servidor. Estas rotas existem pelo mesmo motivo da
-// `/foto`: mandar a chave para o navegador daria a qualquer pessoa com o
-// DevTools aberto o controle do WhatsApp da clínica.
+// A chave da ponte é de servidor — de qualquer uma das duas. Estas rotas
+// existem pelo mesmo motivo da `/foto`: mandar a chave para o navegador daria
+// a qualquer pessoa com o DevTools aberto o controle do WhatsApp da clínica.
+//
+// Qual ponte responde sai da coluna `provedor_whatsapp` (migração 0017), lida
+// a cada chamada — trocar na tela vale na requisição seguinte.
 // ---------------------------------------------------------------------------
-
-/**
- * Qual ponte está ativa. UMA de cada vez (migração 0017).
- *
- * Hoje só a Evolution tem código. Quando o provedor for outro, estas rotas
- * dizem isso em voz alta em vez de chamar a Evolution assim mesmo — silêncio
- * aqui viraria "conectado" mentiroso na tela.
- */
-async function provedorAtivo(): Promise<string> {
-  const cfg = await selecionar<{ provedor_whatsapp: string }>(
-    'configuracoes_agente?select=provedor_whatsapp&limit=1',
-  )
-  return cfg[0]?.provedor_whatsapp ?? 'evolution'
-}
 
 async function rotaConexao(req: Request): Promise<Response> {
   const usuario = await usuarioDaSessao(req)
   if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
 
-  const provedor = await provedorAtivo()
-  if (provedor !== 'evolution') {
-    return json({
-      ok: true, provedor, estado: 'nao_implementado',
-      numero: null, perfil: null, foto: null,
-      servidor: null, instancia: null, chaveFinal: null,
-    })
-  }
+  const ponte = await ponteAtiva()
   // A identificação vem das secrets da função, nunca do banco — e por isso só
-  // sai por aqui, atrás da sessão. Ver `identificacao()` em evolution.ts.
-  return json({ ok: true, provedor, ...identificacao(), ...(await estadoDaConexao()) })
+  // sai por aqui, atrás da sessão. Ver `identificacao()` na porta.
+  return json({
+    ok: true,
+    provedor: ponte.nome,
+    ...ponte.identificacao(),
+    ...(await ponte.estadoDaConexao()),
+  })
 }
 
 async function rotaConectar(req: Request): Promise<Response> {
   const usuario = await usuarioDaSessao(req)
   if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
-  if ((await provedorAtivo()) !== 'evolution') {
-    return json({ ok: false, motivo: 'provedor_nao_implementado' }, 400)
-  }
+
+  const ponte = await ponteAtiva()
+  if (!ponte.configurada()) return json({ ok: false, motivo: 'nao_configurado' }, 400)
 
   const corpo = await req.json().catch(() => ({})) as { numero?: string }
-  const r = await iniciarConexao(corpo.numero)
+  const r = await ponte.iniciarConexao(corpo.numero)
   if (!r) return json({ ok: false, motivo: 'servidor_fora' }, 502)
   return json({ ok: true, ...r })
 }
@@ -419,10 +395,11 @@ async function rotaConectar(req: Request): Promise<Response> {
 async function rotaDesconectar(req: Request): Promise<Response> {
   const usuario = await usuarioDaSessao(req)
   if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
-  if ((await provedorAtivo()) !== 'evolution') {
-    return json({ ok: false, motivo: 'provedor_nao_implementado' }, 400)
-  }
-  return (await desconectar())
+
+  const ponte = await ponteAtiva()
+  if (!ponte.configurada()) return json({ ok: false, motivo: 'nao_configurado' }, 400)
+
+  return (await ponte.desconectar())
     ? json({ ok: true })
     : json({ ok: false, motivo: 'servidor_fora' }, 502)
 }
@@ -520,7 +497,7 @@ async function rotaEnviar(req: Request): Promise<Response> {
   const whatsapp = leads[0]?.whatsapp_lead
   if (!whatsapp) return json({ ok: false, motivo: 'lead_sem_whatsapp' }, 400)
 
-  const idExterno = await enviarTexto(whatsapp, texto)
+  const idExterno = await (await ponteAtiva()).enviarTexto(whatsapp, texto)
 
   await inserir('mensagens_whatsapp', {
     lead_id: leadId,
@@ -539,23 +516,6 @@ async function rotaEnviar(req: Request): Promise<Response> {
 // Apoio
 // ---------------------------------------------------------------------------
 
-/** Descobre o que veio na mensagem, seja qual for o tipo. */
-function leConteudo(dados: Record<string, unknown>): ConteudoRecebido {
-  const m = (dados?.message ?? {}) as Record<string, Record<string, unknown>>
-
-  const texto = (m.conversation as unknown as string) ??
-    (m.extendedTextMessage?.text as string) ??
-    (m.imageMessage?.caption as string) ??
-    (m.videoMessage?.caption as string) ?? null
-
-  if (m.audioMessage) return { tipo: 'audio', texto: null, temMidia: true }
-  if (m.imageMessage) return { tipo: 'imagem', texto: texto ?? null, temMidia: true }
-  if (m.videoMessage) return { tipo: 'video', texto: texto ?? null, temMidia: false }
-  if (m.documentMessage) return { tipo: 'documento', texto: texto ?? null, temMidia: false }
-
-  return { tipo: 'texto', texto: texto ?? null, temMidia: false }
-}
-
 async function criadaEm(mensagemId: string): Promise<string> {
   const linhas = await selecionar<{ criada_em: string }>(
     `mensagens_whatsapp?select=criada_em&id=eq.${mensagemId}&limit=1`,
@@ -566,8 +526,9 @@ async function criadaEm(mensagemId: string): Promise<string> {
 /**
  * O lead nasce SEM NOME, sempre.
  *
- * A Evolution manda o `pushName` — o nome do perfil do WhatsApp — em todo
- * webhook, e é tentador aproveitar. **Não aproveite.** O perfil é o apelido que
+ * As duas pontes mandam o nome do perfil do WhatsApp em todo webhook — a
+ * Evolution em `pushName`, a uazapi em `senderName` —, e é tentador
+ * aproveitar. **Não aproveite.** O perfil é o apelido que
  * a pessoa escolheu, não quem vai sentar na cadeira: o telefone é do marido e
  * quem se consulta é a esposa, o perfil é "Casa da Sogra", duas pessoas dividem
  * o mesmo número.

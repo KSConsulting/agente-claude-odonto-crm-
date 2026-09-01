@@ -52,8 +52,16 @@ Não existe suíte de testes. Ao mexer em algo, valide com `npm run build`
 (que roda o TypeScript) e `npm run lint`.
 
 **O `tsc` do projeto não cobre `supabase/functions/`** (o `tsconfig.app.json`
-inclui só `src`). O código das Edge Functions é validado pelo bundler no
-deploy — erro ali só aparece na hora de publicar.
+inclui só `src`). Dá para conferir sem publicar, com o Deno:
+
+```bash
+npx --yes deno@2 check supabase/functions/whatsapp/index.ts
+```
+
+⚠️ **Ele acusa 6 erros que já existiam** — 4 em `llm.ts`, 1 em `db.ts` e o
+`EdgeRuntime` do `whatsapp/index.ts`, que só existe no runtime do Supabase.
+**Compare com o número, não com "limpo"**: rode antes de mexer, guarde a
+contagem, e confira depois. Sem isso, o erro só aparece na hora de publicar.
 
 ---
 
@@ -554,6 +562,29 @@ tela); o segundo é o servidor fora do ar (nenhum botão daqui resolve — quem
 sobe é a máquina, no painel da hospedagem). Confundir os dois faz a pessoa
 clicar em "Reconectar" enquanto o problema está em outro lugar.
 
+**E `nao_configurado` é um terceiro**, que só passou a existir com a segunda
+ponte: a escolhida não tem chave nas secrets. Sem ele, escolher a uazapi com o
+token em branco diria "o servidor não respondeu" — mandando procurar defeito
+numa máquina quando o que faltou foi preencher um campo.
+
+### Duas pontes, e o seletor só manda em metade
+
+A clínica escolhe entre **Evolution** e **uazapi** no seletor da Secretária de
+IA, e a coluna `provedor_whatsapp` é lida a cada requisição — trocar vale na
+mensagem seguinte, sem republicar. As credenciais das duas convivem nas
+secrets; o que decide é a coluna, não a presença da chave.
+
+A porta é [`_shared/whatsapp.ts`](supabase/functions/_shared/whatsapp.ts), e
+foi escrita **só quando a segunda API chegou**: com um provedor só, a interface
+seria palpite. O `whatsapp/index.ts` não conhece nenhuma das duas.
+
+> ⚠️ **O seletor manda em quem a gente chama, não em quem chama a gente.** O
+> webhook chega sem pedir licença. Quem lê é a ponte **ativa**; o que ela não
+> reconhece é descartado com motivo no log, nunca em silêncio — responder
+> mandaria a resposta pelo número da outra ponte, para quem nunca escreveu para
+> ele. **Só o webhook do provedor ativo deve apontar para a nossa função**, e
+> isso é um passo manual no painel de cada uma.
+
 > **O card de estado precisa das duas condições.** Atender depende do agente
 > ligado **e** do WhatsApp conectado. Até 01/09 o card só conhecia a primeira,
 > e por isso afirmou "está atendendo" por horas com a ponte fora do ar. Painel
@@ -754,7 +785,9 @@ e está todo listado no mapa daquele README.
 **Ela não usa n8n nem Chatwoot.** Esse era o desenho antigo, abandonado antes de
 rodar. Hoje a Letícia é a Edge Function
 [`supabase/functions/whatsapp/`](supabase/functions/whatsapp/), chamada por
-webhook pela **Evolution API v2**. Duas heranças ficaram no schema, ambas
+webhook pela ponte de WhatsApp ativa — **Evolution API v2** ou **uazapi v2**,
+à escolha da clínica no seletor de Secretária de IA. Duas heranças ficaram no
+schema, ambas
 mortas: as colunas `*_chatwoot` de `crm_clinica_dados` e a tabela
 `n8n_chat_histories`, que **nunca chegou a existir** neste banco.
 

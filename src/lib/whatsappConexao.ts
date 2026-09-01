@@ -41,7 +41,7 @@ export type EstadoConexao =
   | 'conectando'
   | 'desconectado'
   | 'indisponivel'
-  | 'nao_implementado'
+  | 'nao_configurado'
 
 export interface Conexao {
   /** Chave do provedor no banco: `evolution` ou `uazapi`. */

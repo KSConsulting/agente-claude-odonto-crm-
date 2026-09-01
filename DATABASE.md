@@ -1112,6 +1112,13 @@ A coluna nasceu com um provedor implementado, de propósito: ela é barata agora
 e cara depois. Sem ela, a tela diria "Evolution" em texto fixo, e o dia da
 troca viraria caça ao literal espalhado por telas, rotas e mensagens de erro.
 
+**Desde 01/09 as duas estão implementadas.** A abstração foi escrita só quando
+a segunda API chegou — com um provedor só, a interface seria palpite. Quem lê
+esta coluna é `_shared/pontes.ts`, **a cada requisição**: trocar na tela vale
+na mensagem seguinte, sem republicar a função. As credenciais das duas podem
+conviver preenchidas nas secrets; o que decide é esta coluna, não a presença
+da chave.
+
 > ⚠️ **As credenciais NÃO moram aqui.** Ficam nas secrets do Supabase, fora do
 > alcance do navegador. `configuracoes_agente` é lida por `authenticated` com
 > acesso total (seção 6): chave de API nessa tabela seria chave visível para

@@ -4,7 +4,14 @@
  * ⚠️ ESCRITO PARA A **v2** (confirmado 2.3.7 na instância da clínica).
  * A v1 usa outros formatos de corpo — `{ textMessage: { text } }` em vez de
  * `{ text }`, por exemplo. Trocar a versão do servidor quebra este arquivo.
+ *
+ * Implementa a porta de `whatsapp.ts`, junto com a uazapi. Ver lá o porquê.
  */
+
+import {
+  foraDoAr, soDigitos,
+  type Conexao, type Estado, type Midia, type Ponte, type Recebimento,
+} from './whatsapp.ts'
 
 const URL_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '')
 const CHAVE = Deno.env.get('EVOLUTION_API_KEY') ?? ''
@@ -55,12 +62,13 @@ export async function enviarTexto(numero: string, texto: string): Promise<string
  * webhook — só a referência. Este é o segundo passo que busca o arquivo.
  */
 export async function baixarMidia(
-  mensagem: Record<string, unknown>,
+  midia: Midia,
 ): Promise<{ base64: string; tipoMime: string } | null> {
+  if (midia.via !== 'evolution') return null
   try {
     const r = await chamar<{ base64?: string; mimetype?: string }>(
       'chat/getBase64FromMediaMessage',
-      { message: mensagem, convertToMp4: false },
+      { message: midia.mensagem, convertToMp4: false },
     )
     if (!r?.base64) return null
     return { base64: r.base64, tipoMime: r.mimetype ?? 'application/octet-stream' }
@@ -69,10 +77,8 @@ export async function baixarMidia(
   }
 }
 
-/** `5511987654321@s.whatsapp.net` → `5511987654321`. */
-export function numeroDoJid(jid: string): string {
-  return (jid ?? '').split('@')[0].split(':')[0].replace(/\D/g, '')
-}
+/** `5511987654321@s.whatsapp.net` → `5511987654321`. Mora em `whatsapp.ts`. */
+export const numeroDoJid = soDigitos
 
 /**
  * A foto de perfil do WhatsApp da pessoa.
@@ -111,26 +117,9 @@ export async function fotoDoPerfil(numero: string): Promise<string | null> {
 /** Prazo para o servidor responder. Passou disso, tratamos como fora do ar. */
 const PRAZO_MS = 8_000
 
-/**
- * `desconectado` e `indisponivel` são coisas MUITO diferentes, e a tela precisa
- * dos dois nomes:
- *
- * - `desconectado` — o servidor respondeu, mas a sessão do WhatsApp caiu.
- *   Resolve reconectando por aqui, com código de pareamento.
- * - `indisponivel` — o servidor não respondeu. Não adianta botão nenhum nesta
- *   tela: quem tem que subir é a máquina, no painel da hospedagem.
- *
- * Foi exatamente a segunda situação que aconteceu em 01/09, e o único sintoma
- * era silêncio no WhatsApp.
- */
-export type Estado = 'conectado' | 'conectando' | 'desconectado' | 'indisponivel'
-
-export interface Conexao {
-  estado: Estado
-  numero: string | null
-  perfil: string | null
-  foto: string | null
-}
+// Os cinco estados e o `Conexao` agora moram em `whatsapp.ts`, porque a uazapi
+// responde os mesmos. O motivo de `desconectado` ≠ `indisponivel` está lá.
+export type { Conexao, Estado }
 
 async function buscar<T>(caminho: string, metodo = 'GET'): Promise<T | null> {
   try {
@@ -166,18 +155,16 @@ interface InstanciaBruta {
  * o dobro do prazo justo quando o servidor está lento.
  */
 export async function estadoDaConexao(): Promise<Conexao> {
+  if (!configurada()) return foraDoAr('nao_configurado')
+
   const lista = await buscar<InstanciaBruta[] | InstanciaBruta>('instance/fetchInstances')
-  if (lista === null) {
-    return { estado: 'indisponivel', numero: null, perfil: null, foto: null }
-  }
+  if (lista === null) return foraDoAr('indisponivel')
 
   const todas = (Array.isArray(lista) ? lista : [lista]).map((i) => i.instance ?? i)
   const nossa = todas.find((i) => (i.name ?? i.instanceName) === INSTANCIA)
 
-  if (!nossa) {
-    // Servidor de pé, mas a instância não existe mais lá dentro.
-    return { estado: 'desconectado', numero: null, perfil: null, foto: null }
-  }
+  // Servidor de pé, mas a instância não existe mais lá dentro.
+  if (!nossa) return foraDoAr('desconectado')
 
   const bruto = (nossa.connectionStatus ?? nossa.state ?? '').toLowerCase()
   const estado: Estado =
@@ -252,4 +239,98 @@ export function identificacao(): {
     instancia: INSTANCIA || null,
     chaveFinal: CHAVE.length >= 4 ? CHAVE.slice(-4) : null,
   }
+}
+
+// ---------------------------------------------------------------------------
+// O que chega
+//
+// Estas duas funções vieram de dentro do `whatsapp/index.ts`, onde estavam
+// soltas no meio da rota. Com uma ponte só isso não incomodava; com duas, a
+// rota não pode saber que existe `messages.upsert` nem `extendedTextMessage`.
+// ---------------------------------------------------------------------------
+
+/** Sem as três secrets, nada acima funciona — e a tela precisa dizer isso. */
+function configurada(): boolean {
+  return Boolean(URL_BASE && CHAVE && INSTANCIA)
+}
+
+/**
+ * O formato do Baileys, que a Evolution repassa cru.
+ *
+ * A árvore é o que ela é: o texto de uma mensagem simples mora em
+ * `message.conversation`, o de uma resposta em `message.extendedTextMessage.text`,
+ * e a legenda de uma foto em `message.imageMessage.caption`. Não há campo
+ * único, e é justamente essa bagunça que a porta esconde do resto do sistema.
+ */
+function leConteudo(dados: Record<string, unknown>): {
+  tipo: string
+  texto: string | null
+  temMidia: boolean
+} {
+  const m = (dados?.message ?? {}) as Record<string, Record<string, unknown>>
+
+  const texto = (m.conversation as unknown as string) ??
+    (m.extendedTextMessage?.text as string) ??
+    (m.imageMessage?.caption as string) ??
+    (m.videoMessage?.caption as string) ?? null
+
+  if (m.audioMessage) return { tipo: 'audio', texto: null, temMidia: true }
+  if (m.imageMessage) return { tipo: 'imagem', texto: texto ?? null, temMidia: true }
+  if (m.videoMessage) return { tipo: 'video', texto: texto ?? null, temMidia: false }
+  if (m.documentMessage) return { tipo: 'documento', texto: texto ?? null, temMidia: false }
+
+  return { tipo: 'texto', texto: texto ?? null, temMidia: false }
+}
+
+function lerWebhook(corpo: Record<string, unknown>): Recebimento {
+  if (corpo.event && String(corpo.event).toUpperCase().replace(/\./g, '_') !== 'MESSAGES_UPSERT') {
+    return { tipo: 'ignorar', motivo: `evento_${corpo.event}` }
+  }
+
+  const dados = (Array.isArray(corpo.data) ? corpo.data[0] : corpo.data) as
+    Record<string, unknown> | undefined
+  const chave = (dados?.key ?? {}) as { fromMe?: boolean; remoteJid?: string; id?: string }
+
+  if (!dados || !chave.remoteJid) return { tipo: 'ignorar', motivo: 'formato_desconhecido' }
+
+  // Mensagem que nós mesmos mandamos volta pelo webhook. Sem este corte, a
+  // Letícia responderia a si mesma, para sempre.
+  if (chave.fromMe) return { tipo: 'ignorar', motivo: 'propria' }
+
+  // Grupo não é atendimento. Newsletter e status, muito menos. A Evolution não
+  // tem um `isGroup` como a uazapi — aqui o sufixo do jid é o único sinal.
+  if (!chave.remoteJid.endsWith('@s.whatsapp.net')) {
+    return { tipo: 'ignorar', motivo: 'nao_e_conversa' }
+  }
+
+  const whatsapp = numeroDoJid(chave.remoteJid)
+  if (!whatsapp) return { tipo: 'ignorar', motivo: 'sem_numero' }
+
+  const c = leConteudo(dados)
+  return {
+    tipo: 'mensagem',
+    mensagem: {
+      whatsapp,
+      idExterno: chave.id ?? null,
+      tipo: c.tipo,
+      texto: c.texto,
+      // A instância está com `webhookBase64: false`, então o arquivo não vem
+      // junto — só a referência, que é a mensagem inteira de volta.
+      midia: c.temMidia ? { via: 'evolution', mensagem: dados } : null,
+    },
+  }
+}
+
+export const EVOLUTION: Ponte = {
+  nome: 'evolution',
+  configurada,
+  lerWebhook,
+  digitando,
+  enviarTexto,
+  baixarMidia,
+  fotoDoPerfil,
+  estadoDaConexao,
+  iniciarConexao,
+  desconectar,
+  identificacao,
 }
