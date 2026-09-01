@@ -495,6 +495,17 @@ componente por onde toda tela autenticada passa. O prompt lê pelo marcador
 > falando de uma pessoa que não existe mais no dia em que a clínica renomeasse.
 > Meia renomeação é pior que nenhuma.
 
+**O campo na tela é só leitura, e isso é decisão de produto, não limitação.** A
+coluna é gravável e a tela poderia editá-la em três linhas. O campo é inerte
+para que trocar o nome seja um ato deliberado, feito no projeto por uma IA com
+o repositório aberto — e não um clique de passagem numa página que a equipe
+abre todo dia. Trocar o nome no meio da operação confunde quem fala com ela há
+meses, e vale para toda conversa em andamento.
+
+> Se um dia isso mudar, o que falta é o `update` e uma chamada a
+> `definirNomeDoAgente()` — que existe e é o que faz as treze telas
+> acompanharem sem recarregar.
+
 ### Lista ou card, e o que decide
 
 As duas listagens da clínica não têm a mesma forma, e a diferença não é gosto:

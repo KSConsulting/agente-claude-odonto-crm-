@@ -5,7 +5,7 @@ import {
 import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
 import { formatarParaExibicao } from '../lib/telefones'
-import { useAgente, definirNomeDoAgente } from '../lib/agente'
+import { useAgente } from '../lib/agente'
 import ConexaoWhatsApp from '../components/ConexaoWhatsApp'
 import ApagarPessoa from '../components/ApagarPessoa'
 import { useConexao, conexaoDePe } from '../lib/whatsappConexao'
@@ -92,8 +92,6 @@ export default function SecretariaIA() {
   const [modoTeste, setModoTeste] = useState(true)
   const [numeros, setNumeros] = useState<string[]>([])
   const [prompt, setPrompt] = useState<string | null>(null)
-  const [nomeEditado, setNomeEditado] = useState('')
-  const [salvandoNome, setSalvandoNome] = useState(false)
 
   const { conexao, recarregar: recarregarConexao } = useConexao()
 
@@ -111,7 +109,6 @@ export default function SecretariaIA() {
           setModoTeste(c.modo_teste)
           setNumeros(c.numeros_teste ?? [])
           setPrompt(c.prompt)
-          setNomeEditado(c.nome_agente)
         }
         setCarregando(false)
       })
@@ -138,30 +135,6 @@ export default function SecretariaIA() {
     if (error) { setErro('Não consegui trocar o provedor.'); return }
     setCfg({ ...cfg, provedor_whatsapp: novo as ConfiguracoesAgente['provedor_whatsapp'] })
     recarregarConexao()
-  }
-
-  /**
-   * Grava o nome na hora, fora do "Salvar" geral.
-   *
-   * É a mesma escolha do liga/desliga e do seletor de provedor: coisas que
-   * mudam a identidade do agente não são rascunho no meio de um formulário.
-   * E o atrito aqui é o aviso que aparece antes — não um campo travado.
-   */
-  async function salvarNome() {
-    if (!cfg) return
-    const limpo = nomeEditado.trim()
-    if (!limpo || limpo === cfg.nome_agente) return
-    setSalvandoNome(true)
-    setErro('')
-    const { error } = await supabase.from('configuracoes_agente')
-      .update({ nome_agente: limpo }).eq('id', cfg.id)
-    setSalvandoNome(false)
-    if (error) { setErro('Não consegui salvar o nome. Tente de novo.'); return }
-    setCfg({ ...cfg, nome_agente: limpo })
-    // A tela inteira acompanha na hora: o `useAgente()` de todo componente
-    // reage a esta chamada. Sem ela, metade da interface ficaria com o nome
-    // velho até alguém recarregar a página.
-    definirNomeDoAgente(limpo)
   }
 
   async function salvar() {
@@ -313,54 +286,49 @@ export default function SecretariaIA() {
         <Erro texto={erro} />
       </div>
 
-      {/* ---------------- O nome dela ----------------
+      {/* ---------------- O nome da secretária ----------------
 
-          Fica no topo porque é a identidade: tudo abaixo é como ela se
-          comporta. E é editável de propósito — campo que mostra e não deixa
-          mexer é porta com placa dizendo "use a outra porta". */}
+          ⚠️ SÓ LEITURA, POR DECISÃO DO PRODUTO. A coluna `nome_agente` é
+          gravável e a tela poderia editá-la; o campo é inerte de propósito,
+          para que trocar o nome seja um ato deliberado feito no projeto — e
+          não um clique de passagem numa tela que a recepção abre todo dia.
+
+          Trocar o nome no meio da operação confunde quem fala com ela há
+          meses, e a mudança vale para toda conversa em andamento. */}
       <div style={cartao}>
-        <div style={titulo}>Nome</div>
+        <div style={titulo}>Nome da secretária</div>
         <p style={legenda}>
-          Como ela se chama nas telas da equipe <strong>e</strong> na conversa com o
-          paciente. Antes isso morava em dois lugares que não se falavam; agora é um
-          campo só, e o prompt lê daqui.
+          É assim que ela se apresenta ao paciente no WhatsApp, e é o nome que a
+          equipe vê nas telas do sistema. Um nome só, nos dois lugares: o prompt
+          dela lê deste mesmo campo.
         </p>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <input
-            value={nomeEditado}
-            onChange={(e) => setNomeEditado(e.target.value)}
-            maxLength={40}
-            placeholder="Letícia"
-            style={{
-              padding: '9px 12px', borderRadius: 9, border: '1px solid #DCE6EA',
-              fontSize: 13.5, fontFamily: FONTE, color: '#16232B',
-              background: '#fff', outline: 'none', minWidth: 220,
-            }}
-          />
-          {nomeEditado.trim() && nomeEditado.trim() !== cfg.nome_agente && (
-            <button
-              onClick={() => { void salvarNome() }}
-              disabled={salvandoNome}
-              style={{ ...botao('#1E6E8C'), cursor: salvandoNome ? 'wait' : 'pointer' }}>
-              <Save size={14} /> {salvandoNome ? 'Salvando...' : 'Salvar nome'}
-            </button>
-          )}
-        </div>
+        <input
+          value={cfg.nome_agente}
+          readOnly
+          aria-readonly="true"
+          title="Este campo não é editado por aqui."
+          style={{
+            padding: '9px 12px', borderRadius: 9, border: '1px solid #DCE6EA',
+            fontSize: 13.5, fontFamily: FONTE, color: '#16232B',
+            background: '#F7FAFB', outline: 'none', minWidth: 220,
+            cursor: 'default',
+          }}
+        />
 
-        {/* O atrito. Trocar o nome no meio da operação confunde quem fala com
-            ela há meses — mas a decisão é da clínica, e o aviso basta. */}
-        {nomeEditado.trim() && nomeEditado.trim() !== cfg.nome_agente && (
-          <div style={{
-            marginTop: 12, background: '#FFFBEB', border: '1px solid #FDE68A',
-            borderRadius: 10, padding: '10px 13px',
-            fontSize: 12.5, color: '#B45309', lineHeight: 1.6,
-          }}>
-            Os pacientes conhecem ela como <strong>{cfg.nome_agente}</strong>. A partir
-            do próximo salvamento ela se apresenta como <strong>{nomeEditado.trim()}</strong>,
-            inclusive para quem está no meio de uma conversa.
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 14,
+          background: '#EAF3F6', border: '1px solid #CFE2E9', borderRadius: 10,
+          padding: '11px 13px',
+        }}>
+          <Bot size={16} color="#1E6E8C" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12.5, color: '#1E6E8C', lineHeight: 1.6 }}>
+            <strong>Para trocar o nome, peça a uma IA no projeto.</strong> Abra a
+            pasta do sistema no Claude Code, no Codex ou na IDE que você usar, e
+            peça a troca. O nome aparece nas telas e dentro do prompt — a IA
+            acerta os dois de uma vez, e é por isso que não se troca por aqui.
           </div>
-        )}
+        </div>
       </div>
 
       {/* ---------------- Conexão do WhatsApp ---------------- */}
