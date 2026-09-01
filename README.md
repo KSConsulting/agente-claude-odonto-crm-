@@ -141,6 +141,34 @@ cd odonto-clinica
 npm install
 ```
 
+Agora crie os **três arquivos de chaves**. Eles não vêm no clone de propósito —
+estão no `.gitignore`, que é o que impede a sua chave de ir junto num `push`.
+O que vem é o molde de cada um, e você copia:
+
+```bash
+cp .env.example                        .env
+cp agente-ia/.env.agente.example       agente-ia/.env.agente.local
+cp .supabase-token.example             .supabase-token.local
+```
+
+Eles não são a mesma coisa, e um deles é descartável:
+
+| Arquivo | Precisa? | Vida útil |
+|---|---|---|
+| **`.env`** | **Sim** — sem ele o sistema não funciona | Permanente |
+| `agente-ia/.env.agente.local` | Só para ligar a Letícia no WhatsApp | Permanente, mas parado: sobe para os secrets do Supabase e fica de registro |
+| `.supabase-token.local` | Só para publicar pela linha de comando | ⛔ **Descartável.** Sai de cena quando o sistema estiver no ar |
+
+Cada molde tem, dentro dele, o comentário dizendo onde achar cada valor. Você
+preenche cada um no passo em que ele for usado — não precisa ter tudo agora.
+
+> **Por que existe um arquivo para o token da conta.** Porque o `supabase login`
+> é interativo: abre o navegador e espera alguém colar um código. Se você está
+> instalando com a ajuda de uma IA na IDE, ela não consegue fazer esse passo — e
+> com o token no arquivo ela aplica as migrações e publica as funções sozinha.
+> Terminada a instalação, o token é **revogado e o arquivo apagado**. O passo a
+> passo está dentro do próprio `.supabase-token.example`.
+
 ### 2. Criar o projeto no Supabase
 
 Acesse [supabase.com](https://supabase.com) → **New Project**.
@@ -196,9 +224,9 @@ vêm de exemplo: cadastre os seus na tela **Profissionais**, e a agenda de cada
 um nasce junto. Tokens também começam vazios: crie o primeiro em
 no **menu do usuário → Token e API**, senão a API responde 401 para quem chamar.
 
-### 4. Configurar as variáveis de ambiente
+### 4. Preencher o `.env`
 
-Crie um arquivo chamado `.env` na raiz do projeto:
+Abra o `.env` que você copiou no passo 1 e preencha as duas linhas:
 
 ```env
 VITE_SUPABASE_URL=https://SEU_PROJECT_REF.supabase.co
@@ -299,6 +327,18 @@ existe, e só cai no `index.html` quando não existe.
 3. Dar F5 dentro de uma ficha de paciente
 4. Menu do usuário → Token e API: a URL dos cURLs tem que apontar para o seu
    projeto do Supabase, e não para `undefined`
+5. **Revogue o token de instalação e apague o arquivo** — nesta ordem:
+
+   ```bash
+   # 1º  https://supabase.com/dashboard/account/tokens  →  Revoke
+   # 2º
+   rm .supabase-token.local
+   ```
+
+   Ele dá acesso total à sua **conta** do Supabase, não só a este projeto, e a
+   instalação acabou. Apagar antes de revogar não revoga nada: o token continua
+   vivo e você jogou fora a cópia que dizia qual era. Precisou publicar de novo
+   depois? Gere outro — leva quinze segundos.
 
 > A Edge Function da API **não** vai para a Vercel — ela roda no Supabase e
 > continua onde está. O deploy aqui é só do sistema que a equipe usa.

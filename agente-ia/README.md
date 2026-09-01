@@ -39,7 +39,8 @@ agente-ia/
 ├── prompt.md            ⭐ o prompt da Letícia — quem ela é e como se comporta
 ├── GUIA-DO-PROMPT.md    🧭 como escrever o prompt de OUTRA clínica
 ├── gerar-prompt.mjs     ⚙️ `npm run prompt`: o .md vira `_shared/prompt-oficial.ts`
-├── .env.agente.local    🔑 as chaves (fora do Git)
+├── .env.agente.example  📋 o molde das chaves — este É versionado
+├── .env.agente.local    🔑 as chaves preenchidas (fora do Git)
 └── exemplos/            🧪 vazia — conversas de teste, quando existirem
 ```
 
@@ -948,6 +949,10 @@ npm run agente:deploy    # regera o prompt e publica a função
 > ```bash
 > export SUPABASE_ACCESS_TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .supabase-token.local | cut -d= -f2-)
 > ```
+>
+> Esse arquivo é **da instalação, e descartável** — o molde
+> [`.supabase-token.example`](../.supabase-token.example) explica como criar o
+> token, e como revogar e apagar quando o sistema estiver no ar.
 
 Depois, apontar o webhook da Evolution para a função, com o segredo no
 cabeçalho (`POST {EVOLUTION_API_URL}/webhook/set/{instancia}`):
@@ -984,12 +989,20 @@ curl -i -X POST https://SEU_REF.supabase.co/functions/v1/whatsapp -d '{}'
 
 ## 11. Chaves e secrets
 
-As seis chaves ficam em [`.env.agente.local`](.env.agente.local) — nesta pasta — arquivo
-ignorado pelo Git, que serve só para preencher e depois subir:
+As seis chaves ficam em `.env.agente.local`, nesta pasta. Ele **não vem no
+clone** — está no `.gitignore`. O que vem é o molde
+[`.env.agente.example`](.env.agente.example), com o comentário de onde achar
+cada chave:
 
 ```bash
-supabase secrets set --env-file agente-ia/.env.agente.local
+cp agente-ia/.env.agente.example agente-ia/.env.agente.local
+# preencha, e então:
+npm run agente:secrets
 ```
+
+O `agente:secrets` **sobe** as chaves para os secrets do Supabase, e é de lá que
+a Edge Function lê. O arquivo local continua sendo o seu único registro do que
+foi configurado — os secrets do Supabase não podem ser lidos de volta.
 
 | Chave | Para quê |
 |---|---|

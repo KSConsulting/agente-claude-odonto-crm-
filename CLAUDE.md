@@ -626,6 +626,21 @@ VITE_SUPABASE_ANON_KEY=sua_anon_key
 Lidas em [`src/lib/supabase.ts`](src/lib/supabase.ts). O `.env` está no
 `.gitignore` — **nunca comite credenciais**.
 
+**Nenhum dos três arquivos de chave vem no clone** — é o `.gitignore` que impede
+a chave de subir num `push`. O que é versionado é o molde de cada um, e o passo 1
+da instalação é copiar:
+
+| Molde (versionado) | Vira | Vida útil |
+|---|---|---|
+| [`.env.example`](.env.example) | `.env` | Permanente — o `npm run dev` lê toda vez |
+| [`agente-ia/.env.agente.example`](agente-ia/.env.agente.example) | `agente-ia/.env.agente.local` | Permanente, mas parado: sobe para os secrets e fica de registro |
+| [`.supabase-token.example`](.supabase-token.example) | `.supabase-token.local` | ⛔ **Descartável** — revogado e apagado quando o sistema sobe |
+
+O terceiro guarda um Personal Access Token da **conta** do Supabase, não do
+projeto: acesso total, todos os projetos. Ele existe porque o `supabase login` é
+interativo e a IA da IDE não consegue fazer esse passo — é a única razão. Cada
+molde carrega dentro dele de onde vem cada valor e quando ele morre.
+
 A `anon key` é pública por natureza (vai no bundle, protegida por RLS). A
 `service_role key` **jamais** entra neste projeto.
 

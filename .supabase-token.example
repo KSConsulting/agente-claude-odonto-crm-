@@ -1,0 +1,67 @@
+# =============================================================================
+#  .supabase-token.local — O ARQUIVO DESCARTÁVEL DA INSTALAÇÃO
+# =============================================================================
+#
+#  ⛔ ESTE É O ÚNICO ARQUIVO DO PROJETO QUE NASCE PARA MORRER.
+#
+#  Os outros dois (`.env` e `.env.agente.local`) ficam para sempre. Este existe
+#  só durante a instalação, e some quando o sistema estiver no ar.
+#
+#      cp .supabase-token.example .supabase-token.local
+#
+# =============================================================================
+#  O QUE É
+# =============================================================================
+#
+#  Um Personal Access Token da sua CONTA no Supabase — não do projeto.
+#
+#  Ele dá acesso total à conta: todos os projetos, inclusive os que não têm
+#  nada a ver com este sistema. É a credencial mais poderosa que aparece em
+#  qualquer lugar deste repositório. Trate como senha de banco.
+#
+# =============================================================================
+#  POR QUE EXISTE, SE O `supabase login` FAZ A MESMA COISA
+# =============================================================================
+#
+#  Porque o `supabase login` é interativo: abre o navegador e espera alguém
+#  colar um código. Se você está instalando este sistema com a ajuda de uma IA
+#  na IDE (Claude Code, Codex) — que é o jeito recomendado, ver
+#  `agente-ia/GUIA-DO-PROMPT.md` — ela não consegue fazer esse passo.
+#
+#  Com o token aqui, ela roda as migrações e publica as Edge Functions sozinha.
+#  É essa a única razão do arquivo existir. Terminou a instalação, ele sai.
+#
+# =============================================================================
+#  COMO CRIAR
+# =============================================================================
+#
+#  1. https://supabase.com/dashboard/account/tokens -> "Generate new token"
+#
+#  2. DÊ UM NOME QUE VOCÊ RECONHEÇA DEPOIS: `instalacao-odonto-clinica`.
+#     Não é enfeite — é por esse nome que você vai achar o token para revogar,
+#     mesmo que já tenha apagado este arquivo.
+#
+#  3. Copie o valor (ele aparece UMA vez) e cole abaixo.
+#
+# =============================================================================
+#  COMO SE LIVRAR DELE — NESTA ORDEM
+# =============================================================================
+#
+#  Quando o sistema estiver no ar (migrações aplicadas, funções publicadas,
+#  site na Vercel respondendo):
+#
+#      1º  REVOGUE  o token, em https://supabase.com/dashboard/account/tokens
+#      2º  APAGUE   este arquivo:  rm .supabase-token.local
+#
+#  A ordem importa. Apagar primeiro não revoga nada — o token continua vivo na
+#  sua conta, e você acabou de jogar fora a cópia que dizia qual era. (Se isso
+#  acontecer, o nome do passo 2 acima é o que te salva.)
+#
+#  Precisou publicar de novo depois? Gere um token novo. Leva quinze segundos,
+#  e é mais barato que manter um vivo por seis meses num arquivo esquecido.
+#
+# =============================================================================
+
+
+# Cole o token aqui. Formato: sbp_...
+SUPABASE_ACCESS_TOKEN=
