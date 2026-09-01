@@ -325,6 +325,39 @@ para `/login`.
 O login tem proteção contra força bruta no cliente: 5 tentativas, depois 30
 segundos de bloqueio com contagem regressiva.
 
+### A regra da senha mora no servidor; a tela só a explica
+
+Trocar a senha exige **10 caracteres, com minúscula, maiúscula, número e
+símbolo** — e uma pontuação `zxcvbn` de 3 ou mais.
+
+| Onde | O quê | Vale? |
+|---|---|---|
+| **Supabase Auth** (Authentication → Password settings) | `password_min_length = 10` e o preset das quatro classes | **Sim.** É quem recusa |
+| `REGRAS_SENHA`, em [`Configuracoes.tsx`](src/pages/Configuracoes.tsx) | A mesma lista, para a interface | Não. Tranca o botão e diz o que falta |
+
+**São duas cópias da mesma regra, e é assim mesmo.** Validação no navegador é
+conselho: quem chamar `supabase.auth.updateUser()` por fora não passa por ela.
+Mas sem a cópia na tela, a única forma de descobrir a regra seria clicar e ser
+recusado. **Mudou uma, mude a outra** — mais frouxa aqui, a pessoa preenche
+tudo e leva um erro sem explicação; mais dura, ela é impedida de usar uma senha
+que o sistema aceitaria.
+
+Três decisões dentro disso:
+
+1. **A força entra como um item da lista, não como recusa no clique.** As quatro
+   classes passam com `Senha@1234`, que qualquer dicionário quebra — então a
+   regra do `zxcvbn` continua valendo. Mas botão trancado por motivo invisível é
+   o pior dos dois mundos.
+2. **A lista fica sempre na tela**, e não só depois de digitar: a regra precisa
+   ser conhecida na hora de escolher a senha, não descoberta na hora da recusa.
+3. **O conjunto de símbolos é copiado do Supabase, à risca.** `/[^A-Za-z0-9]/`
+   seria mais curto e estaria errado — acento não é alfanumérico para essa
+   expressão, então `Josué12345` passaria aqui e seria recusado lá.
+
+> ⚠️ A política do Auth **não** é um arquivo deste repositório: ela vive na
+> configuração do projeto no Supabase. Instalação nova precisa dela ligada à
+> mão, e o [`README.md`](README.md) traz o passo.
+
 ---
 
 ## Convenções de código

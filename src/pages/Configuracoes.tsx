@@ -45,6 +45,42 @@ async function esvaziarPasta(bucket: string, pasta: string): Promise<boolean> {
 }
 
 /* ──────────────────────────────────────────────
+   Regras da senha
+────────────────────────────────────────────── */
+
+/**
+ * ⚠️ ESTAS REGRAS EXISTEM EM DOIS LUGARES — E O OUTRO É QUE VALE.
+ *
+ * Aqui elas são interface: mostram o que falta enquanto a pessoa digita e
+ * trancam o botão. Quem **recusa** é o Supabase Auth, no painel do projeto
+ * (Authentication → Password settings): `password_min_length` e o preset de
+ * caracteres exigidos. Validação de navegador é conselho — quem chamar
+ * `updateUser` por fora não passa por ela.
+ *
+ * Mudou uma, mude a outra. Frouxa demais aqui, a pessoa preenche tudo, clica e
+ * leva um erro do servidor sem explicação; rígida demais, ela é impedida de
+ * usar uma senha que o sistema aceitaria.
+ */
+const SENHA_MINIMO = 10
+
+/**
+ * O que o Supabase conta como símbolo — copiado do preset dele, à risca.
+ *
+ * `/[^A-Za-z0-9]/` seria mais curto e estaria **errado**: acento é "não
+ * alfanumérico" para essa expressão, então `Josué12345` passaria aqui e seria
+ * recusado lá, sem que a tela soubesse dizer por quê.
+ */
+const SIMBOLOS = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~"
+
+const REGRAS_SENHA: { rotulo: string; ok: (senha: string) => boolean }[] = [
+  { rotulo: `Pelo menos ${SENHA_MINIMO} caracteres`, ok: (s) => s.length >= SENHA_MINIMO },
+  { rotulo: 'Uma letra minúscula', ok: (s) => /[a-z]/.test(s) },
+  { rotulo: 'Uma letra maiúscula', ok: (s) => /[A-Z]/.test(s) },
+  { rotulo: 'Um número', ok: (s) => /[0-9]/.test(s) },
+  { rotulo: 'Um símbolo (!, @, #…)', ok: (s) => [...s].some((c) => SIMBOLOS.includes(c)) },
+]
+
+/* ──────────────────────────────────────────────
    Password strength helpers
 ────────────────────────────────────────────── */
 const STRENGTH_LABELS = ['Muito fraca', 'Fraca', 'Razoável', 'Forte', 'Muito forte']
@@ -250,13 +286,33 @@ function TabPerfil({ userId }: { userId: string }) {
   const handleSavePassword = async () => {
     setPasswordError('')
     if (!newPassword) { setPasswordError('Digite a nova senha.'); return }
-    const score = zxcvbn(newPassword).score
-    if (score < 3) { setPasswordError('Senha muito fraca. Use letras maiúsculas, minúsculas, números e símbolos.'); return }
+
+    // O botão já fica trancado até tudo passar. Isto aqui é a segunda tranca:
+    // o estado pode mudar entre o clique e a leitura, e um `disabled` some com
+    // um comando no console.
+    const faltando = REGRAS_SENHA.filter((regra) => !regra.ok(newPassword))
+    if (faltando.length > 0) {
+      setPasswordError(`A senha ainda não atende: ${faltando.map((r) => r.rotulo.toLowerCase()).join(', ')}.`)
+      return
+    }
+    if (zxcvbn(newPassword).score < 3) {
+      setPasswordError('Senha previsível demais. Evite sequências, datas e o nome da clínica.')
+      return
+    }
     if (newPassword !== confirmPassword) { setPasswordError('As senhas não coincidem.'); return }
     setSavingPassword(true)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setSavingPassword(false)
-    if (error) { setPasswordError('Erro ao atualizar a senha. Tente novamente.'); return }
+    if (error) {
+      // Quando o servidor recusa por política, a mensagem genérica esconde a
+      // única informação útil: a regra de lá é mais dura que a daqui.
+      setPasswordError(
+        /password/i.test(error.message ?? '')
+          ? 'O servidor recusou esta senha. Escolha outra que atenda a todos os itens acima.'
+          : 'Erro ao atualizar a senha. Tente novamente.',
+      )
+      return
+    }
     setSavedPassword(true); setNewPassword(''); setConfirmPassword('')
     setTimeout(() => setSavedPassword(false), 3000)
   }
@@ -274,6 +330,21 @@ function TabPerfil({ userId }: { userId: string }) {
   const passwordScore = newPassword ? zxcvbn(newPassword).score : -1
   const strengthColor = passwordScore >= 0 ? STRENGTH_COLORS[passwordScore] : '#DCE6EA'
   const strengthLabel = passwordScore >= 0 ? STRENGTH_LABELS[passwordScore] : ''
+
+  /**
+   * A lista que a pessoa vê, e a mesma que tranca o botão.
+   *
+   * A força entra como um item, e não como uma recusa escondida no clique: as
+   * quatro classes passam com `Senha@1234`, que qualquer ataque de dicionário
+   * quebra. Se a regra existe, ela precisa estar escrita junto das outras —
+   * botão trancado por motivo invisível é o pior dos dois mundos.
+   */
+  const itensSenha = [
+    ...REGRAS_SENHA.map((regra) => ({ rotulo: regra.rotulo, ok: regra.ok(newPassword) })),
+    { rotulo: 'Força: Forte ou Muito forte', ok: passwordScore >= 3 },
+  ]
+  const senhasConferem = confirmPassword.length > 0 && newPassword === confirmPassword
+  const podeSalvarSenha = itensSenha.every((i) => i.ok) && senhasConferem
 
   const ErrorMsg = ({ msg }: { msg: string }) => msg ? (
     <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#DC2626', marginTop: 8 }}>{msg}</div>
@@ -393,6 +464,32 @@ function TabPerfil({ userId }: { userId: string }) {
                 <span style={{ fontSize: 11.5, color: strengthColor, fontWeight: 600 }}>{strengthLabel}</span>
               </div>
             )}
+
+            {/* As exigências ficam SEMPRE visíveis, e não só depois de digitar:
+                a regra precisa ser conhecida na hora de escolher a senha, não
+                descoberta na hora de ser recusado. */}
+            <div style={{
+              marginTop: 10,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(168px, 1fr))',
+              gap: '5px 12px',
+            }}>
+              {itensSenha.map((item) => (
+                <div key={item.rotulo} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 11.5, color: item.ok ? '#1A7A48' : '#6B818C',
+                }}>
+                  {item.ok ? (
+                    <Check size={12} color="#1A7A48" style={{ flexShrink: 0 }} />
+                  ) : (
+                    <span style={{ width: 12, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#DCE6EA' }} />
+                    </span>
+                  )}
+                  {item.rotulo}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Confirmar senha */}
@@ -406,6 +503,13 @@ function TabPerfil({ userId }: { userId: string }) {
                 {showConfirmPass ? <EyeOff size={15} color="#6B818C" /> : <Eye size={15} color="#6B818C" />}
               </button>
             </div>
+            {/* Com o botão trancado, o motivo precisa estar na tela. A lista
+                acima cobre a senha; a conferência precisa da própria linha. */}
+            {confirmPassword.length > 0 && !senhasConferem && (
+              <div style={{ fontSize: 11.5, color: '#DC2626', marginTop: 6 }}>
+                As senhas não coincidem.
+              </div>
+            )}
           </div>
 
           <ErrorMsg msg={passwordError} />
@@ -416,8 +520,8 @@ function TabPerfil({ userId }: { userId: string }) {
             </div>
           )}
 
-          <button onClick={handleSavePassword} disabled={savingPassword || !newPassword || !confirmPassword}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', alignSelf: 'flex-start', background: (!newPassword || !confirmPassword) ? '#DCE6EA' : savingPassword ? '#4C90A8' : '#1E6E8C', color: (!newPassword || !confirmPassword) ? '#6B818C' : '#fff', cursor: (!newPassword || !confirmPassword) ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
+          <button onClick={handleSavePassword} disabled={savingPassword || !podeSalvarSenha}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', alignSelf: 'flex-start', background: !podeSalvarSenha ? '#DCE6EA' : savingPassword ? '#4C90A8' : '#1E6E8C', color: !podeSalvarSenha ? '#6B818C' : '#fff', cursor: !podeSalvarSenha ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
             <KeyRound size={14} /> {savingPassword ? 'Salvando...' : 'Alterar senha'}
           </button>
         </div>

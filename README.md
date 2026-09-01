@@ -317,6 +317,29 @@ outra pessoa.
 O rewrite não atrapalha os assets: a Vercel serve o arquivo real quando ele
 existe, e só cai no `index.html` quando não existe.
 
+### Ligue a política de senha no Supabase Auth
+
+**Isto não vem em migração.** As regras de senha ficam na configuração do
+projeto, não no banco — então um projeto novo nasce aceitando senha de **seis**
+caracteres, sem exigência nenhuma, por mais que a tela de Configurações mostre
+a lista de requisitos.
+
+No painel: **Authentication → Sign In / Providers → Password**
+
+| Campo | Valor |
+|---|---|
+| Minimum password length | `10` |
+| Password Requirements | Lowercase, uppercase letters, digits and symbols |
+
+A lista que aparece em Configurações → Perfil espelha exatamente isso. Se as
+duas divergirem, a pessoa preenche todos os itens verdes e mesmo assim leva uma
+recusa do servidor — sem saber de qual regra.
+
+> **Opcional, e vale a pena:** ligar também o **Prevent use of leaked
+> passwords** (HaveIBeenPwned). É o único item que barra `Senha@2026` — que
+> atende a todos os requisitos acima e está em qualquer lista de senhas
+> vazadas.
+
 ### O que **não** precisa
 
 **Configurar Redirect URLs no Supabase Auth.** O login é
