@@ -72,6 +72,17 @@ const FRASES: Record<string, string> = {
 
 /* ──────────────────────────────────────────────
    Datas
+
+   ⚠️ CÓPIA. As duas funções abaixo existem também em
+   `supabase/functions/_shared/tempo.ts`, palavra por palavra, porque a
+   Letícia precisa exatamente da mesma conversão antes de chamar as mesmas
+   funções SQL. Esta função aqui está publicada SEM NENHUM IMPORT, de
+   propósito (o runtime sobe com `--no-remote`), e trocar isso arriscaria os
+   sete endpoints por uma dedução não testada.
+
+   **Mudou a regra aqui, mude lá.** Se divergirem, as duas portas passam a
+   marcar em horas diferentes — e foi justamente a falta desta conversão do
+   outro lado que gravou consulta três horas mais cedo em produção.
 ────────────────────────────────────────────── */
 
 /** Deslocamento do fuso, em minutos, no instante dado. Cobre horário de verão. */

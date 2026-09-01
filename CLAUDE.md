@@ -704,6 +704,17 @@ um `23P01` cru, sem frase para dizer a quem está esperando no WhatsApp.
 > porque roda dentro do mesmo projeto. Quem está de fora usa os sete endpoints da
 > função `agenda/`, com token. As duas descem para as mesmas funções da migração
 > `0004` — é isso que impede as duas de divergirem.
+>
+> ⚠️ **Mas a mesma função SQL não garante o mesmo resultado.** As duas portas já
+> divergiram: `agenda_marcar` recebe `timestamptz`, e o que chega antes disso é
+> texto. A API pública convertia o texto no fuso da clínica; a Letícia mandava
+> cru. Sem fuso, quem resolve é o Postgres, e a sessão do PostgREST roda em UTC
+> — 14:00 da clínica virava 14:00 de Londres, gravado às **11:00**. A conversão
+> agora é `paraInstante()`, e existe **duas vezes**: em
+> `supabase/functions/_shared/tempo.ts` (Letícia) e dentro de
+> `supabase/functions/agenda/index.ts` (API), que não pode ter import. **Mudou
+> uma, mude a outra.** O caso está contado na seção 7 do
+> [`agente-ia/README.md`](agente-ia/README.md).
 
 `data_agendamento` continua existindo, mas virou reflexo — quem o mantém é o
 trigger `consultas_sincroniza_lead`.

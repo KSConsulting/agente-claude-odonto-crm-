@@ -14,6 +14,7 @@
  */
 
 import { rpc, selecionar, atualizar } from './db.ts'
+import { paraInstante } from './tempo.ts'
 import type { DefinicaoFerramenta } from './llm.ts'
 
 export interface Contexto {
@@ -233,6 +234,16 @@ export async function executar(
       }
 
       case 'marcar_consulta': {
+        // O modelo manda hora local ("2026-09-01T14:00"), sem fuso. Texto sem
+        // fuso NÃO é um instante: `agenda_marcar` recebe `timestamptz`, e a
+        // sessão do PostgREST roda em UTC — sem esta conversão, 14:00 da
+        // clínica é gravado como 14:00 de Londres, ou seja, 11:00 aqui.
+        // Ver `_shared/tempo.ts` para o estrago que isso já causou.
+        const quando = paraInstante(String(args.data_hora ?? ''), ctx.fuso)
+        if (!quando) {
+          return { ok: false, motivo: 'data_invalida', mensagem: RECUSAS.data_invalida }
+        }
+
         const dentista = await acharDentista(args.dentista as string)
         const linhas = await rpc<{
           ok: boolean; motivo: string | null; consulta_id: string | null
@@ -241,12 +252,16 @@ export async function executar(
           p_nome: String(args.nome_completo ?? ''),
           p_whatsapp: ctx.whatsapp,
           p_procedimento: String(args.procedimento ?? ''),
-          p_data_hora: String(args.data_hora ?? ''),
+          p_data_hora: quando.toISOString(),
           p_profissional_id: dentista,
           p_duracao: 60,
           // Idempotência: se esta execução repetir por timeout, devolve o
           // agendamento que já existe em vez de criar um segundo.
-          p_chave_externa: `wa_${ctx.leadId}_${String(args.data_hora ?? '')}`,
+          //
+          // A chave é o INSTANTE, não o texto que o modelo escreveu: "14:00" e
+          // "14:00:00-03:00" são o mesmo horário, e com o texto cru virariam
+          // duas consultas.
+          p_chave_externa: `wa_${ctx.leadId}_${quando.toISOString()}`,
         })
         const r = linhas[0]
         if (!r?.ok) {
@@ -279,11 +294,17 @@ export async function executar(
       }
 
       case 'remarcar_consulta': {
+        // Mesma conversão do marcar_consulta, e pelo mesmo motivo.
+        const quando = paraInstante(String(args.nova_data_hora ?? ''), ctx.fuso)
+        if (!quando) {
+          return { ok: false, motivo: 'data_invalida', mensagem: RECUSAS.data_invalida }
+        }
+
         const linhas = await rpc<{
           ok: boolean; motivo: string | null; data_hora: string | null; profissional: string | null
         }[]>('agenda_remarcar', {
           p_consulta_id: String(args.consulta_id ?? ''),
-          p_nova_data_hora: String(args.nova_data_hora ?? ''),
+          p_nova_data_hora: quando.toISOString(),
           p_profissional_id: null,
           p_whatsapp: ctx.whatsapp,
         })

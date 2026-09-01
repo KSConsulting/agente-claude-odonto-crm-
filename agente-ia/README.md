@@ -49,7 +49,7 @@ caminhos próprios. Esta é a lista completa, para ninguém procurar:
 | Onde | O que é |
 |---|---|
 | `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde |
-| `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, Evolution, montagem do prompt |
+| `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, Evolution, montagem do prompt, conversão de fuso (`tempo.ts`) |
 | `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
 | `src/components/ListaConversas.tsx`<br>`src/components/JanelaConversa.tsx` | As duas colunas dessa tela |
@@ -418,6 +418,43 @@ O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
 > de quem está livre e a trava de horário sobreposto — e o paciente descobriria
 > o problema no dia da consulta. Mesma regra da seção "Ao agendar, o agente
 > chama a API" do [`CLAUDE.md`](../CLAUDE.md).
+
+### ⚠️ Data sem fuso não é hora: passe por `paraInstante()`
+
+`marcar_consulta` e `remarcar_consulta` descem para funções SQL que recebem
+**`timestamptz`**. O modelo escreve hora local (`2026-09-01T14:00`), sem fuso —
+e **texto sem fuso não é um instante**. Quem resolve a ambiguidade é o
+Postgres, com o fuso da sessão, e a sessão do PostgREST roda em **UTC**.
+
+Resultado: 14:00 da clínica é gravado como 14:00 de Londres, que são **11:00 em
+São Paulo**. Foi o que aconteceu no primeiro teste real — o paciente pediu 14h,
+ela mandou 14h, e a consulta ficou às 11h. Ela não errou: leu o banco de volta
+e anunciou fielmente o horário já estragado.
+
+O deslize de três horas é a parte visível. A pior é silenciosa:
+
+| Paciente pede | Virava | O que ele ouvia |
+|---|---|---|
+| 8h, 9h, 10h | 5h, 6h, 7h | Fora do expediente: **"não tenho horário"**, para um horário livre |
+| 11h às 18h | 8h às 15h | Marcava três horas mais cedo |
+| 19h, 20h | 16h, 17h | **Marcava**, com a clínica fechada |
+
+A manhã inteira ficou impossível de agendar, e ninguém percebeu porque o único
+teste caiu na faixa que "funcionava".
+
+**A regra:** nada com hora vai para o banco sem passar por `paraInstante()`, de
+[`_shared/tempo.ts`](../supabase/functions/_shared/tempo.ts). Ela devolve
+`null` no que não entender — e `null` vira a recusa `data_invalida`, não uma
+data inválida gravada em silêncio.
+
+> `ver_horarios_livres` e `agenda_proxima_vaga` escapam: recebem `date`, sem
+> hora, e comparam com a hora local já formatada. Era por isso que as duas
+> ferramentas se contradiziam na mesma conversa — "tem 14h sim", e marcava 11h.
+
+> ⚠️ **A mesma conversão existe duas vezes**, aqui e em
+> `supabase/functions/agenda/index.ts`. A função `agenda/` está publicada sem
+> nenhum import (o runtime sobe com `--no-remote`) e não vale arriscar os sete
+> endpoints por uma dedução não testada. **Mudou uma, mude a outra.**
 
 ### A memória dela — duas camadas, e uma delas ela mesma escreve
 
