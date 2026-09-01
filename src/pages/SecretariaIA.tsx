@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, RotateCcw, FileText,
+  Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, RotateCcw, FileText, X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
@@ -47,6 +48,11 @@ const titulo: React.CSSProperties = {
 
 const legenda: React.CSSProperties = {
   fontSize: 12.5, color: '#6B818C', margin: '0 0 18px', lineHeight: 1.6,
+}
+
+/** Divide um card em duas partes — hoje só o da secretária, com Nome e Modelo. */
+const subtitulo: React.CSSProperties = {
+  fontSize: 13, fontWeight: 700, color: '#16232B', marginBottom: 5,
 }
 
 const botao = (fundo: string): React.CSSProperties => ({
@@ -274,21 +280,22 @@ export default function SecretariaIA() {
             </div>
           </div>
 
-          <button onClick={alternarAtivo} style={botao(ativo ? '#DC2626' : '#1A7A48')}>
-            <Power size={14} />
-            {ativo ? 'Desligar agora' : 'Ligar o agente'}
-          </button>
         </div>
 
+        {/* O interruptor não mora aqui — mora no fim da página. Este card é
+            painel, e painel se lê de relance; a chave que cala a secretária
+            para a clínica inteira não deve estar no caminho do olho de quem só
+            queria conferir se está tudo certo. */}
         <p style={{ ...legenda, margin: '16px 0 0', paddingTop: 14, borderTop: '1px solid #EDF2F4' }}>
-          Este botão vale na hora — não precisa salvar. Desligado, o WhatsApp continua
-          recebendo e tudo fica guardado; ela só não responde.
+          {ativo
+            ? `Para desligar a ${nomeAgente}, vá até o fim desta página.`
+            : `Para ligar a ${nomeAgente}, vá até o fim desta página.`}
         </p>
 
         <Erro texto={erro} />
       </div>
 
-      {/* ---------------- O nome da secretária ----------------
+      {/* ---------------- A secretária: nome e modelo ----------------
 
           ⚠️ SÓ LEITURA, POR DECISÃO DO PRODUTO. A coluna `nome_agente` é
           gravável e a tela poderia editá-la; o campo é inerte de propósito,
@@ -298,12 +305,15 @@ export default function SecretariaIA() {
           Trocar o nome no meio da operação confunde quem fala com ela há
           meses, e a mudança vale para toda conversa em andamento. */}
       <div style={cartao}>
-        <div style={titulo}>Nome da secretária</div>
-        <p style={{ ...legenda, marginBottom: 6 }}>
-          Escolha o nome que a secretária usará para se apresentar aos pacientes.
+        <div style={titulo}>A secretária</div>
+        <p style={{ ...legenda, marginBottom: 18 }}>
+          Como ela se chama e quem pensa as respostas dela.
         </p>
-        <p style={legenda}>
-          Esse nome também será usado dentro do sistema para identificar sua secretária.
+
+        <div style={subtitulo}>Nome</div>
+        <p style={{ ...legenda, marginBottom: 6 }}>
+          O nome que ela usa para se apresentar aos pacientes — e o mesmo que
+          identifica a secretária dentro do sistema.
         </p>
 
         <input
@@ -331,11 +341,53 @@ export default function SecretariaIA() {
             e peça a troca. O nome aparece nas telas e dentro do prompt.
           </div>
         </div>
+
+        {/* ---- Modelo, no mesmo card ----
+
+            Nome e modelo respondem à mesma pergunta — quem é essa secretária —
+            e estavam separados por três cards, com a conexão e o modo teste no
+            meio. O nome é identidade e o modelo é a cabeça: quem abre a página
+            para saber "com quem estou lidando" quer os dois de uma vez. */}
+        <div style={{ height: 1, background: '#EDF2F4', margin: '20px 0' }} />
+
+        <div style={subtitulo}>Modelo de IA</div>
+        <p style={legenda}>
+          Quem pensa as respostas. Trocar aqui vale na mensagem seguinte — não há nada
+          para publicar.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {MODELOS.map((m) => (
+            <label key={m.valor} style={{
+              display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 14px',
+              border: `1px solid ${modelo === m.valor ? '#1E6E8C' : '#DCE6EA'}`,
+              background: modelo === m.valor ? '#EAF3F6' : '#fff',
+              borderRadius: 10, cursor: 'pointer',
+            }}>
+              <input type="radio" name="modelo" checked={modelo === m.valor}
+                onChange={() => setModelo(m.valor)}
+                style={{ marginTop: 2, accentColor: '#1E6E8C', cursor: 'pointer' }} />
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#16232B' }}>{m.nome}</div>
+                <div style={{ fontSize: 12, color: '#6B818C', marginTop: 1 }}>{m.nota}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {MODELOS.find((m) => m.valor === modelo)?.anthropic && (
+          <Aviso>
+            Os modelos Claude exigem a <code style={{ fontFamily: MONO }}>ANTHROPIC_API_KEY</code>{' '}
+            configurada nos secrets do Supabase. Sem ela, a {nomeAgente} para de responder — e
+            o erro só aparece no log da função.
+          </Aviso>
+        )}
       </div>
 
       {/* ---------------- Conexão do WhatsApp ---------------- */}
-      {/* Fica logo depois do card de estado de propósito: quando o card avisa
-          que o WhatsApp caiu, o conserto está na linha de baixo. */}
+      {/* Depois de quem ela é, e antes do modo teste: a ordem da página é a
+          ordem de quem chega — quem é a secretária, por onde ela fala, para
+          quem ela responde, e o que ela diz. */}
       <ConexaoWhatsApp
         conexao={conexao}
         recarregar={recarregarConexao}
@@ -422,42 +474,6 @@ export default function SecretariaIA() {
         )}
       </div>
 
-      {/* ---------------- Modelo ---------------- */}
-      <div style={cartao}>
-        <div style={titulo}>Modelo de IA</div>
-        <p style={legenda}>
-          Quem pensa as respostas. Trocar aqui vale na mensagem seguinte — não há nada
-          para publicar.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {MODELOS.map((m) => (
-            <label key={m.valor} style={{
-              display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 14px',
-              border: `1px solid ${modelo === m.valor ? '#1E6E8C' : '#DCE6EA'}`,
-              background: modelo === m.valor ? '#EAF3F6' : '#fff',
-              borderRadius: 10, cursor: 'pointer',
-            }}>
-              <input type="radio" name="modelo" checked={modelo === m.valor}
-                onChange={() => setModelo(m.valor)}
-                style={{ marginTop: 2, accentColor: '#1E6E8C', cursor: 'pointer' }} />
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#16232B' }}>{m.nome}</div>
-                <div style={{ fontSize: 12, color: '#6B818C', marginTop: 1 }}>{m.nota}</div>
-              </div>
-            </label>
-          ))}
-        </div>
-
-        {MODELOS.find((m) => m.valor === modelo)?.anthropic && (
-          <Aviso>
-            Os modelos Claude exigem a <code style={{ fontFamily: MONO }}>ANTHROPIC_API_KEY</code>{' '}
-            configurada nos secrets do Supabase. Sem ela, a {nomeAgente} para de responder — e
-            o erro só aparece no log da função.
-          </Aviso>
-        )}
-      </div>
-
       {/* ---------------- Prompt ---------------- */}
       <div style={cartao}>
         <div style={titulo}>Prompt</div>
@@ -528,9 +544,73 @@ export default function SecretariaIA() {
           {salvo ? 'Salvo!' : salvando ? 'Salvando...' : 'Salvar'}
         </button>
         <span style={{ fontSize: 12.5, color: '#6B818C' }}>
-          Vale para modo teste, números, modelo e prompt. O liga/desliga já foi salvo.
+          Vale para modo teste, números, modelo e prompt. O ligar/desligar, logo abaixo,
+          não passa por aqui — ele vale no clique.
         </span>
         <Erro texto={erro} />
+      </div>
+
+      {/* ---------------- Ligar e desligar ----------------
+
+          NO FIM DA PÁGINA, DE PROPÓSITO. No topo, junto do painel de estado, o
+          interruptor ficava no caminho do olho de quem só queria conferir se
+          estava tudo certo — e ele cala a secretária para a clínica INTEIRA.
+
+          E a lista existe porque o botão sozinho não conta a parte que
+          tranquiliza: desligar não perde mensagem nenhuma. Quem não sabe disso
+          hesita em desligar quando deveria, ou desliga achando que está
+          fechando o WhatsApp da clínica.
+
+          O aviso aponta para "Assumir a conversa" porque é ali que mora o erro
+          caro: um paciente irritado, e alguém desliga o atendimento de todos
+          para resolver o caso de um. */}
+      <div style={cartao}>
+        <div style={titulo}>Ligar e desligar a {nomeAgente}</div>
+        <p style={{ ...legenda, marginBottom: 12 }}>Com ela desligada:</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {[
+            { ok: true, texto: 'As mensagens dos pacientes continuam chegando.' },
+            { ok: true, texto: 'Tudo fica guardado na página Conversas.' },
+            { ok: false, texto: 'Ela não responde ninguém.' },
+          ].map(({ ok, texto }) => (
+            <div key={texto} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: '#16232B' }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: ok ? '#E8F8EF' : '#FEF2F2',
+              }}>
+                {ok ? <Check size={12} color="#1A7A48" /> : <X size={12} color="#DC2626" />}
+              </span>
+              {texto}
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 18,
+          background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10,
+          padding: '11px 13px',
+        }}>
+          <AlertTriangle size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12.5, color: '#B45309', lineHeight: 1.6 }}>
+            <strong>Isto vale para todos os pacientes.</strong><br />
+            Quer que ela pare de responder só uma pessoa? Não desligue aqui. Abra{' '}
+            <Link to="/conversas" style={{ color: '#B45309', fontWeight: 700 }}>Conversas</Link>,
+            escolha a conversa e clique em <strong>Assumir a conversa</strong>. Assim ela
+            continua atendendo o resto da clínica.
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <button onClick={alternarAtivo} style={botao(ativo ? '#DC2626' : '#1A7A48')}>
+            <Power size={14} />
+            {ativo ? `Desligar a ${nomeAgente}` : `Ligar a ${nomeAgente}`}
+          </button>
+          <span style={{ fontSize: 12.5, color: '#6B818C' }}>
+            Vale na hora. Não precisa salvar.
+          </span>
+        </div>
       </div>
 
       {/* ---------------- Zona de perigo ----------------

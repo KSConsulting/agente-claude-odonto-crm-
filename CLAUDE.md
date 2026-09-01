@@ -695,6 +695,52 @@ O dado é `consultas.interesse`, **congelado no ato de marcar** — e não o
 por lentes em março e por canal em agosto tem o último; olhar a consulta de
 março mostraria "canal", que é falso.
 
+### A página da Secretária: a ordem é a de quem chega
+
+Os cards seguem quatro perguntas, nesta ordem:
+
+| # | Card | Responde |
+|---|---|---|
+| 1 | **Estado** | Está funcionando agora? |
+| 2 | **A secretária** — nome **e** modelo | Quem é ela, e quem pensa por ela |
+| 3 | **Conexão do WhatsApp** | Por onde ela fala |
+| 4 | **Modo de teste** | Para quem ela responde |
+| 5 | **Prompt** | O que ela diz |
+| 6 | **Salvar** | — |
+| 7 | **Ligar e desligar** | O interruptor |
+| 8 | **Apagar uma pessoa** | A zona de perigo |
+
+**Nome e modelo moram no mesmo card.** Estavam separados por três cards, com a
+conexão e o modo teste no meio — e respondem à mesma pergunta: *com quem estou
+lidando?* O nome é a identidade, o modelo é a cabeça.
+
+### O interruptor fica no fim da página, e não no painel de estado
+
+O botão de desligar estava dentro do card verde de "está atendendo". Saiu de lá
+por dois motivos:
+
+1. **Aquele card é painel, e painel se lê de relance.** A chave que cala a
+   secretária para a clínica inteira não deve estar no caminho do olho de quem
+   só queria conferir se está tudo certo.
+2. **É a ação mais destrutiva que a página oferece** — tirando apagar uma
+   pessoa, que fica logo abaixo. Ação destrutiva não fica no topo.
+
+O card de estado passou a apontar para ele em uma linha ("Para desligar a
+Letícia, vá até o fim desta página"), porque esconder sem dizer onde está é
+esconder de verdade.
+
+> ⚠️ **O card explica o que NÃO acontece, e é a parte que mais importa.** Três
+> linhas: as mensagens continuam chegando, tudo fica guardado em Conversas, e
+> ela não responde ninguém. Sem elas, quem não conhece o sistema hesita em
+> desligar quando deveria — ou desliga achando que está fechando o WhatsApp da
+> clínica.
+
+> ⚠️ **E ele aponta para "Assumir a conversa".** Ali mora o erro caro: um
+> paciente irritado, e alguém desliga o atendimento de **todos** para resolver o
+> caso de **um**. Desligar é para o problema que é de todo mundo — prompt
+> alterado, preço errado, chave da IA acabando, ou a decisão de ficar um período
+> sem IA. Para uma conversa só, quem resolve é o `agente_pausado`, em Conversas.
+
 ### O fuso fica na aba Horários, e ele conserta o futuro — não o passado
 
 A grade diz "08:00 às 18:00". **De onde?** Sem a resposta ao lado dela, alguém
