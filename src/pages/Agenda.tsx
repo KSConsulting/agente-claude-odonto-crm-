@@ -6,7 +6,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import {
-  diasDaSemana, fimDaConsulta, gradeDoMes, inicioDaConsulta, limitesDaGrade, rotuloDoPeriodo, somarDias,
+  diasDaSemana, fimDaConsulta, gradeDoMes, inicioDaConsulta, limitesDaGrade,
+  procedimentoComInteresse, rotuloDoPeriodo, somarDias,
 } from '../lib/agenda'
 import { COR_SEM_PROFISSIONAL } from '../lib/cores'
 import { STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
@@ -109,7 +110,7 @@ function DetalheConsulta({
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#16232B' }}>{consulta.lead?.nome_lead ?? 'Sem nome'}</div>
-              <div style={{ fontSize: 13, color: '#6B818C', marginTop: 3 }}>{consulta.procedimento}</div>
+              <div style={{ fontSize: 13, color: '#6B818C', marginTop: 3 }}>{procedimentoComInteresse(consulta)}</div>
             </div>
             <button onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0 }}>
               <X size={18} color="#6B818C" />

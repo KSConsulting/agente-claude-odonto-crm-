@@ -53,7 +53,9 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
     nome: 'marcar_consulta',
     descricao:
       'Marca a consulta de verdade na agenda. Só chame depois de confirmar o ' +
-      'horário com ver_horarios_livres E de ter o nome completo do paciente.',
+      'horário com ver_horarios_livres E de ter o nome completo do paciente. ' +
+      'A maioria dos tratamentos passa antes pela avaliação — a lista de ' +
+      'procedimentos diz quais.',
     parametros: {
       type: 'object',
       properties: {
@@ -63,6 +65,12 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
         dentista: {
           type: 'string',
           description: 'Nome do dentista. Deixe vazio para o sistema escolher quem está livre.',
+        },
+        interesse: {
+          type: 'string',
+          description:
+            'Ao marcar a avaliação, o tratamento que o paciente procura ' +
+            '("Lentes de Contato"). É o que o dentista vê na agenda.',
         },
       },
       required: ['nome_completo', 'procedimento', 'data_hora'],
@@ -247,14 +255,21 @@ export async function executar(
         const dentista = await acharDentista(args.dentista as string)
         const linhas = await rpc<{
           ok: boolean; motivo: string | null; consulta_id: string | null
-          data_hora: string | null; profissional: string | null
+          data_hora: string | null; profissional: string | null; sugestao: string | null
         }[]>('agenda_marcar', {
           p_nome: String(args.nome_completo ?? ''),
           p_whatsapp: ctx.whatsapp,
           p_procedimento: String(args.procedimento ?? ''),
           p_data_hora: quando.toISOString(),
           p_profissional_id: dentista,
-          p_duracao: 60,
+          // O que a pessoa procura, para o dentista ver na agenda. Só faz
+          // sentido quando o que está sendo marcado é a avaliação — e quando
+          // ela esquece, a própria função busca na ficha.
+          p_interesse: String(args.interesse ?? '') || null,
+          // Nulo de propósito: a duração sai de `servicos_clinica`. A avaliação
+          // ocupa 30 minutos, e chumbar 60 aqui desperdiçaria meia hora de
+          // agenda em toda primeira consulta.
+          p_duracao: null,
           // Idempotência: se esta execução repetir por timeout, devolve o
           // agendamento que já existe em vez de criar um segundo.
           //
@@ -264,6 +279,23 @@ export async function executar(
           p_chave_externa: `wa_${ctx.leadId}_${quando.toISOString()}`,
         })
         const r = linhas[0]
+
+        // A PORTA DE ENTRADA. Esta recusa não é um erro — é o fluxo certo, e
+        // ela precisa saber para onde ir. A instrução vem junto com o nome da
+        // avaliação, que sai do banco: renomear a porta na tela não deixa esta
+        // frase para trás.
+        if (r?.motivo === 'exige_avaliacao') {
+          const porta = r.sugestao ?? 'a avaliação'
+          return {
+            ok: false,
+            motivo: 'exige_avaliacao',
+            marque_no_lugar: porta,
+            mensagem:
+              `${args.procedimento} passa antes pela ${porta}. Marque ` +
+              `"${porta}" no mesmo horário, com interesse="${args.procedimento}".`,
+          }
+        }
+
         if (!r?.ok) {
           return { ok: false, motivo: r?.motivo, mensagem: RECUSAS[r?.motivo ?? ''] ?? 'Não consegui marcar.' }
         }

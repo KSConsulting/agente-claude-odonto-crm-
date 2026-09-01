@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { AGENTE_POR_EXTENSO, AGENTE_NOME } from '../lib/agente'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import EditorProcedimento from '../components/EditorProcedimento'
+import PortaDeEntrada from '../components/PortaDeEntrada'
+import { lerPreco, precoParaCampo } from '../lib/procedimentos'
 import type { ServicoClinica } from '../types'
 
 /**
@@ -76,6 +78,37 @@ export default function Procedimentos() {
     }
   }
 
+  /**
+   * Liga e desliga a passagem pela avaliação, no próprio card.
+   *
+   * Escreve na hora, como o liga/desliga de ativo — e desfaz na tela se o banco
+   * recusar. Nenhum "salvar" no rodapé: uma caixinha que não obedece ao clique
+   * é a que mais confunde.
+   */
+  const handleToggleAvaliacao = async (item: ProcedimentoRowState) => {
+    const novo = !item.data.exige_avaliacao
+    setToggleError(null)
+    updateItem(item.data.id, { data: { ...item.data, exige_avaliacao: novo } })
+    const { error } = await supabase.from('servicos_clinica')
+      .update({ exige_avaliacao: novo }).eq('id', item.data.id)
+    if (error) {
+      updateItem(item.data.id, { data: { ...item.data, exige_avaliacao: item.data.exige_avaliacao } })
+      setToggleError('Erro ao atualizar o fluxo. Tente novamente.')
+    }
+  }
+
+  const handleSalvarPreco = async (item: ProcedimentoRowState, valor: number | null) => {
+    if (valor === item.data.preco_a_partir_de) return
+    setToggleError(null)
+    updateItem(item.data.id, { data: { ...item.data, preco_a_partir_de: valor } })
+    const { error } = await supabase.from('servicos_clinica')
+      .update({ preco_a_partir_de: valor }).eq('id', item.data.id)
+    if (error) {
+      updateItem(item.data.id, { data: { ...item.data, preco_a_partir_de: item.data.preco_a_partir_de } })
+      setToggleError('Erro ao salvar o valor. Tente novamente.')
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -116,6 +149,10 @@ export default function Procedimentos() {
   }
 
   const ativos = items.filter((i) => i.data.ativo).length
+
+  // A avaliação sai da grade: ela não é um tratamento, é por onde eles começam.
+  const porta = items.find((i) => i.data.e_avaliacao) ?? null
+  const tratamentos = items.filter((i) => !i.data.e_avaliacao)
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6B818C' }}>Carregando...</div>
 
@@ -193,8 +230,25 @@ export default function Procedimentos() {
         </div>
       )}
 
+      {/* A porta de entrada, fora da grade */}
+      {items.length > 0 && (
+        <PortaDeEntrada
+          porta={porta?.data ?? null}
+          onMudou={(novo) => updateItem(novo.id, { data: novo })}
+          onEditar={(p) => setEditando(p)}
+        />
+      )}
+
       {/* Os cards */}
       <div className="fade-in-2">
+        {tratamentos.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 10px' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6B818C', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+              Tratamentos
+            </span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6B818C' }}>{tratamentos.length}</span>
+          </div>
+        )}
         {items.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '48px 24px', textAlign: 'center' }}>
             <ClipboardList size={34} strokeWidth={1.2} color="#B9C8CE" style={{ marginBottom: 10 }} />
@@ -210,7 +264,7 @@ export default function Procedimentos() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN}px, 1fr))`, gap: 12, alignItems: 'stretch' }}>
-            {items.map((item) => {
+            {tratamentos.map((item) => {
               const p = item.data
               const temDetalhe = !!p.descricao_longa?.trim()
               return (
@@ -237,6 +291,61 @@ export default function Procedimentos() {
                     <p style={descricaoCortada} title={p.descricao ?? undefined}>
                       {p.descricao}
                     </p>
+
+                    {/*
+                      O FLUXO DE AGENDAMENTO, no próprio card.
+
+                      Marcado, a Letícia não agenda este procedimento: agenda a
+                      avaliação e guarda este nome junto. Por isso o campo de
+                      valor some — preço marcado aqui nunca seria falado, e
+                      campo que existe sem ser usado é campo preenchido errado.
+                    */}
+                    <div style={{ marginTop: 2 }}>
+                      <button
+                        onClick={() => handleToggleAvaliacao(item)}
+                        title={p.exige_avaliacao
+                          ? `A ${AGENTE_NOME} marca ${porta?.data.nome ?? 'a avaliação'} no lugar deste.`
+                          : `A ${AGENTE_NOME} agenda este procedimento direto.`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FONTE, textAlign: 'left' }}>
+                        <span style={{
+                          width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+                          border: `1.5px solid ${p.exige_avaliacao ? '#1E6E8C' : '#C4D3D9'}`,
+                          background: p.exige_avaliacao ? '#1E6E8C' : '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'background 0.15s, border-color 0.15s',
+                        }}>
+                          {p.exige_avaliacao && (
+                            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                              <path d="M1.5 5.2L4 7.5L8.5 2.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: p.exige_avaliacao ? '#1E6E8C' : '#6B818C' }}>
+                          Passa pela avaliação
+                        </span>
+                      </button>
+
+                      {!p.exige_avaliacao && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8, paddingLeft: 22 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #DCE6EA', borderRadius: 7, paddingLeft: 8, background: '#fff' }}>
+                            <span style={{ fontSize: 11.5, color: '#9AAEB6' }}>R$</span>
+                            <input
+                              defaultValue={precoParaCampo(p.preco_a_partir_de)}
+                              placeholder="vazio"
+                              onBlur={(e) => {
+                                const v = lerPreco(e.target.value)
+                                e.target.value = precoParaCampo(v)
+                                handleSalvarPreco(item, v)
+                              }}
+                              style={{ width: 74, padding: '5px 8px', border: 'none', fontSize: 12.5, fontFamily: FONTE, color: '#16232B', outline: 'none', background: 'transparent' }}
+                            />
+                          </div>
+                          <span style={{ fontSize: 11, color: '#6B818C', lineHeight: 1.4 }}>
+                            {p.preco_a_partir_de ? 'a partir de' : 'sem valor, ela não fala'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
                     <div
                       title={temDetalhe

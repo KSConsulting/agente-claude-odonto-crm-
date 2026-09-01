@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import {
   distribuirEmColunas, fimDaConsulta, horaParaMinutos, inicioDaConsulta, mesmoDia,
-  minutosDoDia, minutosParaHora, NOMES_DIAS_CURTOS,
+  minutosDoDia, minutosParaHora, NOMES_DIAS_CURTOS, procedimentoComInteresse,
 } from '../lib/agenda'
 import { COR_SEM_PROFISSIONAL } from '../lib/cores'
 import type { ConsultaAgenda, Profissional, ProfissionalHorario } from '../types'
@@ -156,7 +156,7 @@ export default function AgendaSemana({
                 return (
                   <button key={c.id}
                     onClick={(e) => { e.stopPropagation(); onClickConsulta(c) }}
-                    title={`${inicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} – ${fimDaConsulta(c).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${c.lead?.nome_lead ?? 'Sem nome'} · ${c.procedimento}`}
+                    title={`${inicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} – ${fimDaConsulta(c).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${c.lead?.nome_lead ?? 'Sem nome'} · ${procedimentoComInteresse(c)}`}
                     style={{
                       position: 'absolute',
                       top: topo,
@@ -181,7 +181,7 @@ export default function AgendaSemana({
                     </div>
                     {altura > 32 && (
                       <div style={{ fontSize: 10.5, lineHeight: 1.3, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {c.procedimento}
+                        {procedimentoComInteresse(c)}
                       </div>
                     )}
                   </button>

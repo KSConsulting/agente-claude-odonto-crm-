@@ -82,6 +82,11 @@ ordem**:
 17. `supabase/migrations/0017_provedor_whatsapp.sql` — a coluna
     `provedor_whatsapp` em `configuracoes_agente`: qual ponte com o WhatsApp
     está ativa. Ver [seção 4.17](#417-mensagens_whatsapp--configuracoes_agente-migração-0010).
+18. `supabase/migrations/0018_avaliacao_e_precos.sql` — a avaliação vira a
+    **porta de entrada**: quatro colunas em `servicos_clinica`, `interesse` em
+    `consultas`, a função `reais()`, a view de procedimentos com fluxo e valor,
+    e `agenda_marcar` recusando o que passa antes pela avaliação. Ver a
+    [seção 4.6](#46-servicos_clinica).
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -425,6 +430,7 @@ esse segundo vínculo que forma a agenda dele.
 | `chave_externa` | `text` | sim | — | Idempotência da API. **UNIQUE** quando preenchida |
 | `valor_pago` | `numeric(10,2)` | sim | — | |
 | `observacoes` | `text` | sim | — | |
+| `interesse` | `text` | sim | — | O que o paciente procura, quando a consulta é a avaliação |
 | `cancelado_em` | `timestamptz` | sim | — | |
 | `motivo_cancelamento` | `text` | sim | — | |
 | `created_at` | `timestamptz` | não | `now()` | |
@@ -623,9 +629,46 @@ Agente de IA — que devolve **só o nome**, sem `id` nem descrição.
 | `descricao` | `text` | não | `''` |
 | `descricao_longa` | `text` | sim | — |
 | `ativo` | `boolean` | não | `true` |
+| `exige_avaliacao` | `boolean` | não | `true` |
+| `preco_a_partir_de` | `numeric(10,2)` | sim | — |
+| `duracao_minutos` | `integer` | não | `60` |
+| `e_avaliacao` | `boolean` | não | `false` |
 | `created_at` | `timestamptz` | não | `now()` |
 
-**Índice:** `servicos_clinica_created_at_idx` — a listagem ordena por cadastro.
+**Índices:** `servicos_clinica_created_at_idx` — a listagem ordena por cadastro.
+E `servicos_clinica_avaliacao_unica`, índice **parcial** sobre `e_avaliacao`
+`where e_avaliacao`: garante uma porta de entrada só, sem prender as outras
+linhas a um `false` compartilhado.
+
+#### O fluxo de agendamento (migração 0018)
+
+`exige_avaliacao` marcado significa que **o agente não agenda este
+procedimento**: agenda o que estiver com `e_avaliacao` e grava este nome em
+`consultas.interesse`. Quem confere é a função `agenda_marcar`, que devolve
+`motivo = 'exige_avaliacao'` e o nome da porta em `sugestao`.
+
+> ⚠️ **A regra vale para os agentes, não para a clínica.**
+> `NovoAgendamentoModal.tsx` grava direto em `consultas`, sem passar pela
+> função — de propósito. A trava existe para impedir um agente de tomar decisão
+> clínica, não para impedir a recepção de marcar o que quiser.
+
+#### `preco_a_partir_de` tem TRÊS estados
+
+| Valor | O que o agente faz |
+|---|---|
+| `null` | Não fala valor. "Isso a gente vê na avaliação" |
+| `0` | **"É gratuita"** — a frase que derruba a objeção de quem não quer pagar só para saber o preço |
+| `> 0` | "A partir de R$ X" |
+
+**Zero não é vazio aqui.** Tratá-lo como ausente joga fora a melhor resposta
+que o agente tem; tratá-lo como preço faria ele dizer "a partir de R$ 0,00".
+
+O nome da coluna é `preco_a_partir_de`, e não `preco`, porque é assim que o
+agente fala. Um campo chamado `preco` seria preenchido com valor fechado, e a
+frase continuaria dizendo "a partir de".
+
+É **ignorado** quando `exige_avaliacao` — por isso o campo some do card na tela
+de Procedimentos. Campo que existe sem ser usado é campo preenchido errado.
 
 > **Não cadastre marcas registradas** (ClearCorrect, Invisalign e similares).
 > Use a descrição genérica do procedimento: "Alinhadores Transparentes".

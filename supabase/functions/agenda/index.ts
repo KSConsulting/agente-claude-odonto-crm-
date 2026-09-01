@@ -163,6 +163,8 @@ interface Resultado {
   consulta_id?: string
   data_hora: string
   profissional: string | null
+  /** Só em `exige_avaliacao`: o nome da consulta que precisa vir antes. */
+  sugestao?: string | null
 }
 
 /* ──────────────────────────────────────────────
@@ -305,11 +307,29 @@ Deno.serve(async (req) => {
           p_procedimento: corpo.procedimento ?? '',
           p_data_hora: quando.toISOString(),
           p_profissional_id: corpo.profissional_id ?? null,
-          p_duracao: Number(corpo.duracao_minutos ?? 60),
+          // Sem duração explícita, vale a do procedimento em servicos_clinica.
+          // Quem já mandava um número continua mandando.
+          p_duracao: corpo.duracao_minutos ? Number(corpo.duracao_minutos) : null,
           p_chave_externa: corpo.chave_externa ?? null,
+          p_interesse: corpo.interesse ?? null,
         })
 
         const r = data?.[0]
+
+        // A porta de entrada. A frase precisa do NOME da avaliação, que vem do
+        // banco — por isso não cabe no mapa fixo de FRASES.
+        if (r?.motivo === 'exige_avaliacao') {
+          const porta = r.sugestao ?? 'a avaliação'
+          return json({
+            ok: false,
+            motivo: 'exige_avaliacao',
+            marque_no_lugar: porta,
+            mensagem:
+              `Esse tratamento passa antes por uma avaliação com o dentista. ` +
+              `Posso marcar ${porta} para você?`,
+          })
+        }
+
         if (!r?.ok) return recusa(r?.motivo ?? 'erro_interno')
 
         const nome = String(corpo.nome ?? '').trim()

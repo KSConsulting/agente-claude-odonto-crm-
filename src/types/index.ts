@@ -85,6 +85,32 @@ export interface ServicoClinica {
    */
   descricao_longa: string | null
   ativo: boolean
+  /**
+   * Marcado: o agente **não** agenda este procedimento — agenda a avaliação e
+   * guarda este nome em `Consulta.interesse`. Desmarcado: agenda direto.
+   *
+   * Quem confere é a função SQL `agenda_marcar`, não o prompt. A recepção passa
+   * por fora e continua marcando o que quiser.
+   */
+  exige_avaliacao: boolean
+  /**
+   * O piso do valor, e o campo tem **três** estados, não dois:
+   *
+   * - `null` → o agente não fala preço ("isso a gente vê na avaliação")
+   * - `0`    → "é gratuita" — a frase que derruba a objeção de quem não quer
+   *            pagar só para saber o preço
+   * - `> 0`  → "a partir de R$ X"
+   *
+   * Zero **não** é vazio aqui. E o nome é `a_partir_de` porque é assim que ela
+   * fala: um campo chamado `preco` seria preenchido com valor fechado.
+   *
+   * Ignorado quando `exige_avaliacao` — por isso o campo some do card.
+   */
+  preco_a_partir_de: number | null
+  /** Quanto tempo o bloco ocupa na agenda. A avaliação são 30; o resto, 60. */
+  duracao_minutos: number
+  /** A porta de entrada. **Exatamente um** procedimento tem isto (índice único). */
+  e_avaliacao: boolean
   created_at: string
 }
 
@@ -150,6 +176,15 @@ export interface Consulta {
   chave_externa: string | null
   valor_pago: number | null
   observacoes: string | null
+  /**
+   * O que o paciente procura, quando a consulta é a avaliação — "Lentes de
+   * Contato" numa "Avaliação Odontológica".
+   *
+   * Diferente de `procedimento_interesse`, que é da **pessoa** e guarda um
+   * valor só: este é congelado no ato de marcar, então a consulta de março não
+   * passa a mentir quando a pessoa volta em agosto por outra coisa.
+   */
+  interesse: string | null
   cancelado_em: string | null
   motivo_cancelamento: string | null
   created_at: string

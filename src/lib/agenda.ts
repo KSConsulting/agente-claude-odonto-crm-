@@ -278,3 +278,22 @@ export function distribuirEmColunas<T>(
 
   return resultado
 }
+
+
+/**
+ * `"Avaliação Odontológica · Lentes de Contato"` — o que está marcado, e o que
+ * a pessoa quer.
+ *
+ * Existe porque a clínica tem uma porta de entrada só: sem isto, o dentista
+ * abre a quinta-feira e vê oito "Avaliação Odontológica" idênticas, sem saber
+ * qual é qual antes de abrir uma por uma.
+ *
+ * O `interesse` só é preenchido quando a consulta é a avaliação — nas outras, o
+ * procedimento já é o que a pessoa quer, e repetir seria ruído.
+ */
+export function procedimentoComInteresse(
+  c: { procedimento: string; interesse?: string | null },
+): string {
+  const querendo = c.interesse?.trim()
+  return querendo ? `${c.procedimento} · ${querendo}` : c.procedimento
+}

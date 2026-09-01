@@ -83,7 +83,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **dezessete arquivos, nesta ordem**:
+A migração é aplicada em **dezoito arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -100,7 +100,9 @@ agente), `0011_procedimentos_detalhados.sql` (a coluna `descricao_longa`) e
 etiqueta "Agendada") e `0015_baixa_da_consulta.sql` (o status `faltou` e o
 trigger que promove o lead a Paciente) e `0016_ultima_consulta.sql` (a coluna
 calculada `ultima_consulta`, que a tela Pacientes mostra) e
-`0017_provedor_whatsapp.sql` (qual ponte com o WhatsApp está ativa).
+`0017_provedor_whatsapp.sql` (qual ponte com o WhatsApp está ativa) e
+`0018_avaliacao_e_precos.sql` (a avaliação como porta de entrada, o preço
+que pode ser dito, e o que o paciente procura gravado na consulta).
 
 Os pontos que mais causam erro:
 
@@ -164,6 +166,7 @@ src/
 │   ├── pessoas.ts              regra que separa Lead de Paciente
 │   ├── cores.ts                paleta das agendas (cor do profissional)
 │   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
+│   ├── procedimentos.ts        o dinheiro na tela: ler e formatar o "a partir de"
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 │   ├── conversas.ts            ler, enviar, assumir, devolver; e a etiqueta "Agendada"
@@ -186,6 +189,7 @@ src/
 │   ├── CampoTelefone.tsx       seletor de país + contagem de dígitos
 │   ├── TabClinica.tsx          aba "Clínica" de Configurações
 │   ├── EditorProcedimento.tsx  modal de edição de um procedimento
+│   ├── PortaDeEntrada.tsx      a avaliação: fora da grade, com duração e valor
 │   ├── ModalPortal.tsx         leva o modal para o <body> (ver Convenções)
 │   ├── ListaConversas.tsx      coluna esquerda de /conversas
 │   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
@@ -476,6 +480,50 @@ No card, os botões que agem sobre o item ficam **dentro dele** — não numa co
 > **O rodapé do card não esmaece junto.** Desligar um procedimento apaga o corpo
 > (`opacity: 0.5`), mas não o rodapé: apagar o botão que religa é apagar a saída.
 
+### A avaliação é a porta, e por isso não é um card
+
+Quase todo tratamento passa antes por uma **Avaliação Odontológica**: o dentista
+examina, conversa e monta o plano. Duas exceções agendam direto — Limpeza e
+Clareamento.
+
+| Decisão | Por quê |
+|---|---|
+| **A avaliação existe como registro** | Seria mais fácil ter o nome dela no código. Mas aí a duração do bloco, a gratuidade e o próprio nome ficariam presos num deploy. Aqui a clínica muda os três, e a mudança chega na conversa seguinte |
+| **Mas fora da grade de cards** | Ela não é um tratamento, é por onde eles começam. No meio dos vinte ela vira o vigésimo card igual — sendo a consulta que mais vai acontecer |
+| **Uma caixa em cada card, não três categorias** | "Passa pela avaliação", ligado ou desligado. A versão de três níveis foi descartada: duas delas mandavam o agente fazer exatamente a mesma coisa, e categoria que não muda comportamento só serve para ser preenchida errado |
+| **Uma porta só, garantida por índice** | `servicos_clinica_avaliacao_unica` é parcial (`where e_avaliacao`). Duas portas seriam duas respostas para a mesma pergunta |
+| **A trava mora na função SQL** | `agenda_marcar` recusa, e devolve o nome da porta. Prompt é pedido, não trava — a Letícia já ignorou regra escrita com o dado na frente dela. E como as duas portas dos agentes descem para a mesma função, a API externa herda a regra de graça |
+| **A recepção passa por fora** | `NovoAgendamentoModal` grava direto em `consultas`. A regra existe para impedir um **agente** de decidir clínica, não para impedir a clínica de marcar o que quiser |
+
+**O preço tem três estados, e o do meio é o que vale.** Vazio, ela não fala
+valor; `0`, ela diz **"é gratuita"**; acima de zero, "a partir de R$ X". Zero
+não é campo em branco: é a frase que derruba a objeção de quem não quer pagar
+só para saber o preço — e sem ela a resposta vira "o valor a gente vê na
+avaliação", que soa como desconversa.
+
+> **O campo de valor some do card quando "passa pela avaliação" está ligado.**
+> Preço marcado ali nunca seria falado, e campo que existe sem ser usado é campo
+> preenchido errado. É a mesma ideia da caixa única: um estado contraditório
+> não deve ser representável.
+
+**E o card não mostra a frase que ela vai falar.** A frase é montada pela view
+`procedimentos_clinica_agente`, em SQL. Reimplementá-la no TypeScript daria duas
+versões da mesma regra, e um dia a tela mostraria uma coisa e o paciente ouviria
+outra. O card mostra o **dado**. (A prévia da aba Clínica escapa disso porque
+consulta a view de verdade; uma consulta por card seria absurda.)
+
+### O que a pessoa quer aparece ao lado do que está marcado
+
+Com uma porta só, o dentista abriria a quinta-feira e veria oito "Avaliação
+Odontológica" idênticas. Por isso o bloco da Agenda mostra
+`Avaliação Odontológica · Lentes de Contato`, montado por
+`procedimentoComInteresse()` em [`src/lib/agenda.ts`](src/lib/agenda.ts).
+
+O dado é `consultas.interesse`, **congelado no ato de marcar** — e não o
+`procedimento_interesse` do CRM, que é da pessoa e guarda um valor só. Quem veio
+por lentes em março e por canal em agosto tem o último; olhar a consulta de
+março mostraria "canal", que é falso.
+
 ### A conexão do WhatsApp: seção, não aba; e o fornecedor é dado
 
 A ponte com o WhatsApp vive em **Secretária de IA**, como seção da pilha de
@@ -688,7 +736,7 @@ mortas: as colunas `*_chatwoot` de `crm_clinica_dados` e a tabela
 | `informacoes_clinica_agente` | **só lê** — dados da clínica em frases prontas |
 | `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
 | `profissionais_clinica_agente` | **só lê** — dentistas ativos e a jornada de cada um |
-| `servicos_clinica` | **só lê** — a `descricao_longa` de **um** procedimento, pela ferramenta `detalhes_do_procedimento` |
+| `servicos_clinica` | **só lê** — a `descricao_longa` de **um** procedimento, pela ferramenta `detalhes_do_procedimento`. E `agenda_marcar` lê `exige_avaliacao` e `duracao_minutos` para decidir o agendamento |
 | `consultas` | **só lê** para a memória — a consulta futura e o histórico do paciente. Escrita é sempre por função SQL |
 | `configuracoes_agente` | **só lê** — modelo, prompt e a regra do modo teste |
 | `configuracoes_clinica` | **só lê** — só o `fuso_horario` |

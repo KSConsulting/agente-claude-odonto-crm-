@@ -316,7 +316,11 @@ curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/disponibilidade' \
 ### 3.4. Marcar consulta — `POST /marcar`
 
 **Precisa:** `nome`, `whatsapp`, `procedimento` (texto livre), `data_hora`.
-**Opcionais:** `profissional_id`, `duracao_minutos` (padrão 60), `chave_externa`.
+**Opcionais:** `profissional_id`, `duracao_minutos`, `chave_externa`, `interesse`.
+
+> **`duracao_minutos` deixou de ter padrão fixo.** Omitido, vale a duração
+> cadastrada naquele procedimento — a avaliação ocupa 30 minutos, o resto 60.
+> Quem já mandava um número continua mandando, e ele continua ganhando.
 
 **Sem `profissional_id`, o sistema escolhe** uma agenda livre naquele horário —
 é o caso comum, o paciente sem preferência.
@@ -329,6 +333,32 @@ tem hoje. O número deve vir no formato canônico (só dígitos com código do p
 A `chave_externa` é o que impede consulta duplicada quando quem chama repete a
 chamada por timeout. Mandando o mesmo valor, a segunda tentativa devolve o
 agendamento que já existe em vez de criar outro.
+
+#### A avaliação é a porta de entrada
+
+Quase todo tratamento da clínica passa antes por uma avaliação com o dentista.
+**Tentar marcar um deles é recusado**, com o nome da consulta que precisa vir
+antes:
+
+```json
+{
+  "ok": false,
+  "motivo": "exige_avaliacao",
+  "marque_no_lugar": "Avaliação Odontológica",
+  "mensagem": "Esse tratamento passa antes por uma avaliação com o dentista. Posso marcar Avaliação Odontológica para você?"
+}
+```
+
+A saída é remarcar com `procedimento` valendo o nome devolvido em
+`marque_no_lugar`, e o tratamento desejado em **`interesse`** — que é o que faz
+o dentista abrir a agenda e já saber do que se trata.
+
+`GET /procedimentos` diz quais passam pela avaliação, então dá para saber antes
+de tentar.
+
+> **Procedimento fora do catálogo continua passando.** `procedimento` é texto
+> livre, e integração que marca algo que não está em `servicos_clinica` não
+> quebra: nome que não casa é nome sem regra a aplicar.
 
 **Sucesso:**
 
@@ -345,9 +375,9 @@ agendamento que já existe em vez de criar outro.
 O `id` volta para o agente poder cancelar ou remarcar depois sem ter que
 procurar.
 
-**Recusas:** `horario_ocupado`, `sem_profissional_livre`, `fora_expediente`,
-`whatsapp_invalido`, `dados_invalidos`, `data_invalida` — cada uma com a frase
-correspondente.
+**Recusas:** `exige_avaliacao`, `horario_ocupado`, `sem_profissional_livre`,
+`fora_expediente`, `whatsapp_invalido`, `dados_invalidos`, `data_invalida` —
+cada uma com a frase correspondente.
 
 ```bash
 curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/marcar' \

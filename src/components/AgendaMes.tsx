@@ -1,4 +1,6 @@
-import { gradeDoMes, inicioDaConsulta, mesmoDia, NOMES_DIAS_CURTOS } from '../lib/agenda'
+import {
+  gradeDoMes, inicioDaConsulta, mesmoDia, NOMES_DIAS_CURTOS, procedimentoComInteresse,
+} from '../lib/agenda'
 import { COR_SEM_PROFISSIONAL, fundoSuave } from '../lib/cores'
 import type { ConsultaAgenda, Profissional } from '../types'
 
@@ -83,7 +85,7 @@ export default function AgendaMes({ referencia, consultas, profissionaisPorId, o
                   return (
                     <button key={c.id}
                       onClick={(e) => { e.stopPropagation(); onClickConsulta(c) }}
-                      title={`${c.lead?.nome_lead ?? 'Sem nome'} · ${c.procedimento}`}
+                      title={`${c.lead?.nome_lead ?? 'Sem nome'} · ${procedimentoComInteresse(c)}`}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 5, width: '100%',
                         background: naoAconteceu ? 'transparent' : fundoSuave(cor),

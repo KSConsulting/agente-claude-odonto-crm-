@@ -321,6 +321,9 @@ Atualizar `DATABASE.md`, `CLAUDE.md` e este arquivo; `npm run build` e
 | `src/components/AvisoWhatsAppCaiu.tsx` | — | Faixa vermelha em Conversas, só quando a ponte cai |
 | `src/lib/apagarPessoa.ts` | — | Prever o estrago e apagar tudo de uma pessoa |
 | `src/components/ApagarPessoa.tsx` | — | A zona de perigo, no fim da página Secretária de IA |
+| `supabase/migrations/0018_avaliacao_e_precos.sql` | — | A avaliação como porta, o preço falável e o `interesse` na consulta |
+| `src/components/PortaDeEntrada.tsx` | — | A avaliação em bloco próprio, fora da grade de cards |
+| `src/lib/procedimentos.ts` | — | Ler e formatar o "a partir de" na tela |
 
 ### Alterados
 
@@ -437,7 +440,7 @@ O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
 | Ferramenta | Quando ela usa | Já existe? |
 |---|---|---|
 | `ver_horarios_livres` | "tem horário na terça?" | Sim — função SQL da migração `0004` |
-| `marcar_consulta` | Depois de confirmar dia, hora e nome completo | Sim |
+| `marcar_consulta` | Depois de confirmar dia, hora e nome completo. Recusa o que passa pela avaliação, e diz o nome certo | Sim |
 | `remarcar_consulta` | "posso passar para sexta?" | Sim |
 | `cancelar_consulta` | "preciso desmarcar" | Sim |
 | `ver_minhas_consultas` | Antes de remarcar ou cancelar, e no "que dia mesmo é a minha?" | Sim |
@@ -450,6 +453,63 @@ O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
 > de quem está livre e a trava de horário sobreposto — e o paciente descobriria
 > o problema no dia da consulta. Mesma regra da seção "Ao agendar, o agente
 > chama a API" do [`CLAUDE.md`](../CLAUDE.md).
+
+### A avaliação é a porta, e a recusa é o fluxo certo
+
+Quase todo tratamento passa antes por uma avaliação com o dentista. Quem sabe
+disso é a coluna `exige_avaliacao` de `servicos_clinica`, e quem obedece é a
+função SQL — não o prompt.
+
+```
+marcar_consulta("Lentes de Contato", quinta 14h)
+        │
+        ▼
+  agenda_marcar vê exige_avaliacao
+        │
+        ▼
+  { ok: false, motivo: "exige_avaliacao",
+    marque_no_lugar: "Avaliação Odontológica" }
+        │
+        ▼
+marcar_consulta("Avaliação Odontológica", quinta 14h,
+                interesse: "Lentes de Contato")
+```
+
+**Por que na função e não no prompt.** Ela já ignorou regra escrita com o dado
+na frente dela — é o caso de 01/09, contado na seção 8. Prompt é pedido; função
+é trava. E como a Letícia e a API externa descem para a **mesma** função, a
+regra não tem como divergir entre as duas portas.
+
+**A recusa carrega o nome, e o nome vem do banco.** Renomear a avaliação na tela
+não deixa nenhuma frase para trás.
+
+> **`interesse` é o que salva a agenda de virar uma parede.** Com uma porta só,
+> o dentista abriria a quinta-feira e veria oito "Avaliação Odontológica"
+> idênticas. Com ele, lê `Avaliação Odontológica · Lentes de Contato`.
+>
+> E quando ela esquece de mandar, a **própria função** busca o
+> `procedimento_interesse` da ficha — mas só quando o que está sendo marcado é a
+> avaliação. Numa limpeza o procedimento já é o que a pessoa quer, e copiar a
+> ficha encheria a agenda de ruído.
+
+### O preço: três estados, e o do meio é o que vende
+
+Até 01/09 o prompt proibia falar valor, sem exceção. Agora a exceção é **dado**,
+não texto — `preco_a_partir_de`, lido pela view que monta o catálogo:
+
+| Valor | A linha do catálogo | O que ela faz |
+|---|---|---|
+| vazio | *(nada)* | "isso a gente vê na avaliação" |
+| `0` | `Gratuita.` | **"a avaliação é gratuita"** |
+| `250` | `A partir de R$ 250,00.` | "a partir de R$ 250" |
+
+**O zero é o item mais valioso desta tabela.** Sem ele, a resposta a "quanto
+custa?" é sempre "depende, o dentista precisa olhar" — que soa como
+desconversa, e é onde mais gente some da conversa. Com ele, a mesma frase
+termina em oferta: *"e a avaliação é gratuita, quer que eu veja um horário?"*.
+
+O prompt manda usar isso **uma vez**, na objeção. Repetido em toda mensagem
+vira panfleto, pelo mesmo motivo da regra que proíbe repetir o nome do paciente.
 
 ### ⚠️ Data sem fuso não é hora: passe por `paraInstante()`
 
@@ -622,6 +682,8 @@ Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
 | Ferramenta `sobreClinica` | Dados da clínica dentro do prompt | Metade do custo, metade do tempo, e impossível de esquecer |
 | `Agendar` recebendo uma frase | Quatro ferramentas com campos exatos | A API não interpreta texto — quer data, hora e procedimento separados |
 | Exige o dentista para agendar | Dentista é opcional | Nenhuma etapa do fluxo perguntava isso, e a maioria não tem preferência |
+| "Você não informa valor. Nunca." | "Só fala o que está escrito no catálogo" | A avaliação virou gratuita, e "gratuita" é a melhor resposta que ela tem para quem trava no preço. A proibição absoluta jogava isso fora |
+| Agendava qualquer procedimento | Agenda a avaliação, e guarda o desejado em `interesse` | Ela não pode decidir que alguém precisa de canal. O diagnóstico é do dentista |
 | "Informe o valor disponível" | Nunca fala preço | Não existe preço em `servicos_clinica`. A regra antiga faria o agente inventar |
 | "informações do estúdio" | "informações da clínica" | Sobra de outro negócio — o agente repetiria isso com o paciente |
 | Um bloco de 50 palavras | Dois ou três balões curtos | É como gente escreve no WhatsApp |
