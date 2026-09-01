@@ -142,22 +142,26 @@ O caminho de uma mensagem, do celular do paciente até a resposta:
               Salva no banco
                     │
                     ▼
+      Transcreve áudio · guarda foto
+                    │
+                    ▼
+     Espera 8s · silêncio  ─── chegou outra ───▶  Encerra ·
+                    │                             a mais nova responde
+        acende "digitando…"
+                    │
+                    ▼
+       Espera mais 4s  ───────── chegou outra ───▶  Encerra ·
+                    │                             a mais nova responde
+           ninguém escreveu
+                    ▼
       A conversa está assumida?  ──── sim ────▶  Só registra ·
                     │                            o atendente responde
                    não
                     ▼
-          Espera 8 segundos  ─── chegou outra ───▶  Encerra ·
-                    │                               a mais nova responde
-            silêncio · acende
-              "digitando…"
+       Agente ligado? Número      ──── não ───▶  Só registra
+       liberado no modo teste?
                     │
-                    ▼
-          Espera mais 4  ─────── chegou outra ───▶  Encerra ·
-                    │                               a mais nova responde
-           ninguém escreveu
-                    ▼
-      Transcreve áudio · guarda foto
-                    │
+                   sim
                     ▼
        Monta o prompt do momento
                     │
@@ -167,6 +171,13 @@ O caminho de uma mensagem, do celular do paciente até a resposta:
                     ▼
       Responde e atualiza a ficha
 ```
+
+> ⚠️ **A ordem acima é a do código, e ela não é óbvia.** A mídia é baixada e
+> transcrita **antes** da espera — o áudio precisa virar texto de qualquer jeito,
+> e fazer isso enquanto se espera não custa nada. Já as travas (`agente_pausado`
+> e `agente_deve_responder`) são conferidas **depois** dela, de propósito: doze
+> segundos são tempo de sobra para alguém assumir a conversa, e a resposta a
+> essa pergunta tem que ser a mais recente possível.
 
 ### As duas portas de saída
 
@@ -266,7 +277,7 @@ Registradas com o motivo, para ninguém refazer a discussão daqui a três meses
 | **Foto** | O modelo enxerga, mas **nunca diagnostica** | Acolhe e encaminha para avaliação presencial |
 | **Preço** | Fala **só** o que está escrito no catálogo | `preco_a_partir_de` (migração `0018`) tem três estados, e o `0` da avaliação — "é gratuita" — é a melhor resposta que ela tem para quem trava no valor. Ver seção 7 |
 | **Assumir conversa** | Qualquer usuário logado | Clínica pequena, equipe conhecida. A tela mostra quem assumiu |
-| **Redis** | Fica para depois | A espera de 8 segundos resolve dentro da função |
+| **Redis** | Fica para depois | A espera de 12 segundos resolve dentro da própria função — ver "Não é o Postgres que espera, e não é Redis" |
 | **Chaves de API** | Secrets do Supabase, **nunca no `.env`** | O `.env` vira JavaScript no site — a chave ficaria pública |
 | **Modo teste** | Nasce ligado, agente nasce desligado | Com a Evolution conectada, qualquer número aciona o agente. Sem trava, o primeiro teste responde a paciente de verdade |
 
