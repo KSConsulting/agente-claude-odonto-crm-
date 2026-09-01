@@ -34,14 +34,19 @@ const VISUAL: Record<string, { cor: string; fundo: string; borda: string; rotulo
 }
 
 /**
- * `pronto: false` fica visível e desabilitado de propósito. Some da lista seria
- * esconder para onde o sistema está indo; selecionável seria prometer o que
- * ainda não existe.
+ * As duas pontes, as duas selecionáveis.
+ *
+ * Houve um `pronto: false` aqui, que deixava a uazapi visível e desabilitada
+ * enquanto ela não existia — some da lista seria esconder para onde o sistema
+ * ia; selecionável seria prometer o que não existia. As duas foram
+ * implementadas, e a flag saiu junto: bandeira que só tem um valor possível é
+ * a próxima a ser esquecida ligada.
+ *
+ * ⚠️ Acrescentar um provedor aqui é acrescentar em TRÊS lugares: o `CHECK` de
+ * `provedor_whatsapp` no banco, o `PONTES` de `_shared/pontes.ts`, e esta
+ * lista. Nada sincroniza os três.
  */
-const PROVEDORES: { valor: string; pronto: boolean }[] = [
-  { valor: 'evolution', pronto: true },
-  { valor: 'uazapi', pronto: false },
-]
+const PROVEDORES = ['evolution', 'uazapi']
 
 const botaoBase: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, borderRadius: 9,
@@ -151,9 +156,7 @@ export default function ConexaoWhatsApp({ conexao, recarregar, provedor, onTroca
           background: '#fff', outline: 'none', minWidth: 220,
         }}>
         {PROVEDORES.map((p) => (
-          <option key={p.valor} value={p.valor} disabled={!p.pronto}>
-            {nomeDoProvedor(p.valor)}{p.pronto ? '' : ' (em breve)'}
-          </option>
+          <option key={p} value={p}>{nomeDoProvedor(p)}</option>
         ))}
       </select>
       <p style={{ fontSize: 11.5, color: '#6B818C', margin: '6px 0 14px' }}>
