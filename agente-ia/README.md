@@ -452,10 +452,19 @@ O que entra na ficha, e o que fica de fora:
 | Procedimento de interesse | |
 | Resumo da conversa | |
 | **A consulta já marcada** (data, hora, dentista) | |
+| **A ordem de não oferecer agendamento**, quando existe consulta | |
 | Uma linha de placar: quantas consultas fez e quando foi a última | |
 
 A consulta marcada é a linha mais importante da ficha: **oferecer agendamento a
 quem já tem hora na quinta** é o erro mais constrangedor que ela pode cometer.
+E foi exatamente o que ela fez no teste de 01/09 — com o dado na frente dela.
+
+Por isso a ficha é o único lugar do prompt que carrega **ordem junto com dado**:
+quando existe consulta, `montarFicha()` acrescenta uma segunda linha mandando
+não oferecer agendamento. Parece redundante com as `REGRAS INEGOCIÁVEIS`, e
+não é: a ficha é a **última** coisa que o modelo lê antes da conversa, e regra
+perto do dado pesa mais que a mesma regra dez seções acima. Também não custa
+cache — esta seção já é volátil por natureza. O caso está contado na seção 8.
 
 ### O que ela sabe sem precisar perguntar
 
@@ -502,17 +511,24 @@ Nada dentro dele é comentário, instrução para humano ou anotação. Tudo o q
 estiver ali, a Letícia lê como ordem. Explicação sobre o prompt vem para este
 README — nunca para dentro do arquivo.
 
-### Os quatro marcadores
+### Os cinco marcadores
 
-Quatro trechos são preenchidos pelo sistema a cada mensagem, lendo o banco na
+Cinco trechos são preenchidos pelo sistema a cada mensagem, lendo o banco na
 hora. É o que mantém o agente sempre atualizado sem ninguém reescrever nada:
 
 | Marcador | Vem de | Muda quando |
 |---|---|---|
-| `{{DATA_HOJE}}` | O relógio do servidor | A cada mensagem |
 | `{{INFORMACOES_CLINICA}}` | `informacoes_clinica_agente` | Alguém edita a aba Clínica |
 | `{{PROCEDIMENTOS}}` | `procedimentos_clinica_agente` | Alguém liga/desliga um procedimento |
 | `{{PROFISSIONAIS}}` | `profissionais_clinica_agente` | Alguém muda um dentista ou uma jornada |
+| `{{DATA_HOJE}}` | O relógio do servidor | A cada mensagem |
+| `{{FICHA_DO_PACIENTE}}` | `montarFicha()` | A cada mensagem, e por pessoa |
+
+A tabela está **na ordem em que aparecem no arquivo**, e essa ordem não é
+estética: os três primeiros são iguais para todo mundo e os dois últimos mudam
+a cada conversa. O cache de prompt reaproveita o **prefixo comum** entre
+chamadas — subir a data ou a ficha joga fora o desconto do texto inteiro, de
+todas as conversas de uma vez. **Não mova as duas últimas seções para cima.**
 
 Efeito prático: **desligar um procedimento em Configurações tira ele da boca da
 Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
@@ -544,7 +560,8 @@ Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
 ### Faltava
 
 - **Foto** — o prompt dizia que recebia imagem, mas não dizia o que fazer. Regra
-  dura: acolhe, **nunca diagnostica**, encaminha para a avaliação.
+  dura: acolhe e **nunca diagnostica**. O fim da resposta depende da ficha
+  (ver abaixo).
 - **Áudio** — nenhuma instrução existia.
 - **Passar para um humano** — dor forte, trauma, sangramento, reclamação, ou
   pedido explícito. Ela avisa e pausa sozinha.
@@ -552,6 +569,49 @@ Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
   está fechada, sem prometer retorno imediato.
 - **A data de hoje** — sem isso ela não resolve "amanhã" nem "terça". Injetada
   automaticamente a cada mensagem.
+
+### O que o primeiro teste real quebrou (01/09/2026)
+
+Uma conversa de teste no WhatsApp derrubou duas coisas de uma vez, e as duas
+tinham **a mesma causa: o exemplo da seção Foto.**
+
+O paciente já tinha consulta marcada, mandou uma foto do sorriso, e a Letícia
+ofereceu agendar uma avaliação. Trinta segundos depois, perguntada, ela recitou
+dia, hora, procedimento e dentista de cor. Ou seja: **o dado estava na ficha e
+ela sabia.** O que ela fez foi copiar o exemplo, quase palavra por palavra:
+
+| O exemplo no prompt | O que ela mandou |
+|---|---|
+| "Obrigada por mandar! Pelo que dá pra ver aqui não consigo te dizer nada com certeza — isso o dentista precisa olhar de perto. Quer que eu veja um horário pra avaliação?" | "Obrigada por mandar a foto! Pelo que vejo aqui, não consigo dar um diagnóstico certinho — isso o dentista precisa olhar de perto. Quer que eu veja algum horário pra você vir fazer uma avaliação?" |
+
+**Exemplo concreto vence regra abstrata em outra seção.** A regra "não ofereça
+agendar a quem já tem hora" existia, mas morava na última seção do prompt. E o
+texto empurrava para agendar em quatro lugares (Etapa 3, Etapa 4, exemplo do
+Preço, exemplo da Foto) e freava em um. Numericamente o prompt torcia contra a
+resposta certa — ainda mais com um modelo pequeno, que copia exemplo e ignora
+regra distante muito mais que um grande.
+
+**O travessão veio no mesmo pacote: ele estava no exemplo.**
+
+O que mudou:
+
+1. **O exemplo da Foto ganhou dois caminhos**, com e sem consulta marcada.
+2. **Seção nova: `QUANDO A PESSOA JÁ TEM CONSULTA MARCADA`.** Proibir não
+   basta — sem um movimento no lugar, ela volta ao gesto mais treinado. A seção
+   dá nome ao movimento certo: **leve o assunto para a consulta que já existe.**
+3. **Duas regras novas em `REGRAS INEGOCIÁVEIS`**, que é a lista que ela
+   demonstravelmente respeita: na mesma conversa não falou um preço nem deu um
+   diagnóstico.
+4. **Travessão proibido**, e removido dos dois exemplos que o traziam. A regra
+   separa **travessão entre orações** (proibido) de **hífen dentro da palavra**
+   (normal). Sem essa distinção ela escreveria "pos operatorio" e "raio x".
+5. **A ficha passou a levar a ordem junto do dado.** Ver a seção 7.
+
+> Só os **exemplos** foram limpos; a prosa do prompt ainda usa travessão. É de
+> propósito: o que ela imita é a fala entre aspas, não a instrução. Se ainda
+> escapar travessão, o passo seguinte é filtrar no envio
+> (`supabase/functions/whatsapp/index.ts`, onde a resposta é quebrada em
+> mensagens) — prompt acerta quase sempre, código acerta sempre.
 
 ---
 

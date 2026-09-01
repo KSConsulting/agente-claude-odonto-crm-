@@ -140,6 +140,20 @@ export async function montarFicha(
       `JÁ TEM CONSULTA MARCADA: ${proxima.procedimento}, ` +
       `${quando(proxima.data_consulta, fuso)}${dentista}.`,
     )
+    // A INSTRUÇÃO VIAJA COLADA NO DADO, e não só lá no prompt fixo.
+    //
+    // Não é redundância: o prompt fixo já proíbe oferecer agendamento a quem
+    // tem hora, e ela ofereceu assim mesmo — depois de uma foto, trinta
+    // segundos antes de recitar o dia da consulta de cor. Ela tinha o dado.
+    // O que faltou foi a regra estar perto dele.
+    //
+    // A ficha é a ÚLTIMA coisa que o modelo lê antes da conversa. Uma
+    // instrução aqui vale mais que a mesma instrução dez seções acima, e não
+    // custa cache nenhum: esta seção já é volátil por natureza.
+    linhas.push(
+      'Ela já tem hora: NÃO ofereça agendamento, nem depois de foto, medo, ' +
+      'dúvida ou preço. Leve o assunto para essa consulta.',
+    )
   }
 
   if (realizadas.length) {

@@ -664,6 +664,15 @@ por número de WhatsApp, para sempre.
 > inegociável: *"nunca termine uma resposta em que descobriu algo novo sem usar
 > `atualizar_ficha`"*.
 
+**A ficha é o único lugar do prompt que carrega ordem, e não só dado.** Quando
+existe consulta marcada, `montarFicha()` acrescenta uma segunda linha mandando
+não oferecer agendamento. Parece repetir as `REGRAS INEGOCIÁVEIS`, e não é: num
+teste real a Letícia ofereceu agendar a quem tinha hora no dia seguinte — com
+o dado na frente dela, e recitando esse mesmo dado trinta segundos depois.
+Regra colada no dado, na **última** coisa que o modelo lê, pesa mais que a mesma
+regra dez seções acima. E não custa cache: esta seção já é volátil. O caso
+inteiro está na seção 8 do [`agente-ia/README.md`](agente-ia/README.md).
+
 **O histórico de consultas não entra no prompt.** Um paciente de cinco anos tem
 dezenas de linhas, cobradas em toda mensagem para serem usadas quase nunca. Da
 ficha sai só uma linha de placar — quantas fez e quando foi a última —, e o
