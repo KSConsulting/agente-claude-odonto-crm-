@@ -26,7 +26,9 @@ import {
   rpc, selecionar, inserir, atualizar, subirMidia,
   apagar, listarMidias, apagarMidias,
 } from '../_shared/db.ts'
-import { conversar, transcrever, type MensagemLLM, type Parte } from '../_shared/llm.ts'
+import {
+  conversar, transcrever, chavesDeIA, type MensagemLLM, type Parte,
+} from '../_shared/llm.ts'
 import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
 import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
@@ -118,6 +120,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && rota === '/enviar') return await rotaEnviar(req)
     if (req.method === 'GET' && rota === '/prompt-oficial') return await rotaPromptOficial(req)
     if (req.method === 'GET' && rota === '/foto') return await rotaFoto(req)
+    if (req.method === 'GET' && rota === '/chaves-ia') return await rotaChavesIA(req)
     if (req.method === 'GET' && rota === '/conexao') return await rotaConexao(req)
     if (req.method === 'POST' && rota === '/conexao/conectar') return await rotaConectar(req)
     if (req.method === 'POST' && rota === '/conexao/desconectar') return await rotaDesconectar(req)
@@ -383,6 +386,26 @@ async function rotaFoto(req: Request): Promise<Response> {
   if (!numero) return json({ ok: false, motivo: 'sem_numero' }, 400)
 
   return json({ ok: true, url: await (await ponteAtiva()).fotoDoPerfil(numero) })
+}
+
+/**
+ * Quais fornecedores de IA têm chave — para o seletor de modelo.
+ *
+ * SIM OU NÃO, nunca a chave. A tela precisa saber se pode oferecer os modelos
+ * de cada fornecedor; mandar a chave para o navegador daria a qualquer pessoa
+ * com o DevTools aberto uma conta de IA para gastar. Mesmo raciocínio dos 4
+ * dígitos da chave da ponte, um pouco mais curto: aqui nem os 4 dígitos fazem
+ * falta, porque não há painel externo para conferir.
+ *
+ * Sem esta rota o seletor mentia: oferecia os Claude como opção, e a
+ * `ANTHROPIC_API_KEY` nunca foi preenchida. Escolher derrubava a secretária
+ * em silêncio — o erro só aparecia no log da função.
+ */
+async function rotaChavesIA(req: Request): Promise<Response> {
+  const usuario = await usuarioDaSessao(req)
+  if (!usuario) return json({ ok: false, motivo: 'sem_sessao' }, 401)
+
+  return json({ ok: true, ...chavesDeIA() })
 }
 
 // ---------------------------------------------------------------------------

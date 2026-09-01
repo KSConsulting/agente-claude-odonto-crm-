@@ -1122,6 +1122,28 @@ resumo, para quem estiver lendo o schema de cima a baixo.
 Três colunas novas em `crm_clinica_dados`: `agente_pausado`, `assumido_por` e
 `assumido_em` — o botão "Assumir conversa".
 
+#### `modelo` — sem `CHECK`, de propósito
+
+`text not null default 'gpt-4.1'`. **Não há restrição no banco**, e isso é
+escolha: acrescentar modelo não deveria exigir migração, pela mesma razão de
+[`cores.ts`](src/lib/cores.ts) e da lista de fusos. Quem recusa o valor errado
+é a API do fornecedor, e o motivo dela ("this model does not exist") é melhor
+que um `23514` nosso.
+
+Os valores aceitos vivem em **três lugares**, e nada os sincroniza:
+
+| Onde | O quê |
+|---|---|
+| `ModeloAgente`, em [`src/types/index.ts`](src/types/index.ts) | O tipo |
+| `MODELOS`, em [`src/lib/modelosIA.ts`](src/lib/modelosIA.ts) | Nome, nota e fornecedor de cada um — é o que a tela desenha |
+| `conversar()`, em `supabase/functions/_shared/llm.ts` | Para qual API vai, e com quais parâmetros |
+
+> ⚠️ **A tela não oferece o que não tem chave.** `GET /whatsapp/chaves-ia`
+> responde quais fornecedores estão configurados nos secrets — **sim ou não,
+> nunca a chave** — e o card do modelo sem chave nasce desligado, com o motivo.
+> Antes disso, escolher um Claude com a `ANTHROPIC_API_KEY` vazia derrubava a
+> secretária em silêncio: o erro só aparecia no log da função.
+
 #### `provedor_whatsapp` (migração `0017`)
 
 Qual ponte com o WhatsApp está ativa: `evolution` ou `uazapi`. **Uma de cada

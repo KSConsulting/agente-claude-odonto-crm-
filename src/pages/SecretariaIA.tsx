@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Save, Check, Power, Bot, Trash2, Plus, AlertTriangle, FileText, X,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Lock,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import CampoTelefone from '../components/CampoTelefone'
@@ -11,6 +11,10 @@ import { useAgente } from '../lib/agente'
 import ConexaoWhatsApp from '../components/ConexaoWhatsApp'
 import ApagarPessoa from '../components/ApagarPessoa'
 import { useConexao, conexaoDePe } from '../lib/whatsappConexao'
+import {
+  FORNECEDORES, ORDEM_FORNECEDORES, modelosDe, acharModelo, impedimento,
+  useChavesIA,
+} from '../lib/modelosIA'
 import type { ConfiguracoesAgente, ModeloAgente } from '../types'
 
 /**
@@ -31,12 +35,25 @@ import type { ConfiguracoesAgente, ModeloAgente } from '../types'
 const FONTE = "'Plus Jakarta Sans', sans-serif"
 const MONO = "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace"
 
-const MODELOS: { valor: ModeloAgente; nome: string; nota: string; anthropic: boolean }[] = [
-  { valor: 'gpt-4.1-mini',   nome: 'GPT-4.1 mini',    nota: 'Mais barato. É o que está em uso.', anthropic: false },
-  { valor: 'gpt-4.1',        nome: 'GPT-4.1',         nota: 'Mais capaz que o mini.',            anthropic: false },
-  { valor: 'claude-sonnet-5', nome: 'Claude Sonnet 5', nota: 'Equilíbrio entre custo e conversa.', anthropic: true },
-  { valor: 'claude-opus-5',  nome: 'Claude Opus 5',   nota: 'O mais capaz. Mais caro.',          anthropic: true },
-]
+/**
+ * A etiqueta de chave ao lado do nome do fornecedor.
+ *
+ * Verde e ambar, e nao verde e vermelho: falta de chave nao e defeito do
+ * sistema, e um campo que ninguem preencheu ainda.
+ */
+function Pilula({ ok }: { ok: boolean }) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+      background: ok ? '#E8F8EF' : '#FFFBEB',
+      color: ok ? '#1A7A48' : '#B45309',
+      border: `1px solid ${ok ? '#BFE8D0' : '#FDE68A'}`,
+      whiteSpace: 'nowrap',
+    }}>
+      {ok ? 'Chave configurada' : 'Sem chave'}
+    </span>
+  )
+}
 
 const cartao: React.CSSProperties = {
   background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA',
@@ -103,6 +120,10 @@ export default function SecretariaIA() {
   const {
     conexao, recarregar: recarregarConexao, verificando, verificadoEm, intervaloMs,
   } = useConexao()
+
+  // Quais fornecedores de IA têm chave no servidor. `null` = ainda não sei, e
+  // enquanto não sei a tela não desliga nada.
+  const chavesIA = useChavesIA()
 
   const [novoNumero, setNovoNumero] = useState('')
   const [novoValido, setNovoValido] = useState(false)
@@ -372,32 +393,110 @@ export default function SecretariaIA() {
           para publicar.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {MODELOS.map((m) => (
-            <label key={m.valor} style={{
-              display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 14px',
-              border: `1px solid ${modelo === m.valor ? '#1E6E8C' : '#DCE6EA'}`,
-              background: modelo === m.valor ? '#EAF3F6' : '#fff',
-              borderRadius: 10, cursor: 'pointer',
-            }}>
-              <input type="radio" name="modelo" checked={modelo === m.valor}
-                onChange={() => setModelo(m.valor)}
-                style={{ marginTop: 2, accentColor: '#1E6E8C', cursor: 'pointer' }} />
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#16232B' }}>{m.nome}</div>
-                <div style={{ fontSize: 12, color: '#6B818C', marginTop: 1 }}>{m.nota}</div>
-              </div>
-            </label>
-          ))}
-        </div>
+        {/* Um bloco por empresa, e a grade em duas colunas.
 
-        {MODELOS.find((m) => m.valor === modelo)?.anthropic && (
-          <Aviso>
-            Os modelos Claude exigem a <code style={{ fontFamily: MONO }}>ANTHROPIC_API_KEY</code>{' '}
-            configurada nos secrets do Supabase. Sem ela, a {nomeAgente} para de responder — e
-            o erro só aparece no log da função.
-          </Aviso>
-        )}
+            A lista corrida servia para quatro modelos. Com oito ela vira uma
+            coluna alta em que "GPT" e "Claude" se intercalam, e a pergunta que
+            a pessoa faz primeiro — *de qual empresa dá para usar?* — não tem
+            onde ser respondida. Com o bloco, a resposta é o cabeçalho.
+
+            Cards, e não uma lista suspensa: a nota de cada um é o que decide a
+            escolha (barato / caro / pensa antes), e num `select` ela não cabe.
+            É a mesma regra dos Procedimentos — item com texto quer card. */}
+        {ORDEM_FORNECEDORES.map((f) => {
+          const temChave = chavesIA?.[f] ?? true
+          return (
+            <div key={f} style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#16232B' }}>
+                  {FORNECEDORES[f].nome}
+                </span>
+                {/* Enquanto `chavesIA` é nulo não sabemos, e não afirmamos nada:
+                    acusar "sem chave" numa falha de rede de meio segundo é o
+                    mesmo erro do `webhook: 'desconhecido'`. */}
+                {chavesIA !== null && <Pilula ok={temChave} />}
+                <div style={{ flex: 1, height: 1, background: '#EDF2F4' }} />
+              </div>
+
+              <div style={{
+                display: 'grid', gap: 8,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(236px, 1fr))',
+              }}>
+                {modelosDe(f).map((m) => {
+                  const travado = impedimento(m, chavesIA)
+                  const escolhido = modelo === m.valor
+                  return (
+                    <label key={m.valor} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 13px',
+                      border: `1px solid ${escolhido ? '#1E6E8C' : '#DCE6EA'}`,
+                      background: travado ? '#F7FAFB' : escolhido ? '#EAF3F6' : '#fff',
+                      borderRadius: 10, cursor: travado ? 'not-allowed' : 'pointer',
+                    }}>
+                      <input
+                        type="radio" name="modelo" checked={escolhido} disabled={!!travado}
+                        onChange={() => { setModelo(m.valor) }}
+                        style={{
+                          marginTop: 2, accentColor: '#1E6E8C',
+                          cursor: travado ? 'not-allowed' : 'pointer',
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 13.5, fontWeight: 600,
+                          color: travado ? '#6B818C' : '#16232B',
+                        }}>{m.nome}</div>
+                        <div style={{
+                          fontSize: 12, color: '#6B818C', marginTop: 1, lineHeight: 1.5,
+                        }}>{m.nota}</div>
+
+                        {/* O motivo NÃO esmaece junto com o card. Apagar a
+                            explicação de um item desligado é apagar a saída —
+                            mesma regra do rodapé dos Procedimentos. */}
+                        {travado && (
+                          <div style={{
+                            display: 'flex', gap: 5, alignItems: 'flex-start', marginTop: 7,
+                            fontSize: 11.5, color: '#B45309', lineHeight: 1.45,
+                          }}>
+                            <Lock size={12} style={{ flexShrink: 0, marginTop: 2 }} />
+                            <span>{travado}</span>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* O modelo GRAVADO parou de existir ou perdeu a chave.
+
+            É o caso caro e mudo: a tela mostra o nome dele em cima, tudo
+            parece normal, e a secretária não responde ninguém. O card
+            desligado sozinho não conta isso — ele está no meio da grade, e o
+            que está errado é o que está VALENDO. */}
+        {(() => {
+          const atual = acharModelo(modelo)
+          if (!atual) {
+            return (
+              <Aviso>
+                O modelo gravado (<code style={{ fontFamily: MONO }}>{modelo}</code>) não está
+                mais na lista. A {nomeAgente} continua tentando usá-lo — escolha um acima e
+                salve.
+              </Aviso>
+            )
+          }
+          const travado = impedimento(atual, chavesIA)
+          if (!travado) return null
+          return (
+            <Aviso>
+              <strong>{atual.nome} está em uso, e não pode responder.</strong> {travado} Enquanto
+              isso a {nomeAgente} falha em silêncio: a mensagem chega, aparece em Conversas e
+              fica sem resposta. Escolha outro modelo acima e salve.
+            </Aviso>
+          )
+        })()}
 
         {/* ---- Prompt, no mesmo card ----
 

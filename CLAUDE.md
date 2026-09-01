@@ -187,6 +187,7 @@ src/
 │   ├── apagarPessoa.ts         prever o estrago e apagar tudo de alguém
 │   ├── statusLead.ts           cores e rótulos de status (fonte para código novo)
 │   ├── agente.ts               como o Agente de IA se chama NA TELA (ver Design system)
+│   ├── modelosIA.ts            o catálogo de modelos e quais têm chave no servidor
 │   └── apiTokens.ts            geração/hash do token e catálogo dos endpoints
 ├── types/
 │   └── index.ts                tipos espelhando o schema do banco
@@ -729,6 +730,46 @@ mostra qual dos dois está no ar, e manda editar pelo
 
 > A coluna continua gravável, e um valor antigo continua valendo — a tela só
 > não escreve mais nela. Para voltar ao oficial, é `prompt = null`, pela IDE.
+
+### O seletor de modelo: por empresa, e o que não dá para usar aparece desligado
+
+Oito modelos numa coluna só, com "GPT" e "Claude" se intercalando, não responde
+a pergunta que vem primeiro: **de qual empresa dá para usar?** Por isso a lista
+virou um bloco por fornecedor, com uma etiqueta de estado no cabeçalho, e uma
+grade de dois cards por linha dentro dele.
+
+| Decisão | Por quê |
+|---|---|
+| **Bloco por empresa** | A chave é por fornecedor, não por modelo. Sem chave da Anthropic, os dois Claude caem juntos — e um cabeçalho diz isso uma vez, em vez de dois cards repetirem o mesmo aviso |
+| **Card, e não lista suspensa** | O que decide a escolha é a nota ("o mais barato", "raciocina antes", "a mais cara"). Num `select` ela não cabe. Mesma regra dos Procedimentos: item com texto quer card |
+| **O indisponível aparece desligado, não some** | Sumir não responde "cadê o GPT-5?". Desligado com o motivo escrito responde, e ainda diz o que fazer para liberar |
+| **O motivo não esmaece junto com o card** | O corpo do card apaga; a linha do impedimento fica em âmbar cheio. Apagar a explicação de um item desligado é apagar a saída — o mesmo do rodapé dos Procedimentos |
+| **Enquanto não sabemos, nada é desligado** | `useChavesIA()` devolve `null` até a função responder, e `null` é **não sei**, não "não tem". Trancar a tela numa falha de rede de meio segundo é o erro do `webhook: 'desconhecido'`, ao contrário |
+
+> ⚠️ **O aviso mais importante é sobre o modelo que está VALENDO**, e não sobre
+> os desligados. Se a configuração gravada apontar para um modelo sem chave, o
+> card dele está no meio da grade como qualquer outro — mas a secretária **não
+> responde ninguém**, e nada na tela diria isso. Por isso existe uma faixa
+> separada, embaixo da grade: *"Claude Opus 5 está em uso, e não pode
+> responder."*
+
+**A lista é curta, e foi conferida contra a conta de verdade.** A conta da
+clínica enxerga 47 modelos da OpenAI; o seletor oferece seis. Cada um foi
+chamado com ferramenta, em 01/09/2026, antes de entrar — e três candidatos
+foram recusados ali:
+
+| Modelo | O que aconteceu |
+|---|---|
+| `gpt-5`, `gpt-5-mini` | *"Your organization must be verified"* — a OpenAI exige verificar a organização |
+| `gpt-5.6-luna` / `-sol` / `-terra` | Não aceitam ferramenta em `/v1/chat/completions`; exigiriam a Responses API, que é outra integração |
+
+O `gpt-5` ficou na lista, **desligado e com o motivo** — é o que a clínica
+procura pelo nome. Os outros dois não: `gpt-5-mini` repetiria o mesmo recado, e
+os `5.6` não são "bloqueados", são de outra API.
+
+> **Modelo que existe na documentação e não responde nesta conta é um card que
+> promete e falha.** A lista de `src/lib/modelosIA.ts` carrega essa data — quem
+> for acrescentar um modelo, chame antes.
 
 ### O interruptor fica no fim da página, e não no painel de estado
 

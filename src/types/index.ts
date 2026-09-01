@@ -288,15 +288,30 @@ export interface MensagemWhatsapp {
 }
 
 /**
- * Modelos que a aba "Agente de IA" oferece. Acrescentar um aqui exige
- * acrescentar o tratamento correspondente em
- * `supabase/functions/_shared/llm.ts` — nada sincroniza isso sozinho.
+ * Modelos que a página "Secretária de IA" oferece.
+ *
+ * ⚠️ **Acrescentar um exige TRÊS lugares:** este tipo, a lista `MODELOS` de
+ * `src/lib/modelosIA.ts` (o nome, a nota e o fornecedor) e o `conversar()` de
+ * `supabase/functions/_shared/llm.ts`. Nada sincroniza isso sozinho.
+ *
+ * A coluna `configuracoes_agente.modelo` é `text` **sem `CHECK`**, de
+ * propósito: acrescentar modelo não deve exigir migração, pela mesma razão de
+ * `cores.ts` e da lista de fusos. Quem recusa o valor errado é a API do
+ * fornecedor, e o motivo dela é melhor que o nosso.
+ *
+ * Estes foram testados contra a conta da clínica antes de entrarem — modelo
+ * que existe na documentação e não responde nesta conta é uma opção que
+ * promete e falha.
  */
 export type ModeloAgente =
-  | 'claude-opus-5'
-  | 'claude-sonnet-5'
-  | 'gpt-4.1'
   | 'gpt-4.1-mini'
+  | 'gpt-4.1'
+  | 'gpt-5'
+  | 'gpt-5.1'
+  | 'gpt-5.4-mini'
+  | 'gpt-5.5'
+  | 'claude-sonnet-5'
+  | 'claude-opus-5'
 
 export interface ConfiguracoesAgente {
   id: string

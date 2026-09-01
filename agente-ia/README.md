@@ -52,7 +52,7 @@ caminhos próprios. Esta é a lista completa, para ninguém procurar:
 
 | Onde | O que é |
 |---|---|
-| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`) e a de apagar uma pessoa (`/apagar-pessoa`) |
+| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`), a de apagar uma pessoa (`/apagar-pessoa`) e a `/chaves-ia`, que diz quais fornecedores de IA têm chave — **sim ou não, nunca a chave** |
 | `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, as **duas pontes de WhatsApp**, montagem do prompt, conversão de fuso (`tempo.ts`) |
 | `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
@@ -272,7 +272,7 @@ Registradas com o motivo, para ninguém refazer a discussão daqui a três meses
 | **Orquestração** | Sem n8n — tudo neste repositório | Menos peças, código versionado no Git, e o Supabase já roda 24h |
 | **WhatsApp** | Evolution API **ou** uazapi, à escolha da clínica | As duas são não oficiais. É o único ponto que precisa de servidor próprio, e ter duas evita ficar refém de uma |
 | **Memória** | Postgres do próprio Supabase | A memória do agente e a tela de Conversas leem a mesma tabela |
-| **Modelo de IA** | Selecionável na tela. Começando em **`gpt-4.1-mini`** | A clínica já tinha a chave da OpenAI. Anthropic fica para depois |
+| **Modelo de IA** | Selecionável na tela: **seis da OpenAI, dois da Anthropic**. Em uso, o `gpt-4.1-mini` | A clínica já tinha a chave da OpenAI. Os Claude aparecem **desligados** enquanto a `ANTHROPIC_API_KEY` estiver vazia — ver seção 9 |
 | **Áudio** | Transcrito automaticamente | Paciente brasileiro manda áudio. Sem isso o agente trava na primeira mensagem |
 | **Foto** | O modelo enxerga, mas **nunca diagnostica** | Acolhe e encaminha para avaliação presencial |
 | **Preço** | Fala **só** o que está escrito no catálogo | `preco_a_partir_de` (migração `0018`) tem três estados, e o `0` da avaliação — "é gratuita" — é a melhor resposta que ela tem para quem trava no valor. Ver seção 7 |
@@ -380,6 +380,7 @@ não depois.
 | `src/components/PainelLead.tsx` | 4 | Coluna extra: ficha da pessoa, consultas e a foto do WhatsApp |
 | `src/lib/statusLead.ts` | 4 | Cores e rótulos de status, para código novo não fazer a quinta cópia |
 | `src/lib/agente.ts` | 4 | Como ela se chama **na tela** — separado de como se apresenta ao paciente |
+| `src/lib/modelosIA.ts` | 5 | O catálogo de modelos, e o `useChavesIA()` que pergunta quais fornecedores têm chave |
 | `src/pages/SecretariaIA.tsx` | 5 | Página do menu do usuário: modelo, prompt, liga/desliga |
 | `src/components/EditorProcedimento.tsx` | 5 | Modal de edição do procedimento: as duas descrições, com as réguas |
 | `src/components/ModalPortal.tsx` | 5 | Leva o modal para o `<body>` — ver Convenções no [`CLAUDE.md`](../CLAUDE.md) |
@@ -1082,7 +1083,8 @@ mensagens.
 |---|---|---|
 | **Claude Opus 5** — o mais capaz | US$ 0,15 – 0,40 | US$ 45 – 120 |
 | **Claude Sonnet 5** — equilíbrio | US$ 0,06 – 0,16 | US$ 18 – 48 |
-| **GPT-4.1** | faixa parecida | confirme no painel da OpenAI |
+| **GPT-4.1** e **GPT-4.1 mini** | faixa parecida, o mini bem abaixo | confirme no painel da OpenAI |
+| **GPT-5.1 / 5.4 mini / 5.5** | acima dos 4.1: o raciocínio é cobrado como saída | idem |
 | Transcrição de áudio | ~US$ 0,006 / minuto | poucos dólares |
 | Servidor da Evolution | — | ~R$ 40 / mês |
 | Supabase | — | o que já se paga |
@@ -1091,9 +1093,22 @@ Os valores já contam o desconto de cache: o texto fixo do prompt (dados da
 clínica, procedimentos, dentistas) é cobrado cheio na primeira mensagem e por
 volta de 10% disso nas seguintes.
 
-**Sugestão:** começar no Claude Opus 5 para a Letícia nascer boa, e só depois —
-com conversas reais na mão — testar se o Sonnet 5 ou o GPT-4.1 dão conta. A aba
-de Configurações existe exatamente para essa comparação ser um clique.
+> ⚠️ **Os GPT-5 pensam antes de responder, e o pensamento entra na conta.** É
+> saída cobrada que o paciente nunca lê. Medido em 01/09/2026 com uma pergunta
+> real de WhatsApp, o `gpt-5.5` gastou 70 tokens de raciocínio para 366
+> caracteres de resposta — pouco, mas some rápido em 300 conversas. O
+> `gpt-5.4-mini` gastou **zero**: nem todo modelo da geração raciocina por
+> padrão nesta API.
+
+**Hoje só a OpenAI tem chave.** A `ANTHROPIC_API_KEY` está vazia nos secrets, e
+por isso os dois Claude aparecem desligados no seletor, com o motivo escrito no
+card. Preenchê-la e rodar `npm run agente:secrets` é o que os liberta — a tela
+percebe sozinha, sem alteração de código.
+
+**Sugestão de comparação, quando houver as duas chaves:** o `gpt-4.1-mini` é o
+piso de custo e dá conta da conversa; o `gpt-5.4-mini` é o meio-termo da geração
+nova; o Claude Sonnet 5 escreve o português mais natural dos três. Trocar é um
+clique, e vale na mensagem seguinte.
 
 ---
 
@@ -1209,7 +1224,7 @@ foi configurado — os secrets do Supabase não podem ser lidos de volta.
 
 | Chave | Para quê |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude |
+| `ANTHROPIC_API_KEY` | Claude. **Vazia hoje** — e por isso o seletor mostra os dois Claude desligados, em vez de deixar escolher e falhar |
 | `OPENAI_API_KEY` | GPT **e** a transcrição dos áudios — usada mesmo quando o modelo escolhido é o Claude |
 | `EVOLUTION_API_URL` | Endereço do servidor da Evolution |
 | `EVOLUTION_API_KEY` | Autenticação da Evolution |

@@ -6,8 +6,8 @@
  * precisa saber — se atrás está a OpenAI ou a Anthropic.
  *
  * ACRESCENTAR UM MODELO exige três lugares: o tipo `ModeloAgente`
- * (src/types/index.ts), a lista da tela, e o `conversar()` daqui. Nada
- * sincroniza isso sozinho.
+ * (src/types/index.ts), a lista `MODELOS` de `src/lib/modelosIA.ts`, e o
+ * `conversar()` daqui. Nada sincroniza isso sozinho.
  */
 
 const CHAVE_OPENAI = Deno.env.get('OPENAI_API_KEY') ?? ''
@@ -70,6 +70,43 @@ export function ehAnthropic(modelo: string): boolean {
   return modelo.startsWith('claude-')
 }
 
+/**
+ * Os GPT-5 pensam antes de responder, e o pensamento é cobrado como saída.
+ *
+ * Isso muda duas coisas na chamada, e as duas quebram em silêncio se
+ * esquecidas — ver `max_completion_tokens` e `teto()` logo abaixo.
+ */
+function ehRaciocinio(modelo: string): boolean {
+  return modelo.startsWith('gpt-5')
+}
+
+/**
+ * Quanto a resposta pode ocupar.
+ *
+ * ⚠️ **Nos GPT-5 o raciocínio conta neste teto**, e ele vem ANTES do texto. Um
+ * teto curto é gasto pensando, e o paciente recebe uma resposta vazia — que na
+ * prática é silêncio, o pior defeito que esta função tem.
+ *
+ * Medido em 01/09/2026 com uma pergunta real de WhatsApp (preço + fluxo +
+ * agenda no mesmo texto): o `gpt-5.5` queimou 70 tokens de raciocínio antes de
+ * escrever. Longe dos 1024, mas uma conversa com ferramenta pensa mais — e o
+ * teto só cobra o que for gerado, então folga aqui é grátis.
+ */
+function teto(modelo: string): number {
+  return ehRaciocinio(modelo) ? 2048 : 1024
+}
+
+/**
+ * Quais fornecedores têm chave — para a página Secretária de IA.
+ *
+ * Devolve **sim ou não**, nunca a chave. É o que sustenta o modelo aparecer
+ * desligado na tela em vez de ser escolhido e derrubar a secretária em
+ * silêncio. Ver `src/lib/modelosIA.ts`.
+ */
+export function chavesDeIA(): { openai: boolean; anthropic: boolean } {
+  return { openai: !!CHAVE_OPENAI, anthropic: !!CHAVE_ANTHROPIC }
+}
+
 /** Despacha para o fornecedor certo. */
 export function conversar(pedido: PedidoLLM): Promise<RespostaLLM> {
   return ehAnthropic(pedido.modelo) ? viaAnthropic(pedido) : viaOpenAI(pedido)
@@ -123,7 +160,16 @@ async function viaOpenAI(pedido: PedidoLLM): Promise<RespostaLLM> {
 
   const corpo: Record<string, unknown> = {
     model: pedido.modelo,
-    max_tokens: pedido.maxTokens ?? 1024,
+    // ⚠️ `max_completion_tokens`, e NUNCA `max_tokens`.
+    //
+    // Todo GPT-5 recusa o segundo com um 400 seco — "Unsupported parameter:
+    // 'max_tokens' is not supported with this model" —, e o 400 vira exceção
+    // aqui, ou seja, silêncio para quem está esperando no WhatsApp. Foi o que
+    // impediu a geração 5 de entrar no seletor até 01/09/2026.
+    //
+    // Os 4.1 aceitam os dois; um campo só para todos evita a ramificação que
+    // um dia alguém esqueceria de atualizar.
+    max_completion_tokens: pedido.maxTokens ?? teto(pedido.modelo),
     messages: mensagens,
   }
   if (pedido.ferramentas.length) {
@@ -205,7 +251,8 @@ async function viaAnthropic(pedido: PedidoLLM): Promise<RespostaLLM> {
 
   const corpo: Record<string, unknown> = {
     model: pedido.modelo,
-    max_tokens: pedido.maxTokens ?? 1024,
+    // Aqui é `max_tokens` mesmo: a Anthropic nunca renomeou o campo.
+    max_tokens: pedido.maxTokens ?? teto(pedido.modelo),
     // O prompt do sistema é grande e estável: os dados da clínica, os
     // procedimentos e os dentistas se repetem em toda mensagem. Em cache, o
     // trecho custa por volta de 10% a partir da segunda chamada.
