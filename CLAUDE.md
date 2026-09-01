@@ -225,7 +225,7 @@ src/
     ├── Procedimentos.tsx       o catálogo da clínica
     ├── SecretariaIA.tsx        o Agente de IA: modelo, prompt, liga/desliga
     ├── TokenApi.tsx            chaves de acesso e o contrato da API
-    └── Configuracoes.tsx       perfil, clínica e horários
+    └── Configuracoes.tsx       perfil, clínica, horários e o fuso
 ```
 
 ### A agenda não é uma entidade
@@ -1151,6 +1151,29 @@ uma a mais do que o necessário — a segunda envelheceria calada.
 > clínica anuncia; quem manda na disponibilidade é `profissional_horarios`.
 > Anunciar até as 18:00 sem dentista depois das 17:00 faz o agente prometer
 > horário que a própria API recusa em seguida.
+
+### O fuso fica na aba Horários, e não muda nada nesta tela
+
+A grade diz "08:00 às 18:00". **De onde?** Sem a resposta ao lado dela, alguém
+preenche a semana inteira sem se fazer a pergunta — e ela só aparece quando a
+secretária marca uma consulta três horas fora.
+
+Por isso o `fuso_horario` ganhou um card **acima** da grade, e não na aba
+Clínica junto do endereço.
+
+> **Ele existe para o servidor, não para as telas.** Agenda, Dashboard e Leads
+> rodam no fuso do navegador, que no uso real é o da clínica — a recepção está
+> dentro dela. O campo alimenta quem não tem navegador para consultar: o
+> `{{DATA_HOJE}}` do prompt, o `paraInstante()`, a `agenda_disponibilidade` e a
+> `agenda_marcar`. Errado aqui, o estrago não aparece em tela nenhuma: aparece
+> no horário que o paciente ouviu.
+
+**Quatro opções, e não os catorze nomes IANA do Brasil.** Sem horário de verão
+desde 2019, os catorze desabam em quatro deslocamentos — oferecer
+`America/Bahia` e `America/Fortaleza` separados seria pedir uma escolha que não
+muda nada, e escolha que não muda nada é só mais uma chance de errar. A lista
+mora no TypeScript e a coluna **não** tem `CHECK`: ampliar não deve exigir
+migração, pela mesma razão de [`cores.ts`](src/lib/cores.ts).
 
 Três coisas que a definem (detalhes na seção 4.12 do
 [`DATABASE.md`](DATABASE.md)):

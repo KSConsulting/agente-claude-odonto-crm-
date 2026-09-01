@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import type { Usuario, ConfiguracoesClinica, HorarioComercial } from '../types'
 import TabClinica from '../components/TabClinica'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import { useAgente } from '../lib/agente'
 
 /* ──────────────────────────────────────────────
    Upload validation constants
@@ -90,6 +91,29 @@ const STRENGTH_COLORS = ['#DC2626', '#F97316', '#D97706', '#1A7A48', '#1A7A48']
    Helpers
 ────────────────────────────────────────────── */
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
+
+/**
+ * Os fusos do Brasil — quatro, e não os catorze nomes IANA que o país tem.
+ *
+ * Desde 2019 não há horário de verão, então os catorze desabam em **quatro
+ * deslocamentos**. Oferecer `America/Bahia` e `America/Fortaleza` como opções
+ * diferentes seria pedir uma escolha que não muda nada, e toda escolha que não
+ * muda nada é uma chance a mais de errar.
+ *
+ * Lista curta e deliberada, como a de países em
+ * [`telefones.ts`](../lib/telefones.ts) — e, como a paleta de
+ * [`cores.ts`](../lib/cores.ts), **sem `CHECK` no banco**: a coluna aceita
+ * qualquer texto, então acrescentar um fuso um dia não vai exigir migração.
+ * Quem escreve ali é esta lista.
+ */
+const FUSOS = [
+  { valor: 'America/Noronha', rotulo: 'GMT-2 · Fernando de Noronha' },
+  { valor: 'America/Sao_Paulo', rotulo: 'GMT-3 · Brasília, São Paulo, Sul e Nordeste' },
+  { valor: 'America/Manaus', rotulo: 'GMT-4 · Amazonas, Mato Grosso, Rondônia, Roraima' },
+  { valor: 'America/Rio_Branco', rotulo: 'GMT-5 · Acre' },
+]
+
+const FUSO_PADRAO = 'America/Sao_Paulo'
 
 type TabKey = 'perfil' | 'clinica' | 'horarios'
 
@@ -578,6 +602,91 @@ interface HorarioRow {
   error: string
 }
 
+/**
+ * O fuso da clínica — e por que ele mora na aba Horários.
+ *
+ * A grade logo abaixo diz "08:00 às 18:00". De onde? Sem esta resposta ao lado
+ * dela, alguém preenche a grade inteira sem nunca se perguntar isso — e a
+ * pergunta só aparece quando a secretária marca uma consulta três horas fora.
+ *
+ * ── ELE NÃO MUDA NADA NESTA TELA ───────────────────────────────────────────
+ *
+ * As telas rodam no fuso do navegador, que no uso real é o da clínica: a
+ * recepção está dentro dela. Este campo existe para o **servidor**, que não tem
+ * navegador nenhum para consultar — o `{{DATA_HOJE}}` do prompt, o
+ * `paraInstante()` que converte "quinta às 14h" em `timestamptz`, a
+ * `agenda_disponibilidade` e a `agenda_marcar`.
+ *
+ * É por isso que a legenda fala da secretária, e não da Agenda. Errado aqui, o
+ * estrago não aparece em tela nenhuma: aparece no horário que o paciente ouviu.
+ */
+function CartaoFusoHorario() {
+  const { rotulo: rotuloAgente } = useAgente()
+  const [fuso, setFuso] = useState(FUSO_PADRAO)
+  const [id, setId] = useState<string | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const [salvo, setSalvo] = useState(false)
+  const [erro, setErro] = useState('')
+
+  useEffect(() => {
+    supabase.from('configuracoes_clinica').select('id, fuso_horario').limit(1).single()
+      .then(({ data }) => {
+        if (!data) return
+        setId(data.id)
+        if (data.fuso_horario) setFuso(data.fuso_horario)
+      })
+  }, [])
+
+  const salvar = async () => {
+    setSalvando(true); setErro('')
+    const { error } = id
+      ? await supabase.from('configuracoes_clinica').update({ fuso_horario: fuso }).eq('id', id)
+      : await supabase.from('configuracoes_clinica').insert({ fuso_horario: fuso })
+    setSalvando(false)
+    if (error) { setErro('Erro ao salvar. Tente novamente.'); return }
+    setSalvo(true)
+    setTimeout(() => setSalvo(false), 2000)
+  }
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA',
+      padding: '18px 24px', marginBottom: 18,
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: '#16232B' }}>Fuso horário da clínica</div>
+      <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4, lineHeight: 1.6 }}>
+        Em que fuso os horários abaixo devem ser lidos. Quem usa isso é a {rotuloAgente},
+        que marca consultas do lado do servidor e não tem como saber onde a clínica fica.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
+        <select
+          value={fuso}
+          onChange={(e) => { setFuso(e.target.value) }}
+          style={{
+            padding: '9px 12px', borderRadius: 9, border: '1px solid #DCE6EA',
+            fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif",
+            color: '#16232B', background: '#fff', outline: 'none', cursor: 'pointer',
+            minWidth: 300, flex: 1, maxWidth: 420,
+          }}
+        >
+          {FUSOS.map(({ valor, rotulo }) => (
+            <option key={valor} value={valor}>{rotulo}</option>
+          ))}
+        </select>
+        <SaveButton onClick={() => { void salvar() }} saving={salvando} saved={salvo} />
+      </div>
+
+      {erro && (
+        <div style={{
+          background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8,
+          padding: '8px 12px', fontSize: 12.5, color: '#DC2626', marginTop: 10,
+        }}>{erro}</div>
+      )}
+    </div>
+  )
+}
+
 function TabHorarios() {
   const [rows, setRows] = useState<HorarioRow[]>(
     Array.from({ length: 7 }, (_, i) => ({
@@ -623,10 +732,20 @@ function TabHorarios() {
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', overflow: 'hidden' }}>
+    <>
+      {/* Antes da grade, de propósito: ela diz "08:00 às 18:00", e é o fuso
+          que responde "de onde". */}
+      <CartaoFusoHorario />
+
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', overflow: 'hidden' }}>
       <div style={{ padding: '18px 24px', borderBottom: '1px solid #EDF2F4' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#16232B' }}>Horários de Funcionamento</div>
-        <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>Esses horários são usados no Dashboard para calcular contatos dentro e fora do horário comercial.</div>
+        <div style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4, lineHeight: 1.6 }}>
+          O horário que a clínica anuncia. O Dashboard usa para separar contatos dentro
+          e fora do expediente, e é daqui que sai a frase de atendimento que a secretária
+          fala ao paciente. Quem manda na agenda de cada dentista é a jornada dele, em
+          Profissionais.
+        </div>
       </div>
       {rows.map((row, idx) => (
         <React.Fragment key={row.dia_semana}>
@@ -663,7 +782,8 @@ function TabHorarios() {
           )}
         </React.Fragment>
       ))}
-    </div>
+      </div>
+    </>
   )
 }
 

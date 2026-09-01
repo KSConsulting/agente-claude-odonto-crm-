@@ -585,6 +585,13 @@ nulo); `configuracoes_clinica_cep_valido` exige `^\d{8}$`.
 > isto, o cálculo de disponibilidade da API erra em 3 horas e o Agente de IA
 > passa a oferecer consulta de madrugada. Fica no banco, e não no código, para
 > mudar sem novo deploy.
+>
+> Quem escreve é a aba **Horários** de Configurações, com uma lista de **quatro**
+> opções — os quatro deslocamentos do Brasil, já que sem horário de verão os
+> catorze nomes IANA do país desabam em quatro. A coluna continua **sem `CHECK`**,
+> pela mesma razão que a paleta de `cores.ts` não tem: ampliar a lista um dia não
+> deve exigir migração. Até 01/09/2026 não havia tela nenhuma para este campo, e
+> corrigi-lo era um `update` no SQL Editor.
 
 A unicidade é garantida por um índice sobre uma expressão constante:
 
