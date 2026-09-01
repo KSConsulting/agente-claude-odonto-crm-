@@ -177,6 +177,7 @@ src/
 │   ├── pessoas.ts              regra que separa Lead de Paciente
 │   ├── cores.ts                paleta das agendas (cor do profissional)
 │   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
+│   ├── periodo.ts              o recorte de datas dos filtros (3 telas, 1 regra)
 │   ├── procedimentos.ts        o dinheiro na tela: ler e formatar o "a partir de"
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
@@ -206,6 +207,7 @@ src/
 │   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
 │   ├── PainelLead.tsx          coluna extra: ficha da pessoa, com abrir/esconder
 │   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
+│   ├── FiltroPeriodo.tsx       a lista de períodos + o botão "Personalizado"
 │   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
 │   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha em Conversas — só quando cai
 │   ├── ApagarPessoa.tsx        zona de perigo: apaga uma pessoa inteira
@@ -619,6 +621,30 @@ Letícia marca para o paciente.
 
 > **O rodapé do card não esmaece junto.** Desligar um procedimento apaga o corpo
 > (`opacity: 0.5`), mas não o rodapé: apagar o botão que religa é apagar a saída.
+
+### O filtro de período: uma lista, e um botão ao lado
+
+Dashboard, Leads e Pacientes recortam o mesmo período — agora com o mesmo
+componente ([`FiltroPeriodo.tsx`](src/components/FiltroPeriodo.tsx)) sobre a
+mesma regra ([`src/lib/periodo.ts`](src/lib/periodo.ts)). As duas páginas
+tinham `getPeriodRange` copiada palavra por palavra, e já com formatação
+diferente uma da outra — que é como duas cópias começam a divergir.
+
+Eram **nove pílulas** numa faixa que quebrava em duas linhas em tela estreita e
+empurrava a página para baixo. Nove opções lado a lado também não têm
+hierarquia: "Hoje" e "Ano passado" pediam o mesmo esforço de leitura, sendo que
+uma é escolhida todo dia e a outra quase nunca.
+
+**Mas "Personalizado" não entrou na lista — ele não é um período, é um modo.**
+Como nona opção, escolhê-lo fechava a lista e deixava lá a palavra
+"Personalizado", que não diz de quando até quando: para saber o recorte era
+preciso abrir a lista de novo. Fora dela, ele acende junto com os dois campos
+de data — e as datas são a resposta.
+
+> Enquanto o modo está ligado, a lista mostra um item apagado
+> ("Período personalizado") em vez de afirmar "Este mês" com outro recorte
+> valendo. **Escolher qualquer período nela desliga o modo** — é o caminho de
+> volta, sem precisar de um segundo botão para isso.
 
 ### A avaliação é a porta, e por isso não é um card
 

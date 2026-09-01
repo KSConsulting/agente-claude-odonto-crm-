@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Download, FileText, ChevronDown, Users, UserCheck, UserPlus, X, ArrowRight } from 'lucide-react'
+import { Search, Download, FileText, Users, UserCheck, UserPlus, X, ArrowRight } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from '../lib/supabase'
@@ -9,6 +9,11 @@ import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/con
 import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
 import CampoTelefone from './CampoTelefone'
 import AvisoBaixaConsulta from './AvisoBaixaConsulta'
+import FiltroPeriodo from './FiltroPeriodo'
+import {
+  getPeriodRange, inRange,
+  type DateRange, type PeriodKey,
+} from '../lib/periodo'
 import type { LeadClinica, LeadStatus } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -79,24 +84,6 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
 /* ──────────────────────────────────────────────
    Types & constants
 ────────────────────────────────────────────── */
-type PeriodKey =
-  | 'today' | 'yesterday' | 'last7' | 'last14'
-  | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom'
-
-interface DateRange { start: Date; end: Date }
-
-const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
-  { key: 'today', label: 'Hoje' },
-  { key: 'yesterday', label: 'Ontem' },
-  { key: 'last7', label: 'Últimos 7 dias' },
-  { key: 'last14', label: 'Últimos 14 dias' },
-  { key: 'this_month', label: 'Este mês' },
-  { key: 'last_month', label: 'Mês passado' },
-  { key: 'this_year', label: 'Este ano' },
-  { key: 'last_year', label: 'Ano passado' },
-  { key: 'custom', label: 'Personalizado' },
-]
-
 const STATUS_LABELS: Record<LeadStatus, string> = {
   iniciou_conversa: 'Iniciou Conversa',
   conversando: 'Conversando',
@@ -124,32 +111,6 @@ const STATUS_STYLE: Record<LeadStatus, { bg: string; color: string; pulse?: bool
 /* ──────────────────────────────────────────────
    Helpers
 ────────────────────────────────────────────── */
-function startOfDay(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()) }
-function endOfDay(d: Date)   { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999) }
-
-function getPeriodRange(key: PeriodKey, custom?: DateRange): DateRange {
-  const now = new Date()
-  const today = startOfDay(now)
-  switch (key) {
-    case 'today':      return { start: today, end: endOfDay(now) }
-    case 'yesterday':  { const y = new Date(today); y.setDate(y.getDate()-1); return { start: y, end: endOfDay(y) } }
-    case 'last7':      { const s = new Date(today); s.setDate(s.getDate()-6); return { start: s, end: endOfDay(now) } }
-    case 'last14':     { const s = new Date(today); s.setDate(s.getDate()-13); return { start: s, end: endOfDay(now) } }
-    case 'this_month': return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfDay(now) }
-    case 'last_month': { const s = new Date(now.getFullYear(), now.getMonth()-1, 1); const e = new Date(now.getFullYear(), now.getMonth(), 0); return { start: s, end: endOfDay(e) } }
-    case 'this_year':  return { start: new Date(now.getFullYear(), 0, 1), end: endOfDay(now) }
-    case 'last_year':  return { start: new Date(now.getFullYear()-1, 0, 1), end: endOfDay(new Date(now.getFullYear()-1, 11, 31)) }
-    case 'custom':     return custom ?? { start: today, end: endOfDay(now) }
-    default:           return { start: today, end: endOfDay(now) }
-  }
-}
-
-function inRange(dateStr: string | null, range: DateRange) {
-  if (!dateStr) return false
-  const d = new Date(dateStr)
-  return d >= range.start && d <= range.end
-}
-
 function fmtDate(str: string | null) {
   if (!str) return '—'
   return new Date(str).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -531,27 +492,13 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
       </div>
 
       {/* Period filter */}
-      <div className="fade-in-2" style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-        <div style={{ display: 'inline-flex', background: '#fff', border: '1px solid #DCE6EA', borderRadius: 10, padding: 4, gap: 2, flexWrap: 'wrap' }}>
-          {PERIOD_OPTIONS.map(({ key, label }) => (
-            <button key={key} onClick={() => setPeriod(key)}
-              style={{ padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: period === key ? 600 : 500, fontFamily: "'Plus Jakarta Sans', sans-serif", background: period === key ? '#1E6E8C' : 'transparent', color: period === key ? '#fff' : '#6B818C', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {label}{key === 'custom' && <ChevronDown size={12} />}
-            </button>
-          ))}
-        </div>
-        {period === 'custom' && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: '1px solid #DCE6EA', borderRadius: 10, padding: '6px 14px', fontSize: 13 }}>
-            <span style={{ color: '#6B818C' }}>De</span>
-            <input type="date" max={new Date().toISOString().split('T')[0]} value={customRange.start.toISOString().split('T')[0]}
-              onChange={(e) => setCustomRange((r) => ({ ...r, start: new Date(e.target.value) }))}
-              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', cursor: 'pointer' }} />
-            <span style={{ color: '#6B818C' }}>até</span>
-            <input type="date" max={new Date().toISOString().split('T')[0]} value={customRange.end.toISOString().split('T')[0]}
-              onChange={(e) => setCustomRange((r) => ({ ...r, end: endOfDay(new Date(e.target.value)) }))}
-              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', cursor: 'pointer' }} />
-          </div>
-        )}
+      <div className="fade-in-2" style={{ marginBottom: 20 }}>
+        <FiltroPeriodo
+          periodo={period}
+          onPeriodo={setPeriod}
+          faixa={customRange}
+          onFaixa={setCustomRange}
+        />
       </div>
 
       {/* Search + Export */}

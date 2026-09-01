@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
-  Users, Calendar, TrendingUp, ChevronDown,
+  Users, Calendar, TrendingUp,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -8,74 +8,12 @@ import {
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { formatarParaExibicao } from '../lib/telefones'
+import FiltroPeriodo from '../components/FiltroPeriodo'
+import {
+  getPeriodRange, inRange, startOfDay, endOfDay,
+  type DateRange, type PeriodKey,
+} from '../lib/periodo'
 import type { LeadClinica, HorarioComercial, LeadStatus } from '../types'
-
-/* ──────────────────────────────────────────────
-   Types
-────────────────────────────────────────────── */
-type PeriodKey =
-  | 'today' | 'yesterday' | 'last7' | 'last14'
-  | 'this_month' | 'last_month' | 'this_year' | 'last_year'
-  | 'custom'
-
-interface DateRange { start: Date; end: Date }
-
-/* ──────────────────────────────────────────────
-   Helpers
-────────────────────────────────────────────── */
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
-}
-function endOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
-}
-
-function getPeriodRange(key: PeriodKey, custom?: DateRange): DateRange {
-  const now = new Date()
-  const today = startOfDay(now)
-  switch (key) {
-    case 'today': return { start: today, end: endOfDay(now) }
-    case 'yesterday': {
-      const y = new Date(today); y.setDate(y.getDate() - 1)
-      return { start: y, end: endOfDay(y) }
-    }
-    case 'last7': {
-      const s = new Date(today); s.setDate(s.getDate() - 6)
-      return { start: s, end: endOfDay(now) }
-    }
-    case 'last14': {
-      const s = new Date(today); s.setDate(s.getDate() - 13)
-      return { start: s, end: endOfDay(now) }
-    }
-    case 'this_month': {
-      const s = new Date(now.getFullYear(), now.getMonth(), 1)
-      return { start: s, end: endOfDay(now) }
-    }
-    case 'last_month': {
-      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const e = new Date(now.getFullYear(), now.getMonth(), 0)
-      return { start: s, end: endOfDay(e) }
-    }
-    case 'this_year': {
-      const s = new Date(now.getFullYear(), 0, 1)
-      return { start: s, end: endOfDay(now) }
-    }
-    case 'last_year': {
-      const s = new Date(now.getFullYear() - 1, 0, 1)
-      const e = new Date(now.getFullYear() - 1, 11, 31)
-      return { start: s, end: endOfDay(e) }
-    }
-    case 'custom':
-      return custom ?? { start: today, end: endOfDay(now) }
-    default: return { start: today, end: endOfDay(now) }
-  }
-}
-
-function inRange(dateStr: string | null, range: DateRange): boolean {
-  if (!dateStr) return false
-  const d = new Date(dateStr)
-  return d >= range.start && d <= range.end
-}
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
@@ -199,21 +137,6 @@ function KpiCard({
 }
 
 /* ──────────────────────────────────────────────
-   Período labels
-────────────────────────────────────────────── */
-const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
-  { key: 'today', label: 'Hoje' },
-  { key: 'yesterday', label: 'Ontem' },
-  { key: 'last7', label: 'Últimos 7 dias' },
-  { key: 'last14', label: 'Últimos 14 dias' },
-  { key: 'this_month', label: 'Este mês' },
-  { key: 'last_month', label: 'Mês passado' },
-  { key: 'this_year', label: 'Este ano' },
-  { key: 'last_year', label: 'Ano passado' },
-  { key: 'custom', label: 'Personalizado' },
-]
-
-/* ──────────────────────────────────────────────
    Main Component
 ────────────────────────────────────────────── */
 export default function Dashboard() {
@@ -221,7 +144,6 @@ export default function Dashboard() {
   const [horarios, setHorarios] = useState<HorarioComercial[]>([])
   const [period, setPeriod] = useState<PeriodKey>('this_month')
   const [customRange, setCustomRange] = useState<DateRange>({ start: new Date(), end: new Date() })
-  const [showCustom, setShowCustom] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -338,72 +260,12 @@ export default function Dashboard() {
 
       {/* Period Filter */}
       <div className="fade-in-2" style={{ marginBottom: 28 }}>
-        <div style={{
-          display: 'inline-flex',
-          background: '#fff',
-          border: '1px solid #DCE6EA',
-          borderRadius: 10,
-          padding: 4,
-          gap: 2,
-          flexWrap: 'wrap',
-        }}>
-          {PERIOD_OPTIONS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => { setPeriod(key); if (key === 'custom') setShowCustom(true) }}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 7,
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12.5,
-                fontWeight: period === key ? 600 : 500,
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                background: period === key ? '#1E6E8C' : 'transparent',
-                color: period === key ? '#fff' : '#6B818C',
-                transition: 'all 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              {label}
-              {key === 'custom' && <ChevronDown size={12} />}
-            </button>
-          ))}
-        </div>
-
-        {/* Custom date picker */}
-        {period === 'custom' && showCustom && (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 10,
-            marginLeft: 12,
-            background: '#fff',
-            border: '1px solid #DCE6EA',
-            borderRadius: 10,
-            padding: '6px 14px',
-            fontSize: 13,
-          }}>
-            <span style={{ color: '#6B818C' }}>De</span>
-            <input
-              type="date"
-              max={new Date().toISOString().split('T')[0]}
-              value={customRange.start.toISOString().split('T')[0]}
-              onChange={(e) => setCustomRange((r) => ({ ...r, start: new Date(e.target.value) }))}
-              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', cursor: 'pointer' }}
-            />
-            <span style={{ color: '#6B818C' }}>até</span>
-            <input
-              type="date"
-              max={new Date().toISOString().split('T')[0]}
-              value={customRange.end.toISOString().split('T')[0]}
-              onChange={(e) => setCustomRange((r) => ({ ...r, end: endOfDay(new Date(e.target.value)) }))}
-              style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', cursor: 'pointer' }}
-            />
-          </div>
-        )}
+        <FiltroPeriodo
+          periodo={period}
+          onPeriodo={setPeriod}
+          faixa={customRange}
+          onFaixa={setCustomRange}
+        />
       </div>
 
       {/* KPI Cards */}
