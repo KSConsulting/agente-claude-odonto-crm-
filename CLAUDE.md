@@ -649,7 +649,7 @@ commit.
 | Dependência, script do `package.json` | `CLAUDE.md` (Stack / Comandos) |
 | Correção de algo listado em Débito técnico | Remova o item de `CLAUDE.md` |
 | Variável de ambiente | `CLAUDE.md` + `DATABASE.md` (seção 1.3) |
-| Prompt do Agente de IA | [`agente-ia/prompt.md`](agente-ia/prompt.md) — e confira se a seção 8 do README da pasta ainda descreve ele |
+| Prompt do Agente de IA | [`agente-ia/prompt.md`](agente-ia/prompt.md) — e confira se a seção 8 do README da pasta ainda descreve ele, e se o [`GUIA-DO-PROMPT.md`](agente-ia/GUIA-DO-PROMPT.md) ainda classifica certo a seção mexida |
 | Ferramentas, modelo ou etapas do Agente de IA | [`agente-ia/README.md`](agente-ia/README.md) (a seção correspondente **e** a tabela de estado) |
 
 Ao mudar o banco, **prefira verificar contra o banco real** (consultas da seção
@@ -722,9 +722,16 @@ comece pelo [`agente-ia/README.md`](agente-ia/README.md): quem ele é, como
 funciona, as decisões tomadas, o estado de cada etapa e **o mapa de onde fica
 cada arquivo**. Leia antes de mexer em qualquer coisa ligada a ele.
 
-A pasta guarda o **conteúdo** (o prompt em `prompt.md`, os exemplos, as
-chaves). O **código** fica onde as ferramentas obrigam — `supabase/functions/`
-e `src/` — e está todo listado no mapa daquele README.
+A pasta guarda o **conteúdo** (o prompt em `prompt.md` e as chaves). O
+**código** fica onde as ferramentas obrigam — `supabase/functions/` e `src/` —
+e está todo listado no mapa daquele README.
+
+> **Levar o sistema para outra clínica?** O
+> [`agente-ia/GUIA-DO-PROMPT.md`](agente-ia/GUIA-DO-PROMPT.md) diz o que no
+> `prompt.md` é conteúdo da clínica e o que é **contrato com o código** — os
+> marcadores, a ordem das duas seções finais e os nomes das ferramentas quebram
+> em silêncio. E a primeira instrução dele é que o prompt se edita **pela IA da
+> IDE**, que lê este repositório antes de escrever.
 
 > ⚠️ **A tabela de estado daquele README diz o que já foi construído.** O que
 > estiver em etapa não concluída não existe — não procure o arquivo.

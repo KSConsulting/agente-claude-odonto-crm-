@@ -37,6 +37,7 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 agente-ia/
 ├── README.md            📖 este documento
 ├── prompt.md            ⭐ o prompt da Letícia — quem ela é e como se comporta
+├── GUIA-DO-PROMPT.md    🧭 como escrever o prompt de OUTRA clínica
 ├── gerar-prompt.mjs     ⚙️ `npm run prompt`: o .md vira `_shared/prompt-oficial.ts`
 ├── .env.agente.local    🔑 as chaves (fora do Git)
 └── exemplos/            🧪 vazia — conversas de teste, quando existirem
@@ -322,6 +323,7 @@ não depois.
 | `agente-ia/prompt.md` | 1 | ⭐ O prompt da Letícia — identidade, tom, fluxo e regras |
 | `agente-ia/exemplos/` | 1 | ⬜ **vazia** — conversas de teste, quando existirem |
 | `agente-ia/README.md` | — | ✅ **já criado** — este documento |
+| `agente-ia/GUIA-DO-PROMPT.md` | — | Como escrever o prompt ao levar o sistema para outra clínica |
 | `agente-ia/.env.agente.local` | — | ✅ **já criado** — as 6 chaves a preencher |
 | `supabase/migrations/0017_provedor_whatsapp.sql` | — | A coluna `provedor_whatsapp`: qual ponte está ativa |
 | `src/lib/whatsappConexao.ts` | — | Consultar, parear e desconectar — e o `useConexao()` que acompanha |
@@ -1017,7 +1019,7 @@ parte da entrega**:
 | Uma etapa concluída | A tabela de estado (topo) **e** reescreva a seção no tempo presente |
 | Tabela, coluna ou bucket do agente | Seção 6 **e** o [`DATABASE.md`](../DATABASE.md) |
 | Ferramentas do agente | Seção 7 |
-| O prompt | Seção 8 |
+| O prompt | Seção 8 — e confira se o [`GUIA-DO-PROMPT.md`](GUIA-DO-PROMPT.md) ainda classifica certo a seção que você mexeu |
 | Modelo ou preço | Seção 9 |
 | Chave nova | Seção 11 **e** [`.env.agente.local`](.env.agente.local) |
 
