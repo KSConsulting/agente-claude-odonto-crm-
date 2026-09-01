@@ -273,7 +273,7 @@ Registradas com o motivo, para ninguém refazer a discussão daqui a três meses
 | **WhatsApp** | Evolution API **ou** uazapi, à escolha da clínica | As duas são não oficiais. É o único ponto que precisa de servidor próprio, e ter duas evita ficar refém de uma |
 | **Memória** | Postgres do próprio Supabase | A memória do agente e a tela de Conversas leem a mesma tabela |
 | **Modelo de IA** | Selecionável na tela: **seis da OpenAI, dois da Anthropic**. Em uso, o `gpt-4.1-mini` | A clínica já tinha a chave da OpenAI. Os Claude aparecem **desligados** enquanto a `ANTHROPIC_API_KEY` estiver vazia — ver seção 9 |
-| **Áudio** | Transcrito automaticamente | Paciente brasileiro manda áudio. Sem isso o agente trava na primeira mensagem |
+| **Áudio** | Transcrito automaticamente (Whisper) | Paciente brasileiro manda áudio. Sem isso o agente trava na primeira mensagem |
 | **Foto** | O modelo enxerga, mas **nunca diagnostica** | Acolhe e encaminha para avaliação presencial |
 | **Preço** | Fala **só** o que está escrito no catálogo | `preco_a_partir_de` (migração `0018`) tem três estados, e o `0` da avaliação — "é gratuita" — é a melhor resposta que ela tem para quem trava no valor. Ver seção 7 |
 | **Assumir conversa** | Qualquer usuário logado | Clínica pequena, equipe conhecida. A tela mostra quem assumiu |
@@ -857,11 +857,16 @@ reais, e três diferenças justificaram cada decisão dela:
 |---|---|---|
 | **O texto** | a árvore do Baileys (`message.conversation`, `extendedTextMessage.text`, `imageMessage.caption`…) | `text`, plano |
 | **Grupo** | só o sufixo do jid (`@g.us`) | `isGroup`, booleano |
-| **Mídia** | POST devolvendo base64 — o evento não traz o arquivo | `fileURL` pronto no evento |
+| **Mídia** | POST devolvendo base64 — o evento não traz o arquivo | POST devolvendo uma URL dela, já descriptografada |
 
 A terceira é a que moldou o tipo `Midia`: uma **referência opaca**, montada por
 quem leu o webhook e entendida pela mesma ponte na hora de baixar. O `index.ts`
 carrega o valor sem olhar dentro.
+
+> ⚠️ **A linha da mídia já foi lida errado uma vez.** A uazapi tem um campo
+> `fileURL` no evento, e ele parecia dizer "o arquivo vem pronto" — mas chega
+> **vazio**, e a foto e o áudio da estreia sumiram por causa disso. O caso está
+> logo abaixo.
 
 > ⚠️ **O seletor manda em quem a gente chama, não em quem chama a gente.** O
 > webhook chega sem pedir licença. Com as duas configuradas e as duas apontadas
@@ -891,11 +896,59 @@ porque nunca criamos instância.
 | `iniciarConexao` | `POST /instance/connect` — `paircode` e `qrcode` na resposta |
 | `desconectar` | `POST /instance/disconnect` — ⬜ não testada |
 | `fotoDoPerfil` | `POST /chat/details` — `{ number }`, a URL vem em `image` |
-| `baixarMidia` | o `fileURL` do próprio evento |
+| `baixarMidia` | `POST /message/download` — `{ id }` (o `messageid`), devolve `fileURL` e `mimetype`. O `fileURL` do evento chega vazio |
 
 A referência foi levantada **contra o servidor**, e não pela documentação:
 `docs.uazapi.com` monta a página por JavaScript e os markdown por trás dela são
 rascunho de template.
+
+### A mídia da uazapi não vem no webhook, e o silêncio disso é caro
+
+Na estreia, um áudio e uma foto chegaram e a Letícia respondeu às duas **sem
+ter recebido nenhuma das duas**:
+
+| O paciente mandou | Ela respondeu |
+|---|---|
+| Um áudio de 6s: *"Eu queria saber o endereço de vocês."* | *"Não consegui ouvir direito o áudio, pode me mandar de novo?"* |
+| Uma foto (uma captura de tela, mandada como teste) | *"Obrigada por mandar a foto! Imagino que isso esteja te incomodando bastante. Pelo que vejo aqui não consigo dar um diagnóstico…"* |
+
+A causa é uma só: **o `fileURL` do evento chega vazio.** A ponte montava a
+referência de mídia só quando ele vinha preenchido, então ela vinha `null`,
+`baixarMidia` nunca era chamada, e nada foi baixado. No banco, `midia_url` e
+`conteudo` das duas linhas ficaram **nulos**.
+
+A `content.URL` que vem ao lado não resolve: é a CDN do WhatsApp, com o
+arquivo criptografado pela `mediaKey`. Baixar dali devolve bytes que não são
+áudio nem imagem.
+
+**Quem entrega é `POST /message/download`**, com o `messageid`. Ele responde
+`{ cached, fileURL, mimetype }` — uma URL do servidor da própria uazapi, já
+descriptografada e servida sem token. O áudio volta convertido de
+`audio/ogg; codecs=opus` para `audio/mpeg`.
+
+#### As duas respostas erradas tiveram causas diferentes
+
+**A do áudio foi sorte.** Sem transcrição, o histórico mostrou `[áudio]`, e o
+prompt manda pedir para repetir quando a transcrição vem ruim. Ela acertou o
+comportamento pelo motivo errado.
+
+**A da foto foi o problema de verdade**, e ele sobrevive ao conserto acima:
+qualquer download que falhe traz o sintoma de volta. A seção `Foto` do prompt
+começa com *"Você consegue ver a imagem"*, então diante de `[foto enviada]`
+sozinho o modelo **executa o roteiro**: acolhe, imagina a dor, recusa o
+diagnóstico. Ele não estava alucinando — estava obedecendo.
+
+Por isso a correção tem duas metades, e a segunda é a que importa:
+
+| Metade | O quê |
+|---|---|
+| **Baixar** | `referencia()` devolve `{ via: 'uazapi', id }` quando o `fileURL` falta, e `baixarMidia` resolve o id pelo `/message/download` |
+| **Confessar** | Download que falha grava `conteudo` — `[áudio que não consegui abrir]` ou `não consegui abrir esta foto` — e o prompt ganhou a linha que manda pedir de novo em vez de acolher |
+
+> ⚠️ **Falha de mídia tem que chegar ao modelo como falha.** Enquanto ela era
+> silêncio, o modelo lia a ausência do texto como "a foto está aí" e seguia o
+> roteiro. Ele sabe pedir de novo; o que ele não sabe é adivinhar que está
+> cego.
 
 ### O dia em que ela caiu, e o que isso mudou
 

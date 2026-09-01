@@ -304,6 +304,32 @@ async function viaAnthropic(pedido: PedidoLLM): Promise<RespostaLLM> {
 // ---------------------------------------------------------------------------
 
 /**
+ * A extensão que o Whisper vai ler no nome do arquivo.
+ *
+ * As duas pontes entregam formatos diferentes: a Evolution passa o
+ * `audio/ogg; codecs=opus` original do WhatsApp, a uazapi devolve o mesmo
+ * áudio já convertido em `audio/mpeg`. A regra antiga chamava os dois de
+ * `audio.ogg`.
+ *
+ * ⚠️ **Isto é precaução, e não o conserto de um bug observado.** Testado em
+ * 01/09/2026 com um mp3 de verdade da uazapi, o Whisper transcreveu certo
+ * mesmo com o nome errado — ele farejou o conteúdo. Mas o nome é o que a
+ * documentação dele manda usar para decidir o formato, e depender do faro de
+ * um serviço de terceiro é apostar num comportamento que ninguém prometeu.
+ *
+ * O `ogg` é o padrão porque é o formato em que o WhatsApp grava.
+ */
+function extensaoDeAudio(tipoMime: string): string {
+  const t = tipoMime.toLowerCase()
+  if (t.includes('mpeg') || t.includes('mp3')) return 'mp3'
+  if (t.includes('m4a') || t.includes('mp4') || t.includes('aac')) return 'm4a'
+  if (t.includes('wav')) return 'wav'
+  if (t.includes('webm')) return 'webm'
+  if (t.includes('flac')) return 'flac'
+  return 'ogg'
+}
+
+/**
  * Transcreve o áudio do paciente.
  *
  * Usa a chave da OpenAI **mesmo quando o modelo de conversa é o Claude**:
@@ -313,7 +339,8 @@ async function viaAnthropic(pedido: PedidoLLM): Promise<RespostaLLM> {
 export async function transcrever(bytes: Uint8Array, tipoMime: string): Promise<string | null> {
   if (!CHAVE_OPENAI) return null
 
-  const extensao = tipoMime.includes('mp4') || tipoMime.includes('m4a') ? 'm4a' : 'ogg'
+  const extensao = extensaoDeAudio(tipoMime)
+
   const formulario = new FormData()
   formulario.append('file', new Blob([bytes], { type: tipoMime }), `audio.${extensao}`)
   formulario.append('model', 'whisper-1')

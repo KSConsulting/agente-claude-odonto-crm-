@@ -70,15 +70,24 @@ export interface Conexao {
  * - a **Evolution** não manda o arquivo no webhook (`webhookBase64: false`),
  *   só a referência — e quer a mensagem inteira de volta num POST para
  *   devolver o base64;
- * - a **uazapi** já entrega `fileURL` pronto no próprio evento.
+ * - a **uazapi** manda o `messageid`, e quer um POST em `/message/download`
+ *   para devolver uma URL sua, já descriptografada.
  *
  * Então isto é uma referência **opaca**: quem monta é a ponte que leu o
  * webhook, e quem entende é a mesma ponte na hora de baixar. O `index.ts`
  * carrega o valor sem nunca olhar dentro.
+ *
+ * ⚠️ **`via: 'url'` é a exceção, não a regra.** Nenhuma das duas pontes usa
+ * ela hoje: a URL que a uazapi põe em `content.URL` é a CDN do WhatsApp, com
+ * o arquivo **criptografado** pela `mediaKey` — baixar dali devolve bytes que
+ * não são áudio nem imagem. A variante fica porque um servidor configurado
+ * para hospedar a mídia preenche o `fileURL` do próprio evento, e aí ela é o
+ * caminho curto.
  */
 export type Midia =
   | { via: 'url'; url: string }
   | { via: 'evolution'; mensagem: Record<string, unknown> }
+  | { via: 'uazapi'; id: string }
 
 export interface MensagemRecebida {
   /** Canônico: só dígitos, com DDI. É a chave de `whatsapp_lead`. */

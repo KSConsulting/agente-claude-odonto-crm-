@@ -918,6 +918,19 @@ seria palpite. O `whatsapp/index.ts` não conhece nenhuma das duas.
 > ele. **Só o webhook do provedor ativo deve apontar para a nossa função**, e
 > isso é um passo manual no painel de cada uma.
 
+> ⚠️ **Nenhuma das duas manda o arquivo no webhook — nem a que parece mandar.**
+> A Evolution quer a mensagem de volta num POST; a uazapi tem um campo
+> `fileURL` no evento que chega **vazio**, e quem entrega é
+> `POST /message/download`. A `content.URL` ao lado dele é a CDN do WhatsApp,
+> criptografada. Ler aquele campo como promessa custou um áudio e uma foto na
+> estreia — o caso está na seção 8 do
+> [`agente-ia/README.md`](agente-ia/README.md).
+>
+> **E mídia que não baixa precisa virar texto**, nunca silêncio. O prompt
+> promete à Letícia que ela vê a imagem: diante de um `[foto enviada]` sem
+> conteúdo, ela acolhe a dor de uma foto que nunca chegou. Hoje a falha grava
+> `não consegui abrir esta foto`, e o prompt manda pedir de novo.
+
 > **Atender depende de TRÊS condições, e o card demorou a aprender as duas
 > últimas.** O agente ligado, o WhatsApp conectado **e o webhook apontado para
 > a nossa função**. Até 01/09 o card só conhecia a primeira, e afirmou "está

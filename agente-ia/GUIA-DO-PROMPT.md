@@ -89,7 +89,7 @@ nenhum.
 | `# A CLÍNICA` | Nada — os dados vêm do banco | Os três marcadores e o texto que explica o formato do catálogo |
 | `# PREÇO` | Se a clínica fala valor, e quais | O `preco_a_partir_de` é quem decide o que aparece no catálogo |
 | `# A AVALIAÇÃO É A PORTA DE ENTRADA` | O nome e o papel da consulta de entrada | A recusa é da função SQL. O prompt só explica o que fazer com ela |
-| `# ÁUDIO, FOTO E VÍDEO` | O que ela faz com uma foto | Que ela **recebe** os três — isso é código |
+| `# ÁUDIO, FOTO E VÍDEO` | O que ela faz com uma foto | Que ela **recebe** os três — isso é código. E a frase `não consegui abrir esta foto` é **literal**: quem a escreve é o `index.ts` |
 | `# REGRAS INEGOCIÁVEIS` | As regras da sua clínica | Ver o aviso abaixo |
 
 > ⚠️ **As regras inegociáveis não são enfeite.** Quase toda linha de lá é a
@@ -151,6 +151,14 @@ inchado às onze da noite.
 primeira mensagem e foto na terceira. O sistema entrega os dois; se o prompt não
 disser o que fazer, ela improvisa — e improvisar na frente de uma foto de boca é
 como se dá diagnóstico sem querer.
+
+> ⚠️ **E diga o que fazer quando a foto NÃO abre.** Um prompt que só promete
+> "você consegue ver a imagem" transforma qualquer falha de download em
+> encenação: ela acolhe a dor, imagina o incômodo e recusa o diagnóstico de uma
+> foto que nunca chegou ao modelo. Aconteceu, e não foi alucinação — foi o
+> roteiro sendo seguido à risca sobre um dado ausente. A frase que o código
+> grava é `não consegui abrir esta foto`, e o prompt tem que reconhecê-la
+> **por essas palavras**.
 
 ---
 

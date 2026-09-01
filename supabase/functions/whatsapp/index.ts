@@ -228,6 +228,27 @@ async function processar(
       } else if (recebida.tipo === 'imagem') {
         imagem = { tipo: 'imagem', tipoMime: midia.tipoMime, base64: midia.base64 }
       }
+    } else {
+      // O DOWNLOAD FALHOU, E ISSO PRECISA VIRAR TEXTO.
+      //
+      // Sem esta linha, o `conteudo` fica nulo e o histórico mostra só
+      // "[foto enviada]" — que o prompt manda acolher, porque ele promete à
+      // Letícia que ela vê a imagem. Foi o que aconteceu na estreia da
+      // uazapi: ela agradeceu a foto, disse "imagino que esteja te
+      // incomodando" e recusou o diagnóstico de uma imagem que nunca chegou
+      // ao modelo.
+      //
+      // Falha de mídia tem que chegar ao modelo como falha. Ele sabe pedir de
+      // novo; o que ele não sabe é adivinhar que está cego.
+      console.error(`midia nao baixada: ${recebida.tipo} de ${whatsapp}`)
+      const aviso = recebida.tipo === 'audio'
+        ? '[áudio que não consegui abrir]'
+        : recebida.tipo === 'imagem'
+        ? 'não consegui abrir esta foto'
+        : null
+      if (aviso) {
+        await atualizar('mensagens_whatsapp', `id=eq.${mensagemId}`, { conteudo: aviso })
+      }
     }
   }
 

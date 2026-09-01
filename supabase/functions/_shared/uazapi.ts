@@ -11,8 +11,10 @@
  * 1. **O texto vem plano.** `text`, e não a árvore do Baileys
  *    (`message.conversation`, `message.extendedTextMessage.text`, …).
  * 2. **`isGroup` é booleano.** A Evolution obriga a olhar o sufixo do jid.
- * 3. **A mídia já vem com URL.** `fileURL` no próprio evento, em vez de um
- *    POST devolvendo base64.
+ * 3. **A mídia sai por um POST próprio.** `/message/download` com o
+ *    `messageid` devolve uma URL do servidor da uazapi, já descriptografada.
+ *    (O `fileURL` do evento existe, mas chega **vazio** nesta instalação — e
+ *    a `content.URL` ao lado dele é a CDN do WhatsApp, criptografada.)
  *
  * Autenticação: header `token` com o token **da instância**. O token de admin
  * (que cria e apaga instâncias) não entra aqui — este sistema nunca cria
@@ -40,13 +42,14 @@ async function chamar<T>(
   caminho: string,
   corpo?: Record<string, unknown>,
   metodo = 'POST',
+  prazo = PRAZO_MS,
 ): Promise<T | null> {
   try {
     const r = await fetch(`${URL_BASE}${caminho}`, {
       method: metodo,
       headers: CABECALHOS,
       body: corpo === undefined ? undefined : JSON.stringify(corpo),
-      signal: AbortSignal.timeout(PRAZO_MS),
+      signal: AbortSignal.timeout(prazo),
     })
     if (!r.ok) return null
     return await r.json() as T
@@ -131,21 +134,39 @@ function lerWebhook(corpo: Record<string, unknown>): Recebimento {
   const whatsapp = soDigitos(m.chatid ?? m.sender ?? '')
   if (!whatsapp) return { tipo: 'ignorar', motivo: 'sem_numero' }
 
-  const url = (m.fileURL ?? '').trim()
+  // `messageid` é o id do WhatsApp — o mesmo que a Evolution chama de
+  // `key.id`. O `id` da uazapi vem prefixado com o número da instância, e
+  // mudaria se a clínica trocasse de número.
+  const id = m.messageid ?? m.id ?? null
 
   return {
     tipo: 'mensagem',
     mensagem: {
       whatsapp,
-      // `messageid` é o id do WhatsApp — o mesmo que a Evolution chama de
-      // `key.id`. O `id` da uazapi vem prefixado com o número da instância, e
-      // mudaria se a clínica trocasse de número.
-      idExterno: m.messageid ?? m.id ?? null,
+      idExterno: id,
       tipo,
       texto: (m.text ?? '').trim() || null,
-      midia: url && BAIXAVEIS.has(tipo) ? { via: 'url', url } : null,
+      midia: BAIXAVEIS.has(tipo) ? referencia(m, id) : null,
     },
   }
+}
+
+/**
+ * De onde esta mensagem vai ser baixada.
+ *
+ * ⚠️ **O `fileURL` do webhook chega VAZIO**, e foi assim que o áudio e a foto
+ * sumiram na estreia: sem referência, o `index.ts` não baixava nada, e a
+ * Letícia respondia a uma foto que nunca viu. A `content.URL` que vem ao lado
+ * não salva — é a CDN do WhatsApp, com o arquivo criptografado pela
+ * `mediaKey`.
+ *
+ * O `fileURL` continua sendo preferido porque é uma requisição a menos, e
+ * porque um servidor configurado para hospedar a mídia o preenche.
+ */
+function referencia(m: MensagemUazapi, id: string | null): Midia | null {
+  const url = (m.fileURL ?? '').trim()
+  if (url) return { via: 'url', url }
+  return id ? { via: 'uazapi', id } : null
 }
 
 // ---------------------------------------------------------------------------
@@ -173,12 +194,39 @@ async function enviarTexto(numero: string, texto: string): Promise<string | null
   return r.messageid ?? r.id ?? null
 }
 
+/**
+ * Pede à uazapi que descriptografe a mídia e a hospede.
+ *
+ * `POST /message/download` com o `messageid` devolve
+ * `{ cached, fileURL, mimetype }` — uma URL do próprio servidor dela, que
+ * responde 200 sem token. O prazo é maior que o padrão: aqui pode haver
+ * download e conversão do lado de lá, e 8 segundos é curto para um áudio
+ * longo.
+ *
+ * ⚠️ O `mimetype` daqui **não é o do WhatsApp**: um áudio que chegou como
+ * `audio/ogg; codecs=opus` volta convertido em `audio/mpeg`. É este que vale
+ * — é o do arquivo que vamos buscar.
+ */
+async function urlDoArquivo(id: string): Promise<string | null> {
+  const r = await chamar<{ fileURL?: string }>(
+    '/message/download',
+    { id },
+    'POST',
+    20_000,
+  )
+  return r?.fileURL || null
+}
+
 async function baixarMidia(
   midia: Midia,
 ): Promise<{ base64: string; tipoMime: string } | null> {
-  if (midia.via !== 'url') return null
+  let alvo: string | null = null
+  if (midia.via === 'url') alvo = midia.url
+  else if (midia.via === 'uazapi') alvo = await urlDoArquivo(midia.id)
+  if (!alvo) return null
+
   try {
-    const r = await fetch(midia.url, { signal: AbortSignal.timeout(20_000) })
+    const r = await fetch(alvo, { signal: AbortSignal.timeout(20_000) })
     if (!r.ok) return null
     const bytes = new Uint8Array(await r.arrayBuffer())
 
