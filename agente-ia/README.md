@@ -951,6 +951,55 @@ Por isso a correção tem duas metades, e a segunda é a que importa:
 > roteiro. Ele sabe pedir de novo; o que ele não sabe é adivinhar que está
 > cego.
 
+### "Só consigo confirmar depois da avaliação" era uma porta aberta
+
+O paciente mandou a foto do próprio sorriso, ouviu que o dentista precisa
+avaliar, e insistiu por áudio:
+
+> *"Então, mas você não consegue ver aí meu sorriso e me dar algumas dicas? Eu
+> sei que eu preciso passar pela consulta, mas pela sua opinião, o que que eu
+> devo estar fazendo aí com esse meu sorriso? Colocar lente, clareamento, me
+> diz aí."*
+
+Ela respondeu, e a resposta **parecia certa**:
+
+> *"Entendo seu interesse, mas só consigo confirmar o que é melhor após a
+> avaliação com o dentista."*
+
+Ela não deu diagnóstico, não citou procedimento, e terminou convidando para a
+avaliação. As `REGRAS INEGOCIÁVEIS` foram todas respeitadas.
+
+**O problema é o verbo.** *"Só consigo confirmar"* diz que ela **tem** uma
+opinião e está esperando um carimbo — e quem ouve isso insiste, porque a
+opinião parece existir e estar do outro lado da parede. A recusa que não fecha
+a porta é convite para bater nela de novo.
+
+E havia um buraco antes desse: a regra proibia **diagnóstico**, e o paciente
+não pediu diagnóstico. Pediu **indicação** — *lente ou clareamento?*. São
+coisas diferentes, e o prompt só cobria a primeira; a segunda ela improvisou.
+
+| A regra é | A resposta certa é |
+|---|---|
+| ❌ "ainda não posso dizer" | ✅ "não é o meu trabalho dizer" |
+
+Por isso a seção `# QUANDO PEDEM SUA OPINIÃO SOBRE O TRATAMENTO` existe, e por
+isso ela veta as frases pelo nome: *"só consigo confirmar depois da avaliação"*,
+*"preciso ver antes"*, *"a princípio seria"*, *"geralmente nesses casos"*.
+
+> ⚠️ **Mas calar sobre tudo seria pior.** Se ela parasse de explicar o que um
+> procedimento **é**, a Etapa 3 do fluxo morria junto — e ela deixaria de
+> vender. A seção carrega uma tabela separando as duas coisas: *"o que é lente
+> de contato?"* ela explica; *"lente resolve pra mim?"* é do dentista. **O que
+> o procedimento é, ela conta. Se ele serve para aquela pessoa, não.**
+
+Reproduzido contra o modelo em uso antes de publicar, com a conversa real:
+
+| Situação | O que ela passou a responder |
+|---|---|
+| O áudio acima | *"Essa resposta não é minha, viu? Quem indica o tratamento é o dentista, olhando de perto."* |
+| *"ah vai, me dá só um palpite"* | *"Minha função é garantir seu atendimento, não indicar tratamentos."* |
+| *"o que é lente de contato dental?"* | Explicou, e convidou para a avaliação — a Etapa 3 continua de pé |
+
 ### A foto vira texto, e é isso que ela lê
 
 A imagem ia **anexada** à mensagem, direto para o modelo da conversa. Funcionava

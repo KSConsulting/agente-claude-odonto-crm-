@@ -80,6 +80,7 @@ nenhum.
 | `# COMO VOCÊ FALA` | Tom, tamanho da resposta, palavras que evita e prefere |
 | `# FLUXO DE ATENDIMENTO` | As etapas, na ordem que a clínica atende |
 | `# QUANDO PASSAR PARA UMA PESSOA` | O que é urgência **nesta** especialidade |
+| `# QUANDO PEDEM SUA OPINIÃO SOBRE O TRATAMENTO` | Onde fica a linha entre **explicar** e **indicar**, nesta especialidade |
 | `# FORA DO HORÁRIO DE ATENDIMENTO` | Se ela agenda de madrugada ou só responde |
 
 ### 🟡 Adapte com cuidado — a regra é sua, o mecanismo não
