@@ -951,6 +951,99 @@ Por isso a correção tem duas metades, e a segunda é a que importa:
 > roteiro. Ele sabe pedir de novo; o que ele não sabe é adivinhar que está
 > cego.
 
+### Três defeitos de um teste só, e o mais caro era invisível
+
+Um atendimento completo — foto, áudio, dúvida de preço, agendamento e pedido de
+remarcação — deixou três coisas quebradas. Elas parecem independentes e têm a
+mesma origem: **o que o modelo sabe some entre uma mensagem e outra**, e o
+sistema não tinha rede embaixo de nenhuma delas.
+
+#### 1. "Não consegui acessar a agenda" — e a agenda estava perfeita
+
+| Quem | O quê |
+|---|---|
+| Paciente | *"Puts, vamos remarcar… remarca aí para amanhã mesmo, às 15 horas."* |
+| Letícia | *"Consegui achar sua avaliação marcada para amanhã meio-dia."* |
+| Letícia | *"O horário das 15h também está livre. Quer que eu mude?"* |
+| Paciente | *"aham"* |
+| Letícia | *"Não consegui acessar a agenda para remarcar agora."* |
+
+`agenda_remarcar` foi chamada à mão com os mesmos argumentos e respondeu
+`ok: true` na primeira tentativa. A função SQL nunca teve problema.
+
+**O `consulta_id` é que tinha sumido.** `ver_minhas_consultas` rodou na
+mensagem do "vamos remarcar"; a resposta dela — onde vinha o id — morreu com
+aquela execução. Na mensagem seguinte, o "aham", `montarHistorico()`
+reconstruiu a conversa a partir de `mensagens_whatsapp`, que **só guarda os
+balões de texto**. O id não estava em lugar nenhum, e ela chamou
+`remarcar_consulta` com o campo vazio.
+
+Vazio, o Postgres recusa o uuid com `22P02`; o `rpc()` levanta; o `catch` devolve
+a frase neutra. Um `uuid` inventado teria dado `nao_encontrada` — recusa limpa,
+com nome. **Foi o buraco no meio do caminho que virou "a agenda está fora do
+ar".**
+
+> ⚠️ **A regra que sobrou disso vale para qualquer ferramenta nova:** um id que
+> vem de outra ferramenta **não sobrevive à próxima mensagem**. Exigir que o
+> modelo chame `ver_minhas_consultas` de novo é uma regra que depende de ele
+> lembrar; achar a consulta pelo `lead_id` do contexto é uma regra que não
+> depende de ninguém. Hoje `consultaAlvo()` faz isso: com uma consulta marcada,
+> usa aquela; com várias, devolve a lista e manda perguntar qual.
+
+#### 2. O nome dito, confirmado, e jogado fora
+
+A Letícia perguntou o nome completo *para registrar a avaliação*, o paciente
+respondeu **"Rogério Cardoso Albuquerque"**, a consulta foi marcada — e o CRM
+continuou sem nome. Pior: mostrava **"cliente"**.
+
+Duas falhas encaixadas:
+
+| Onde | O quê |
+|---|---|
+| `atualizar_ficha` | Foi chamada com `nome: "cliente"` antes de alguém perguntar. **Rótulo é pior que vazio**: a ficha passa a parecer preenchida, ela lê "já sei o nome" e nunca mais pergunta — o mesmo estrago que faz o `pushName` do WhatsApp ser ignorado |
+| `agenda_marcar` | Recebia o `p_nome` e só o usava no `insert` do lead. Mas o lead **já existia** — ele nasce na primeira mensagem, muito antes de falar em agendar. O único caminho que gravava o nome é o que quase nunca acontece |
+
+Três correções, em camadas, porque nenhuma sozinha basta:
+
+1. **A ferramenta recusa rótulo** (`ehNomeGenerico`): *cliente*, *paciente*,
+   *lead*, *contato*, só dígitos. Lista curta de propósito — um sobrenome raro
+   nunca pode ser recusado aqui.
+2. **A ficha manda preencher o que ficou para trás.** Quando `nome_lead` está
+   vazio, `montarFicha()` escreve *"se ele JÁ disse o nome em qualquer ponto da
+   conversa, grave agora"* — a mesma técnica do "já tem consulta marcada", e
+   pelo mesmo motivo: a ordem colada no dado, na última coisa que o modelo lê.
+3. **A migração `0021` fecha por baixo.** `agenda_marcar` preenche o
+   `nome_lead` **vazio** com o nome dado ao marcar. Só o vazio: nome já gravado
+   pode ter vindo da recepção, que fala com a pessoa na cadeira.
+
+#### 3. O resumo cabia numa linha
+
+`resumo_conversa` de trinta e oito mensagens: *"Quero marcar avaliação para
+colocar lente de contato. Ainda não agendou."* — curto **e** desatualizado.
+
+A descrição da ferramenta pedia *"resumo curto"*, e o prompt, *"uma ou duas
+frases"*. O modelo obedeceu.
+
+| Antes | Agora |
+|---|---|
+| "Resumo curto do que foi conversado" | Uma tabela de tamanho: acima de 10 mensagens, **no mínimo 5 linhas** |
+| Sem dizer de quem é a história | **Do lado do paciente** — o que ele disse, não o que ela respondeu |
+| Sem formato | Uma linha por ideia, cada uma começando com `- ` |
+
+> ⚠️ **A regra das 50 palavras estava vazando.** `# REGRAS INEGOCIÁVEIS` dizia
+> *"Máximo de 50 palavras"* pensando na resposta ao paciente, e o modelo
+> aplicava também ao resumo. Agora ela diz **na RESPOSTA ao paciente**, e a
+> seção do resumo repete que ele não entra nessa conta.
+
+> **E a quebra de linha virou determinística.** Às vezes o modelo escreve os
+> marcadores certos na mesma linha (`- quer lente. - pediu 15h. - marcou`).
+> É o mesmo conteúdo sem a quebra — recusar seria perder a memória por um
+> caractere. `arrumarResumo()` quebra em ` - ` **precedido de pontuação**, para
+> não partir "pós-operatório" nem um travessão.
+
+Medido com a conversa real, contra o `gpt-4.1-mini`: o resumo passou de 1 para
+5 linhas, do ponto de vista do paciente, e o nome voltou a ser gravado.
+
 ### "Só consigo confirmar depois da avaliação" era uma porta aberta
 
 O paciente mandou a foto do próprio sorriso, ouviu que o dentista precisa

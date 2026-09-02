@@ -94,6 +94,17 @@ ordem**:
 20. `supabase/migrations/0020_apagar_foto_e_logo.sql` — as políticas de
     **DELETE** em `avatars` e `logos`. Sem elas dava para trocar as duas
     imagens e não dava para tirar. Ver a [seção 7](#7-storage).
+21. `supabase/migrations/0021_nome_do_paciente.sql` — `agenda_marcar` passa a
+    preencher o `nome_lead` **vazio** com o nome dado no ato de marcar. Antes,
+    o `p_nome` só era usado no `insert` do lead — e o lead já existe desde a
+    primeira mensagem do WhatsApp, então o nome que o paciente ditava para a
+    consulta era jogado fora. Só o vazio é preenchido: nome já gravado pode ter
+    vindo da recepção.
+
+    > ⚠️ **Ela recria a `agenda_marcar` inteira**, porque `create or replace`
+    > exige o corpo todo. O arquivo foi **gerado do `pg_get_functiondef()` do
+    > banco** e só o bloco do paciente mudou — reescrever 130 linhas à mão é
+    > copiar e torcer para não mover uma vírgula.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 

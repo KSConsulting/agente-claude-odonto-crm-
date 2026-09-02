@@ -86,14 +86,20 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
   },
   {
     nome: 'remarcar_consulta',
-    descricao: 'Muda uma consulta existente para outro dia ou horário.',
+    descricao:
+      'Muda uma consulta existente para outro dia ou horário. Quando o ' +
+      'paciente só tem uma consulta marcada, não precisa do consulta_id.',
     parametros: {
       type: 'object',
       properties: {
-        consulta_id: { type: 'string', description: 'Vem de ver_minhas_consultas.' },
+        consulta_id: {
+          type: 'string',
+          description:
+            'Só quando ele tiver MAIS DE UMA marcada. Vem de ver_minhas_consultas.',
+        },
         nova_data_hora: { type: 'string', description: 'AAAA-MM-DDTHH:MM.' },
       },
-      required: ['consulta_id', 'nova_data_hora'],
+      required: ['nova_data_hora'],
       additionalProperties: false,
     },
   },
@@ -101,14 +107,18 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
     nome: 'cancelar_consulta',
     descricao:
       'Desmarca uma consulta. Antes de chamar, pergunte se o paciente ' +
-      'prefere remarcar.',
+      'prefere remarcar. Quando ele só tem uma marcada, não precisa do ' +
+      'consulta_id.',
     parametros: {
       type: 'object',
       properties: {
-        consulta_id: { type: 'string', description: 'Vem de ver_minhas_consultas.' },
+        consulta_id: {
+          type: 'string',
+          description:
+            'Só quando ele tiver MAIS DE UMA marcada. Vem de ver_minhas_consultas.',
+        },
         motivo: TEXTO,
       },
-      required: ['consulta_id'],
       additionalProperties: false,
     },
   },
@@ -149,9 +159,25 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
     parametros: {
       type: 'object',
       properties: {
-        nome: { type: 'string', description: 'Como o paciente se chama.' },
+        nome: {
+          type: 'string',
+          description:
+            'O nome que o PACIENTE disse. Nunca um rótulo genérico como ' +
+            '"cliente", "paciente" ou "lead" — sem o nome dito, não mande este campo.',
+        },
         procedimento_interesse: TEXTO,
-        resumo: { type: 'string', description: 'Resumo curto do que foi conversado.' },
+        resumo: {
+          type: 'string',
+          description:
+            'A história do atendimento, do ponto de vista do PACIENTE: o que ' +
+            'ele procura, o que contou de si, o que perguntou, o que o ' +
+            'preocupa e em que pé ficou. NÃO descreva o que você respondeu. ' +
+            'Formato: uma linha por ideia, cada linha começando com "- ", ' +
+            'nunca um parágrafo corrido. Tamanho: numa conversa com mais de ' +
+            '10 mensagens, NO MÍNIMO 5 linhas (até 10); de 5 a 10 mensagens, ' +
+            '3 a 5 linhas. Reescreva o texto inteiro a cada vez, incluindo o ' +
+            'que já estava lá.',
+        },
       },
       additionalProperties: false,
     },
@@ -173,6 +199,53 @@ function dataHora(iso: string, fuso: string): string {
   }).format(new Date(iso))
 }
 
+/**
+ * Isto é um rótulo, e não o nome de uma pessoa.
+ *
+ * O modelo chamou `atualizar_ficha` com `nome: "cliente"` antes de perguntar
+ * como a pessoa se chamava — e a partir dali o CRM tinha um lead chamado
+ * "cliente", com o nome de verdade ("Rogério Cardoso Albuquerque") dito dez
+ * minutos depois e jogado fora.
+ *
+ * A lista é curta de propósito: ela veta o que é claramente um espaço
+ * reservado, e deixa passar qualquer coisa que pareça nome. Um sobrenome raro
+ * nunca pode ser recusado aqui.
+ */
+const NOMES_GENERICOS = new Set([
+  'cliente', 'paciente', 'lead', 'contato', 'usuario', 'usuário', 'pessoa',
+  'nome', 'sem nome', 'não informado', 'nao informado', 'desconhecido',
+  'anonimo', 'anônimo', 'n/a', 'na', '-',
+])
+
+function ehNomeGenerico(nome: string): boolean {
+  const limpo = nome.trim().toLowerCase().replace(/\s+/g, ' ')
+  // Só dígitos também não é nome: é o telefone voltando pela porta dos fundos.
+  return NOMES_GENERICOS.has(limpo) || /^[\d\s()+-]+$/.test(limpo)
+}
+
+/**
+ * O resumo, em linhas — mesmo quando o modelo entregou tudo numa linha só.
+ *
+ * O prompt e a descrição da ferramenta pedem "uma linha por ideia, começando
+ * com `- `". Na maioria das vezes ele obedece. Nas outras, ele escreve os
+ * mesmos marcadores **na mesma linha**: `- quer lente. - pediu 15h. - marcou`.
+ *
+ * Não é um resumo pior — é o mesmo conteúdo com a quebra faltando. Recusar
+ * seria perder a memória da conversa por um caractere; pedir de novo depende
+ * de o modelo colaborar na segunda tentativa. **Quebrar é determinístico, e
+ * custa duas linhas.**
+ *
+ * Só divide em ` - ` **precedido de fim de frase ou de vírgula** — nunca no
+ * hífen de "pós-operatório" nem no travessão de uma frase.
+ */
+function arrumarResumo(bruto: string): string {
+  const texto = bruto.trim()
+  if (!texto || texto.includes('\n')) return texto
+
+  const quebrado = texto.replace(/([.;:,!?])\s+-\s+/g, '$1\n- ')
+  return quebrado === texto ? texto : quebrado
+}
+
 /** Nome digitado pelo paciente → uuid do profissional. Nulo se não achar. */
 async function acharDentista(nome?: string): Promise<string | null> {
   if (!nome || !nome.trim()) return null
@@ -192,6 +265,59 @@ const RECUSAS: Record<string, string> = {
   dados_invalidos: 'Faltou alguma informação.',
   data_invalida: 'A data não foi entendida.',
   nao_encontrada: 'Essa consulta não foi encontrada.',
+  sem_consulta: 'Este paciente não tem consulta marcada.',
+  varias_consultas: 'Ele tem mais de uma consulta marcada — pergunte qual.',
+}
+
+/** Aceita só o formato de uuid. Qualquer outra coisa é um id que não existe. */
+function ehUuid(v: unknown): boolean {
+  return typeof v === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.trim())
+}
+
+/**
+ * Qual consulta remarcar ou cancelar, quando o modelo não tem o id na mão.
+ *
+ * ── POR QUE ISTO EXISTE ────────────────────────────────────────────────────
+ *
+ * **O modelo não guarda resultado de ferramenta entre uma mensagem e outra.**
+ * `montarHistorico()` reconstrói a conversa a partir de `mensagens_whatsapp`,
+ * que só tem os balões de texto — a chamada de `ver_minhas_consultas` e o que
+ * ela devolveu somem no fim da execução.
+ *
+ * Foi assim que a primeira remarcação falhou. Numa mensagem ela achou a
+ * consulta ("Consegui achar sua avaliação marcada para amanhã meio-dia"); na
+ * seguinte, o paciente disse "aham" — e o `consulta_id` já não existia. Ela
+ * chamou `remarcar_consulta` com o campo vazio, o Postgres recusou o uuid
+ * (`22P02`), o `rpc()` levantou, e o paciente ouviu "não consegui acessar a
+ * agenda agora". A agenda estava perfeita.
+ *
+ * Exigir que ele chame `ver_minhas_consultas` de novo, na mesma resposta, é
+ * uma regra que depende de o modelo lembrar. **Não precisar do id é uma regra
+ * que não depende de ninguém**: o paciente quase sempre tem uma consulta só, e
+ * o dono da consulta já é o `lead_id` do contexto.
+ */
+async function consultaAlvo(
+  ctx: Contexto,
+  idBruto: unknown,
+): Promise<{ id: string } | { erro: string; consultas?: unknown[] }> {
+  if (ehUuid(idBruto)) return { id: String(idBruto).trim() }
+
+  const linhas = await selecionar<{ id: string; procedimento: string; data_consulta: string }>(
+    `consultas?select=id,procedimento,data_consulta` +
+    `&lead_id=eq.${ctx.leadId}&status=eq.agendada` +
+    `&order=data_consulta.asc&limit=10`,
+  )
+  if (!linhas.length) return { erro: 'sem_consulta' }
+  if (linhas.length === 1) return { id: linhas[0].id }
+  return {
+    erro: 'varias_consultas',
+    consultas: linhas.map((c) => ({
+      consulta_id: c.id,
+      procedimento: c.procedimento,
+      quando: dataHora(c.data_consulta, ctx.fuso),
+    })),
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -332,10 +458,18 @@ export async function executar(
           return { ok: false, motivo: 'data_invalida', mensagem: RECUSAS.data_invalida }
         }
 
+        const alvo = await consultaAlvo(ctx, args.consulta_id)
+        if ('erro' in alvo) {
+          return {
+            ok: false, motivo: alvo.erro, mensagem: RECUSAS[alvo.erro],
+            ...(alvo.consultas ? { consultas: alvo.consultas } : {}),
+          }
+        }
+
         const linhas = await rpc<{
           ok: boolean; motivo: string | null; data_hora: string | null; profissional: string | null
         }[]>('agenda_remarcar', {
-          p_consulta_id: String(args.consulta_id ?? ''),
+          p_consulta_id: alvo.id,
           p_nova_data_hora: quando.toISOString(),
           p_profissional_id: null,
           p_whatsapp: ctx.whatsapp,
@@ -348,10 +482,18 @@ export async function executar(
       }
 
       case 'cancelar_consulta': {
+        const alvo = await consultaAlvo(ctx, args.consulta_id)
+        if ('erro' in alvo) {
+          return {
+            ok: false, motivo: alvo.erro, mensagem: RECUSAS[alvo.erro],
+            ...(alvo.consultas ? { consultas: alvo.consultas } : {}),
+          }
+        }
+
         const linhas = await rpc<{
           ok: boolean; motivo: string | null; data_hora: string | null
         }[]>('agenda_cancelar', {
-          p_consulta_id: String(args.consulta_id ?? ''),
+          p_consulta_id: alvo.id,
           p_whatsapp: ctx.whatsapp,
           p_motivo: (args.motivo as string) ?? null,
         })
@@ -427,11 +569,21 @@ export async function executar(
 
       case 'atualizar_ficha': {
         const campos: Record<string, unknown> = {}
-        if (args.nome) campos.nome_lead = String(args.nome).slice(0, 120)
+
+        // ⚠️ NOME DE MENTIRA É PIOR QUE NOME VAZIO.
+        //
+        // Gravado "cliente", a ficha passa a parecer preenchida: a Letícia lê
+        // "já sei o nome" e nunca mais pergunta, e as telas mostram um lead
+        // chamado "cliente" para sempre. Vazio, o número formatado aparece na
+        // tela e ela continua perguntando — que é o certo. Mesma razão pela
+        // qual o `pushName` do WhatsApp é ignorado.
+        const nome = String(args.nome ?? '').trim()
+        if (nome && !ehNomeGenerico(nome)) campos.nome_lead = nome.slice(0, 120)
         if (args.procedimento_interesse) {
           campos.procedimento_interesse = String(args.procedimento_interesse).slice(0, 120)
         }
-        if (args.resumo) campos.resumo_conversa = String(args.resumo).slice(0, 2000)
+        const resumo = arrumarResumo(String(args.resumo ?? ''))
+        if (resumo) campos.resumo_conversa = resumo.slice(0, 2000)
         if (!Object.keys(campos).length) return { ok: true, nada_a_fazer: true }
 
         // `crm_clinica` é view auto-atualizável. Nunca escrever em

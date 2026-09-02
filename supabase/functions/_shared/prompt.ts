@@ -118,7 +118,27 @@ export async function montarFicha(
 
   const linhas: string[] = []
 
-  if (pessoa.nome_lead?.trim()) linhas.push(`Nome: ${pessoa.nome_lead.trim()}`)
+  if (pessoa.nome_lead?.trim()) {
+    linhas.push(`Nome: ${pessoa.nome_lead.trim()}`)
+  } else {
+    // A FICHA NÃO TEM NOME — E A CONVERSA PODE JÁ TER.
+    //
+    // Mesma técnica do "já tem consulta marcada" logo abaixo, pelo mesmo
+    // motivo: a regra do prompt fixo ("grave o nome assim que souber") só
+    // dispara no instante em que a pessoa diz. Se aquela resposta não gravou,
+    // nada mais volta a esse assunto — o nome fica escrito na conversa, à
+    // vista, e nunca entra na ficha.
+    //
+    // Foi o que aconteceu: o paciente disse "Rogério Cardoso Albuquerque"
+    // para marcar a avaliação, a consulta foi criada, e o CRM ficou com um
+    // lead sem nome. Aqui a ordem viaja colada à ausência do dado, na última
+    // coisa que o modelo lê.
+    linhas.push(
+      'Nome: ainda não sei. Se ele JÁ disse o nome em qualquer ponto da ' +
+      'conversa, grave agora com atualizar_ficha, mesmo que a mensagem de ' +
+      'agora seja sobre outra coisa. Se não disse, pergunte.',
+    )
+  }
 
   if (realizadas.length) {
     linhas.push('Situação: já é paciente da clínica, não é a primeira vez que vem.')

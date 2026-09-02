@@ -91,7 +91,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **vinte arquivos, nesta ordem**:
+A migração é aplicada em **vinte e um arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -113,7 +113,13 @@ calculada `ultima_consulta`, que a tela Pacientes mostra) e
 que pode ser dito, e o que o paciente procura gravado na consulta) e
 `0019_nome_do_agente.sql` (o nome do agente vira dado, lido pelas telas e pelo
 prompt) e `0020_apagar_foto_e_logo.sql` (as políticas de DELETE que faltavam em
-`avatars` e `logos`).
+`avatars` e `logos`) e `0021_nome_do_paciente.sql` (o `agenda_marcar` passa a
+preencher o `nome_lead` vazio com o nome dado ao marcar).
+
+> ⚠️ **A `0021` recria a `agenda_marcar` inteira**, porque `create or replace`
+> exige o corpo todo. O arquivo foi **gerado a partir do
+> `pg_get_functiondef()` do banco**, e só o bloco do paciente mudou — escrever
+> as 130 linhas à mão seria copiar e torcer para não mover uma vírgula.
 
 Os pontos que mais causam erro:
 
@@ -156,7 +162,16 @@ Os pontos que mais causam erro:
    regra mora em `temConsultaMarcada()`, em
    [`src/lib/conversas.ts`](src/lib/conversas.ts). Filtrar por status erra em
    silêncio, e erra justo com quem mais volta.
-9. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
+9. **O modelo não guarda resultado de ferramenta entre uma mensagem e
+   outra.** `montarHistorico()` reconstrói a conversa a partir de
+   `mensagens_whatsapp`, que só tem os balões de texto — a chamada de
+   ferramenta e o que ela devolveu somem no fim da execução. **Ferramenta que
+   exige um id vindo de outra ferramenta quebra na mensagem seguinte**, e foi
+   assim que a primeira remarcação falhou. Quem precisa de um id que o paciente
+   nunca digita deve **achá-lo pelo `lead_id` do contexto**, como faz
+   `consultaAlvo()` em
+   [`ferramentas.ts`](supabase/functions/_shared/ferramentas.ts).
+10. **`whatsapp_lead` é único e tem formato canônico**: só dígitos, com o código
    do país (`5511987654321`). Nunca grave formatado — um trigger tira a
    pontuação, mas ninguém adivinha o DDI que faltar. Repetido devolve `23505`.
    É o formato em que a Evolution entrega; a regra dos países vive em
