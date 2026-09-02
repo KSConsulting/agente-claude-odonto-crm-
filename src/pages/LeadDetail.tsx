@@ -109,11 +109,13 @@ function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId:
   const [form, setForm] = useState<NewConsultaForm>({ procedimento: '', data_consulta: '', profissional_id: '', duracao_minutos: '60', status: 'agendada', valor_pago: '', observacoes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const catalogo = useCatalogoProcedimentos()
 
   const set = (field: keyof NewConsultaForm, value: string) => setForm((f) => ({ ...f, [field]: value }))
 
   const handleSave = async () => {
-    if (!form.procedimento.trim() || !form.data_consulta) { setError('Preencha os campos obrigatórios.'); return }
+    if (!form.procedimento) { setError('Escolha o procedimento.'); return }
+    if (!form.data_consulta) { setError('Escolha a data da consulta.'); return }
     setSaving(true); setError('')
     const { data, error: err } = await supabase.from('consultas').insert({
       lead_id: leadId,
@@ -130,8 +132,12 @@ function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId:
     if (err) {
       // 23P01 = exclusion_violation: a restrição `consultas_sem_sobreposicao`
       // barrou uma consulta em cima de outra na agenda desse profissional.
+      // 23514 = a trigger `consultas_procedimento_valido`: procedimento que
+      // saiu do catálogo entre abrir o modal e salvar.
       setError(err.code === '23P01'
         ? 'Esse profissional já tem consulta nesse horário. Escolha outro horário ou outra agenda.'
+        : err.code === '23514'
+        ? 'Esse procedimento não está mais no catálogo da clínica.'
         : 'Erro ao salvar consulta.')
       return
     }
@@ -151,10 +157,27 @@ function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId:
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* PROCEDIMENTO: LISTA FECHADA, COMO NAS OUTRAS PORTAS.
+
+              Este campo era texto livre, e ficou para trás na padronização —
+              o que significava que, desde a migração `0022`, digitar "Limpeza"
+              aqui batia na trigger `consultas_procedimento_valido` e voltava
+              como "Erro ao salvar consulta", sem dizer o motivo. Campo livre
+              contra uma trava do banco não é liberdade: é um erro escondido. */}
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Procedimento *</label>
-            <input value={form.procedimento} onChange={(e) => set('procedimento', e.target.value)} placeholder="Ex: Avaliação inicial, Limpeza, Canal..." style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
+            <select value={form.procedimento} onChange={(e) => set('procedimento', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}
+              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}>
+              <option value="">{catalogo.length ? 'Escolha o procedimento...' : 'Carregando...'}</option>
+              {catalogo.map((nome) => (
+                <option key={nome} value={nome}>{nome}</option>
+              ))}
+            </select>
+            {catalogo.length > 0 && (
+              <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 5 }}>
+                Falta algum? Cadastre em <strong>Procedimentos</strong> e ele aparece aqui.
+              </div>
+            )}
           </div>
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>Data da Consulta *</label>

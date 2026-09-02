@@ -153,11 +153,18 @@ Os pontos que mais causam erro:
    que impede duas consultas ativas se sobrepondo na mesma agenda. Ela devolve
    `23P01`, e a interface precisa traduzir isso — repetir a chamada dá o mesmo
    erro.
-7. **Ninguém vira Paciente sem a baixa da consulta.** `pessoas.ts` separa
+7. **Ninguém vira Paciente sem uma consulta realizada.** `pessoas.ts` separa
    `/leads` de `/clientes` por `consulta_realizada` / `paciente_recorrente`, e
-   **a única porta automática para eles é a consulta virar `realizada`** — o
-   trigger promove (e passa a `paciente_recorrente` na 2ª). Quem escreve isso é
-   a Agenda ou o `AvisoBaixaConsulta`; a tela nunca escreve o funil na mão.
+   a porta é sempre a mesma: **uma consulta `realizada` existir**. Pela baixa
+   (a Agenda ou o `AvisoBaixaConsulta`), o trigger promove — e passa a
+   `paciente_recorrente` na 2ª.
+
+   > **O cadastro manual era a exceção, e deixou de ser.** "Novo Paciente"
+   > gravava `consulta_realizada` no clique, e a pessoa ficava com a etiqueta
+   > verde **sem uma consulta sequer por trás** — a tela afirmando um
+   > atendimento que o sistema não sabia mostrar. Hoje o modal cria a consulta
+   > junto; **sem a data, a pessoa entra como Contato**, e o modal diz isso
+   > antes do clique (o botão troca para "Cadastrar como Contato").
 8. **"Agendou?" não se pergunta ao `status`.** O trigger preserva
    `consulta_realizada` e `paciente_recorrente` quando alguém marca de novo —
    então **um paciente que volta e marca NÃO fica em `consulta_agendada`**.
@@ -669,7 +676,7 @@ de data — e as datas são a resposta.
 > valendo. **Escolher qualquer período nela desliga o modo** — é o caminho de
 > volta, sem precisar de um segundo botão para isso.
 
-### Procedimento é vocabulário fechado, nas cinco portas
+### Procedimento é vocabulário fechado, em toda porta
 
 "Qual o procedimento mais procurado?" não tinha resposta. A mesma coisa entrava
 como `Lentes de Contato`, `lente de contato`, `lentes` e `lente pro dente` —
@@ -686,10 +693,19 @@ Eram quatro portas de texto livre, e todas foram fechadas:
 
 E o banco confere por baixo, nas duas tabelas (migração `0022`).
 
-> **A quinta veio depois, e já nasceu fechada.** A ficha do lead
-> ([`LeadDetail.tsx`](src/pages/LeadDetail.tsx)) passou a **editar** os
-> procedimentos — antes era só leitura —, com as mesmas caixas do cadastro.
-> Porta nova de vocabulário nasce com a lista, nunca com um campo de texto.
+A ficha do lead ([`LeadDetail.tsx`](src/pages/LeadDetail.tsx)) tem mais duas,
+e as duas contam uma lição diferente:
+
+| Porta | História |
+|---|---|
+| **Procedimentos de interesse**, na ficha | Era só leitura, e **já nasceu fechada** quando virou editável. Porta nova de vocabulário nasce com a lista, nunca com um campo de texto |
+| Modal **Nova Consulta**, na ficha | **Ficou para trás na padronização.** Continuou texto livre depois da `0022` — e desde então digitar "Limpeza" ali batia na trigger e voltava como *"Erro ao salvar consulta"*, sem motivo |
+
+> ⚠️ **Campo livre contra uma trava do banco não é liberdade: é um erro
+> escondido.** A `0022` fechou o banco e quatro telas; a quinta só apareceu
+> semanas depois, quando alguém foi usá-la. **Ao fechar um vocabulário,
+> procure TODAS as telas que escrevem naquela coluna** — `grep` pelo nome da
+> coluna, não pela memória de onde ela é usada.
 
 **`enum` não é um pedido, é uma trava.** "Use o nome exato" no prompt é
 instrução, e instrução às vezes é atendida. `enum` no schema faz os dois
@@ -797,8 +813,14 @@ Agora o cadastro cria a consulta junto. Quatro decisões:
 |---|---|
 | **Quem decide `realizada` ou `agendada` é o Tipo**, lá em cima | Um segundo par de botões faria a mesma pergunta ("já veio, ou ainda vem?") que o Tipo já faz — com essas palavras: *"Ainda não realizou consulta"* / *"Consulta já realizada"*. Duas respostas para uma pergunta só é contradição esperando ser digitada |
 | **Só a data e a hora ficam à vista**; procedimento, agenda e duração nascem quando ela é preenchida | Um formulário de agendamento inteiro sempre aberto num campo **opcional** é peso cobrado de quem não vai usá-lo |
-| **Vazio não cria nada** | E esse caso é o mais comum de todos: quem migra uma ficha antiga quase nunca sabe a data. O cadastro sem consulta continua existindo, e a coluna continua dizendo "Cadastrado à mão" |
+| **Vazio não cria nada — e a pessoa entra como Contato** | É a regra 7 sem exceção: quem torna alguém paciente é a consulta, não a etiqueta. Sem isso, "Novo Paciente" produzia uma etiqueta verde de "Consulta Realizada" com nada por trás |
 | **Realizada no futuro é recusada** | Não quer dizer nada — e é o engano fácil de quem está cadastrando um paciente e quer marcar o **retorno** dele. A recusa diz onde ir: a Agenda |
+
+> **E o modal diz isso ANTES do clique.** Marcar "Paciente" e a pessoa
+> aparecer em Contatos seria uma surpresa; então o aviso é âmbar (é o que vai
+> acontecer, não um erro) e o botão troca de nome para **"Cadastrar como
+> Contato"**. Depois de salvar, a página já leva você até a lista certa — isso
+> `handleNewLeadSaved` sempre fez.
 
 > ⚠️ **A consulta é inserida DEPOIS da pessoa, e as duas não estão na mesma
 > transação.** Quando a segunda falha (tipicamente `23P01`, o horário ocupado),

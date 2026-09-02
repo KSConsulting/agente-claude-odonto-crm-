@@ -76,8 +76,9 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
     tipoPadrao: 'paciente',
     arquivo: 'pacientes',
     vazio: 'Nenhum paciente nesse período.',
-    // Paciente sem data aqui é cadastro manual: "Novo Paciente" grava o status
-    // direto, sem criar consulta. Dizer isso é melhor que um traço mudo.
+    // Paciente sem data aqui é ficha ANTIGA: hoje ninguém entra em Pacientes
+    // sem uma consulta realizada por trás, então esta linha só descreve o que
+    // já estava no banco. Dizer isso é melhor que um traço mudo.
     colunaData: { titulo: 'Última Consulta', campo: 'ultima_consulta', vazio: 'Cadastrado à mão' },
   },
 }
@@ -229,7 +230,20 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
 
     setSaving(true); setError('')
 
-    const status: LeadStatus = ehPaciente ? 'consulta_realizada' : 'iniciou_conversa'
+    /* QUEM TORNA ALGUÉM PACIENTE É A CONSULTA, E NÃO O BOTÃO.
+
+       Antes, marcar "Paciente" gravava `consulta_realizada` na hora — e a
+       pessoa ficava com a etiqueta verde "Consulta Realizada" sem uma consulta
+       sequer por trás dela. A tela afirmava um atendimento que o sistema não
+       tinha como mostrar.
+
+       Sem data, ela entra como Contato. É a mesma regra que já vale no resto
+       do sistema (ninguém vira Paciente sem a baixa da consulta) — o cadastro
+       manual era a única exceção, e era ela que produzia a etiqueta vazia.
+
+       O Tipo continua mandando: é ele que decide `realizada` ou `agendada`
+       quando há data, e é ele que muda a pergunta do bloco de consulta. */
+    const status: LeadStatus = (ehPaciente && inicio) ? 'consulta_realizada' : 'iniciou_conversa'
 
     let pessoa = jaCriado
     if (!pessoa) {
@@ -464,9 +478,24 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
             />
 
             {!consulta.quando ? (
-              <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6, lineHeight: 1.5 }}>
-                Sem data, nenhuma consulta é criada — a pessoa entra só no cadastro.
-              </div>
+              /* Marcar "Paciente" e a pessoa aparecer em Contatos seria uma
+                 surpresa — então a consequência é dita aqui, antes do clique, e
+                 o botão lá embaixo troca de nome junto. Âmbar e não vermelho:
+                 não é erro, é o que vai acontecer. */
+              ehPaciente ? (
+                <div style={{
+                  marginTop: 8, background: '#FFFBEB', border: '1px solid #FDE68A',
+                  borderRadius: 8, padding: '9px 11px', fontSize: 11.5,
+                  color: '#B45309', lineHeight: 1.55,
+                }}>
+                  Sem a data, esta pessoa entra como <strong>Contato</strong>, e não como
+                  Paciente. Quem torna alguém paciente é a consulta — não a etiqueta.
+                </div>
+              ) : (
+                <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6, lineHeight: 1.5 }}>
+                  Sem data, nenhuma consulta é criada — a pessoa entra só no cadastro.
+                </div>
+              )
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
                 <div>
@@ -551,7 +580,7 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
           </button>
           <button onClick={handleSave} disabled={saving || !!duplicado}
             style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: duplicado ? '#DCE6EA' : saving ? '#4C90A8' : '#1E6E8C', cursor: (saving || duplicado) ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: duplicado ? '#6B818C' : '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {saving ? 'Cadastrando...' : 'Cadastrar'}
+            {saving ? 'Cadastrando...' : (ehPaciente && !consulta.quando ? 'Cadastrar como Contato' : 'Cadastrar')}
           </button>
         </div>
       </div>
