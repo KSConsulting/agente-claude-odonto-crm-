@@ -36,7 +36,6 @@ interface ModeConfig {
   icone: typeof Users
   corIcone: string
   botaoNovo: string
-  tipoPadrao: 'lead' | 'paciente'
   arquivo: string
   vazio: string
   /**
@@ -60,7 +59,6 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
     icone: Users,
     corIcone: '#1E6E8C',
     botaoNovo: 'Novo Contato',
-    tipoPadrao: 'lead',
     arquivo: 'contatos',
     vazio: 'Nenhum contato nesse período.',
     colunaData: { titulo: 'Consulta Marcada', campo: 'data_agendamento', vazio: 'Sem consulta' },
@@ -73,7 +71,6 @@ const CONFIG: Record<PessoasMode, ModeConfig> = {
     icone: UserCheck,
     corIcone: '#1A7A48',
     botaoNovo: 'Novo Paciente',
-    tipoPadrao: 'paciente',
     arquivo: 'pacientes',
     vazio: 'Nenhum paciente nesse período.',
     // Paciente sem data aqui é ficha ANTIGA: hoje ninguém entra em Pacientes
@@ -135,7 +132,6 @@ function StatusBadge({ status }: { status: LeadStatus }) {
    NewLeadModal
 ────────────────────────────────────────────── */
 interface NewLeadForm {
-  tipo: 'lead' | 'paciente'
   nome: string
   whatsapp: string
   procedimentos: string[]
@@ -147,10 +143,9 @@ interface NewLeadForm {
  * A consulta que o cadastro pode criar junto com a pessoa.
  *
  * Note que NÃO há aqui um campo dizendo se ela já aconteceu ou vai acontecer.
- * Quem responde isso é o **Tipo**, no topo do formulário, com essas mesmas
- * palavras: "Ainda não realizou consulta" / "Consulta já realizada". Um segundo
- * par de botões faria a mesma pergunta duas vezes — e duas respostas para uma
- * pergunta só é contradição esperando ser digitada.
+ * **Quem responde isso é a própria data**: no passado, aconteceu; no futuro,
+ * vai acontecer. Um seletor ao lado de um campo que já responde a pergunta é
+ * pedir para os dois discordarem — e o perdedor era sempre quem digitou.
  */
 interface NewConsulta {
   quando: string
@@ -163,14 +158,13 @@ const DURACOES = [15, 30, 45, 60, 90, 120]
 
 interface NewLeadModalProps {
   titulo: string
-  tipoPadrao: 'lead' | 'paciente'
   onClose: () => void
   onSaved: (lead: LeadClinica) => void
 }
 
-function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProps) {
+function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
   const [form, setForm] = useState<NewLeadForm>({
-    tipo: tipoPadrao, nome: '', whatsapp: '', procedimentos: [], data_nascimento: '', anotacoes: '',
+    nome: '', whatsapp: '', procedimentos: [], data_nascimento: '', anotacoes: '',
   })
   const [whatsappValido, setWhatsappValido] = useState(false)
   const [duplicado, setDuplicado] = useState<PessoaResumo | null>(null)
@@ -182,6 +176,7 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
   const [consulta, setConsulta] = useState<NewConsulta>({
     quando: '', procedimento: '', profissional_id: '', duracao: '60',
   })
+  const [agora, setAgora] = useState(() => Date.now())
   const [profissionais, setProfissionais] = useState<Profissional[]>([])
   /* A pessoa que JÁ foi criada, quando só a consulta falhou. Sem guardar isto,
      tentar de novo bateria no WhatsApp duplicado — e o erro apontaria para o
@@ -193,7 +188,26 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
       .then(({ data }) => setProfissionais((data ?? []) as Profissional[]))
   }, [])
 
-  const ehPaciente = form.tipo === 'paciente'
+  /* A DATA DECIDE — E É A ÚNICA COISA QUE DECIDE.
+
+     No passado, a consulta aconteceu (`realizada`, e a pessoa vira Paciente);
+     no futuro, vai acontecer (`agendada`, e ela fica em Contatos com "Consulta
+     Agendada"); sem data, nenhuma consulta é criada e ela entra como Contato.
+
+     Havia aqui um seletor "Lead / Paciente", e ele foi removido: com a data
+     respondendo à mesma pergunta, ele não decidia mais nada — e quando os dois
+     discordavam (Paciente + data no futuro), quem levava um erro na cara era
+     quem tinha digitado a informação certa. */
+  const instante = (() => {
+    if (!consulta.quando) return null
+    const d = new Date(consulta.quando)
+    return isNaN(d.getTime()) ? null : d
+  })()
+  /* `Date.now()` durante a renderização é impuro, e o ESLint reprova com razão:
+     o resultado mudaria sozinho a cada re-render. O relógio é lido na abertura
+     do modal e relido a cada mexida no campo de data — que é o único momento em
+     que a resposta pode ter mudado para quem está olhando. */
+  const jaAconteceu = instante !== null && instante.getTime() <= agora
 
   const set = <C extends keyof NewLeadForm>(field: C, value: NewLeadForm[C]) =>
     setForm((f) => ({ ...f, [field]: value }))
@@ -218,15 +232,8 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
 
     // A consulta é opcional. Com data preenchida, ela passa a ter exigências
     // próprias — e `procedimento` é `not null` no banco.
-    const inicio = consulta.quando ? new Date(consulta.quando) : null
-    if (inicio && isNaN(inicio.getTime())) { setError('A data da consulta não é válida.'); return }
-    if (inicio && !consulta.procedimento) { setError('Escolha o procedimento da consulta.'); return }
-    // Consulta realizada no futuro não quer dizer nada — e é o engano fácil de
-    // quem está cadastrando um paciente e quer marcar o RETORNO dele.
-    if (inicio && ehPaciente && inicio.getTime() > Date.now()) {
-      setError('Uma consulta já realizada não pode estar no futuro. Para marcar um retorno, cadastre a pessoa e use a Agenda.')
-      return
-    }
+    if (consulta.quando && !instante) { setError('A data da consulta não é válida.'); return }
+    if (instante && !consulta.procedimento) { setError('Escolha o procedimento da consulta.'); return }
 
     setSaving(true); setError('')
 
@@ -237,13 +244,14 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
        sequer por trás dela. A tela afirmava um atendimento que o sistema não
        tinha como mostrar.
 
-       Sem data, ela entra como Contato. É a mesma regra que já vale no resto
-       do sistema (ninguém vira Paciente sem a baixa da consulta) — o cadastro
-       manual era a única exceção, e era ela que produzia a etiqueta vazia.
+       Sem data — ou com data no futuro — ela entra como Contato. É a mesma
+       regra que já vale no resto do sistema (ninguém vira Paciente sem uma
+       consulta realizada); o cadastro manual era a única exceção, e era ela
+       que produzia a etiqueta vazia.
 
-       O Tipo continua mandando: é ele que decide `realizada` ou `agendada`
-       quando há data, e é ele que muda a pergunta do bloco de consulta. */
-    const status: LeadStatus = (ehPaciente && inicio) ? 'consulta_realizada' : 'iniciou_conversa'
+       Para a consulta no futuro quem grava o funil nem é esta linha: o trigger
+       `consultas_sincroniza_lead` move para `consulta_agendada` logo depois. */
+    const status: LeadStatus = jaAconteceu ? 'consulta_realizada' : 'iniciou_conversa'
 
     let pessoa = jaCriado
     if (!pessoa) {
@@ -272,15 +280,15 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
       setJaCriado(pessoa)
     }
 
-    if (inicio) {
+    if (instante) {
       const { error: errConsulta } = await supabase.from('consultas').insert({
         lead_id: pessoa.id,
         profissional_id: consulta.profissional_id || null,
         procedimento: consulta.procedimento,
-        data_consulta: inicio.toISOString(),
+        data_consulta: instante.toISOString(),
         duracao_minutos: Number(consulta.duracao),
-        // O Tipo decide, e é a única coisa que decide.
-        status: ehPaciente ? 'realizada' : 'agendada',
+        // A data decide, e é a única coisa que decide.
+        status: jaAconteceu ? 'realizada' : 'agendada',
         origem: 'equipe',
       })
 
@@ -299,7 +307,8 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
 
       // Consulta agendada move o funil pelo trigger `consultas_sincroniza_lead`.
       // Reler é o que impede a lista de mostrar o status de antes — e de deixar
-      // a pessoa na página errada.
+      // a pessoa na página errada. É o caminho normal de quem marca para o
+      // futuro: sai daqui como `iniciou_conversa` e volta `consulta_agendada`.
       const { data: atualizado } = await supabase.from('crm_clinica')
         .select('*').eq('id', pessoa.id).single()
       if (atualizado) pessoa = atualizado as LeadClinica
@@ -336,30 +345,15 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
           </button>
         </div>
 
-        {/* Tipo selector */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 8 }}>Tipo *</label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {([
-              { value: 'lead', label: 'Lead (Contato)', sub: 'Ainda não realizou consulta' },
-              { value: 'paciente', label: 'Paciente (Cliente)', sub: 'Consulta já realizada' },
-            ] as const).map(({ value, label, sub }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => set('tipo', value)}
-                style={{
-                  padding: '10px 14px', borderRadius: 10, border: `2px solid ${form.tipo === value ? '#1E6E8C' : '#DCE6EA'}`,
-                  background: form.tipo === value ? '#EAF3F6' : '#fff', cursor: 'pointer', textAlign: 'left',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 700, color: form.tipo === value ? '#1E6E8C' : '#16232B' }}>{label}</div>
-                <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 2 }}>{sub}</div>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* O SELETOR "Lead / Paciente" MORAVA AQUI, E FOI REMOVIDO.
+
+            Ele perguntava "já realizou consulta?" ao lado de um campo de data
+            que responde a mesma coisa melhor — e quando os dois discordavam,
+            quem levava o erro era quem tinha digitado a informação certa.
+
+            Controle que não decide mais nada não é inofensivo: ele promete uma
+            escolha e o sistema faz outra coisa. Hoje quem decide é a data, e
+            o botão de salvar diz o que vai sair. */}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Nome */}
@@ -455,7 +449,7 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, flexWrap: 'wrap' }}>
               <CalendarPlus size={14} color="#1E6E8C" />
               <span style={{ fontSize: 12.5, fontWeight: 700, color: '#16232B' }}>
-                {ehPaciente ? 'Quando foi a consulta?' : 'Quando será a consulta?'}
+                Consulta
               </span>
               <span style={{ fontSize: 11.5, color: '#6B818C' }}>(opcional)</span>
             </div>
@@ -464,6 +458,7 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
               type="datetime-local"
               value={consulta.quando}
               onChange={(e) => {
+                setAgora(Date.now())
                 setC('quando', e.target.value)
                 // Quem marcou UM interesse quase sempre vai marcar a consulta
                 // dele. É sugestão, não trava — a lista continua aberta.
@@ -478,24 +473,10 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
             />
 
             {!consulta.quando ? (
-              /* Marcar "Paciente" e a pessoa aparecer em Contatos seria uma
-                 surpresa — então a consequência é dita aqui, antes do clique, e
-                 o botão lá embaixo troca de nome junto. Âmbar e não vermelho:
-                 não é erro, é o que vai acontecer. */
-              ehPaciente ? (
-                <div style={{
-                  marginTop: 8, background: '#FFFBEB', border: '1px solid #FDE68A',
-                  borderRadius: 8, padding: '9px 11px', fontSize: 11.5,
-                  color: '#B45309', lineHeight: 1.55,
-                }}>
-                  Sem a data, esta pessoa entra como <strong>Contato</strong>, e não como
-                  Paciente. Quem torna alguém paciente é a consulta — não a etiqueta.
-                </div>
-              ) : (
-                <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6, lineHeight: 1.5 }}>
-                  Sem data, nenhuma consulta é criada — a pessoa entra só no cadastro.
-                </div>
-              )
+              <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6, lineHeight: 1.5 }}>
+                Sem data, nenhuma consulta é criada — e a pessoa entra como <strong>Contato</strong>.
+                Quem torna alguém paciente é a consulta, não a etiqueta.
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
                 <div>
@@ -540,10 +521,13 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
                   </div>
                 </div>
 
+                {/* A tela dizendo o que vai fazer, e a frase muda no instante em
+                    que a data cruza o presente. Sem isto, "passado vira Paciente
+                    e futuro não" seria uma regra que só se descobre depois. */}
                 <div style={{ fontSize: 11.5, color: '#6B818C', lineHeight: 1.5 }}>
-                  {ehPaciente
-                    ? 'Entra no histórico como realizada — e é a data que a lista de Pacientes passa a mostrar em "Última Consulta".'
-                    : 'Entra na agenda como marcada, e o funil acompanha sozinho.'}
+                  {jaAconteceu
+                    ? <>Está no passado: entra no histórico como <strong>realizada</strong>, e a pessoa vira <strong>Paciente</strong>.</>
+                    : <>Está no futuro: entra na agenda como <strong>marcada</strong>, e a pessoa fica em Contatos com a etiqueta "Consulta Agendada".</>}
                 </div>
               </div>
             )}
@@ -580,7 +564,10 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
           </button>
           <button onClick={handleSave} disabled={saving || !!duplicado}
             style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: duplicado ? '#DCE6EA' : saving ? '#4C90A8' : '#1E6E8C', cursor: (saving || duplicado) ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: duplicado ? '#6B818C' : '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {saving ? 'Cadastrando...' : (ehPaciente && !consulta.quando ? 'Cadastrar como Contato' : 'Cadastrar')}
+            {/* O botão diz o que vai SAIR, não o que a página se chama: quem
+                abriu "Novo Paciente" e não deu data leva um Contato, e precisa
+                saber disso antes de clicar. */}
+            {saving ? 'Cadastrando...' : jaAconteceu ? 'Cadastrar como Paciente' : 'Cadastrar como Contato'}
           </button>
         </div>
       </div>
@@ -841,7 +828,6 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
       {showNewLead && (
         <NewLeadModal
           titulo={cfg.botaoNovo}
-          tipoPadrao={cfg.tipoPadrao}
           onClose={() => setShowNewLead(false)}
           onSaved={handleNewLeadSaved}
         />

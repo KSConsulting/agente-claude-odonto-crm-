@@ -163,8 +163,9 @@ Os pontos que mais causam erro:
    > gravava `consulta_realizada` no clique, e a pessoa ficava com a etiqueta
    > verde **sem uma consulta sequer por trás** — a tela afirmando um
    > atendimento que o sistema não sabia mostrar. Hoje o modal cria a consulta
-   > junto; **sem a data, a pessoa entra como Contato**, e o modal diz isso
-   > antes do clique (o botão troca para "Cadastrar como Contato").
+   > junto, e **quem decide é a data**: no passado ela vira Paciente, no futuro
+   > ou sem data ela entra como Contato. O botão diz qual dos dois antes do
+   > clique.
 8. **"Agendou?" não se pergunta ao `status`.** O trigger preserva
    `consulta_realizada` e `paciente_recorrente` quando alguém marca de novo —
    então **um paciente que volta e marca NÃO fica em `consulta_agendada`**.
@@ -807,20 +808,45 @@ digitava e não tinha onde entrar.**
 pessoa nascia vazio, e a data da última visita — que é o dado inteiro de uma
 ficha migrada — não tinha campo.
 
-Agora o cadastro cria a consulta junto. Quatro decisões:
+Agora o cadastro cria a consulta junto — e **quem decide tudo é a data**:
+
+| A data | A consulta nasce | A pessoa entra como |
+|---|---|---|
+| **vazia** | nenhuma | **Contato** |
+| **no passado** | `realizada` | **Paciente** |
+| **no futuro** | `agendada` | **Contato**, com a etiqueta "Consulta Agendada" |
+
+**O seletor "Lead / Paciente" foi removido, e essa é a decisão que carrega as
+outras.** Ele perguntava *"já realizou consulta?"* ao lado de um campo de data
+que responde a mesma coisa — e melhor, porque a data traz o **quando** junto.
+
+Enquanto os dois existiram, cada combinação precisou de uma regra, e uma delas
+virou um erro na cara de quem estava certo: marcar "Paciente" com data no
+futuro era **recusado** (*"uma consulta já realizada não pode estar no
+futuro"*), quando a leitura óbvia era um paciente com consulta marcada. O
+seletor não conseguia decidir o que prometia decidir.
+
+> **Controle que não decide mais nada não é inofensivo.** Ele promete uma
+> escolha e o sistema faz outra coisa. Foi por isso que ele saiu inteiro, em
+> vez de ganhar mais uma regra.
+
+Duas decisões menores que sobreviveram:
 
 | Decisão | Por quê |
 |---|---|
-| **Quem decide `realizada` ou `agendada` é o Tipo**, lá em cima | Um segundo par de botões faria a mesma pergunta ("já veio, ou ainda vem?") que o Tipo já faz — com essas palavras: *"Ainda não realizou consulta"* / *"Consulta já realizada"*. Duas respostas para uma pergunta só é contradição esperando ser digitada |
 | **Só a data e a hora ficam à vista**; procedimento, agenda e duração nascem quando ela é preenchida | Um formulário de agendamento inteiro sempre aberto num campo **opcional** é peso cobrado de quem não vai usá-lo |
-| **Vazio não cria nada — e a pessoa entra como Contato** | É a regra 7 sem exceção: quem torna alguém paciente é a consulta, não a etiqueta. Sem isso, "Novo Paciente" produzia uma etiqueta verde de "Consulta Realizada" com nada por trás |
-| **Realizada no futuro é recusada** | Não quer dizer nada — e é o engano fácil de quem está cadastrando um paciente e quer marcar o **retorno** dele. A recusa diz onde ir: a Agenda |
+| **A frase embaixo do campo muda no instante em que a data cruza o presente** | "Passado vira Paciente e futuro não" seria, sem ela, uma regra que só se descobre depois de salvar |
 
-> **E o modal diz isso ANTES do clique.** Marcar "Paciente" e a pessoa
-> aparecer em Contatos seria uma surpresa; então o aviso é âmbar (é o que vai
-> acontecer, não um erro) e o botão troca de nome para **"Cadastrar como
-> Contato"**. Depois de salvar, a página já leva você até a lista certa — isso
-> `handleNewLeadSaved` sempre fez.
+> **E o botão diz o que vai SAIR, não como a página se chama:** *"Cadastrar
+> como Paciente"* ou *"Cadastrar como Contato"*. Quem abriu "Novo Paciente" e
+> não deu data leva um Contato — e precisa saber disso antes de clicar. Depois
+> de salvar, a página já leva você até a lista certa; isso `handleNewLeadSaved`
+> sempre fez.
+
+> ⚠️ **A data no passado assume que a pessoa COMPARECEU** (`realizada`), e não
+> há como dizer o contrário por aqui. É o caso raro de cadastrar alguém novo
+> por uma consulta que já passou e ainda não teve baixa — a saída é cadastrar
+> sem data e usar "Nova Consulta" na ficha, que tem o seletor de status.
 
 > ⚠️ **A consulta é inserida DEPOIS da pessoa, e as duas não estão na mesma
 > transação.** Quando a segunda falha (tipicamente `23P01`, o horário ocupado),
@@ -831,10 +857,13 @@ Agora o cadastro cria a consulta junto. Quatro decisões:
 > **E o lead é relido depois da consulta agendada.** Quem move o funil é o
 > trigger `consultas_sincroniza_lead`, no banco — a linha que o `insert`
 > devolveu é anterior a ele. Sem reler, a lista mostraria `iniciou_conversa`
-> para alguém que acabou de ficar com consulta marcada. (Conferido no banco:
-> `realizada` inserida direto **não** mexe no funil — aquele ramo do trigger só
-> roda em `UPDATE` —, e é por isso que o Tipo continua sendo quem grava o
-> status.)
+> para alguém que acabou de ficar com consulta marcada — que é **o caminho
+> normal** de quem marca para o futuro.
+>
+> (Conferido no banco: `realizada` inserida direto **não** mexe no funil —
+> aquele ramo do trigger só roda em `UPDATE`. É por isso que o `insert` da
+> pessoa já grava `consulta_realizada` quando a data está no passado, em vez
+> de esperar um trigger que não vai disparar.)
 
 #### A ficha do lead virou editável
 
