@@ -4,6 +4,38 @@ Orientações para agentes trabalhando neste repositório.
 
 ---
 
+## ⚠️ PRIMEIRO: isto é uma instalação nova?
+
+**Confira antes de qualquer outra coisa.** Se **não existe um arquivo `.env` na
+raiz**, ou se ele existe e está vazio, então esta é uma **instalação nova** — e
+a pessoa que está falando com você quer **colocar o sistema no ar para a
+clínica dela**, não mexer no código.
+
+Nesse caso:
+
+1. **Leia o [`INSTALACAO.md`](INSTALACAO.md) inteiro** antes de propor
+   qualquer passo. Ele é o dono da instalação, e nenhum outro documento deste
+   repositório descreve o caminho completo.
+2. **Conduza a pessoa pelas seis partes, na ordem.** Ela pode não ser
+   programadora — explique em português simples, sem jargão, e faça uma coisa
+   de cada vez.
+3. **Respeite a divisão de quem age.** As partes 1, 2, 4, 5 e 6 são dela: criar
+   contas, colar chaves, clicar em painéis de terceiros, configurar pela tela.
+   A parte 3 é sua: aplicar as 24 migrações e publicar as duas Edge Functions.
+   Não tente fazer a parte dela, e não deixe a parte 3 para ela.
+4. **Não pule a parte 5**, mesmo que o sistema já esteja funcionando. O banco
+   nasce com o catálogo de procedimentos da clínica de origem, e desde a
+   migração `0022` esse catálogo é **vocabulário fechado**: sem trocá-lo, o
+   agente de IA oferece tratamentos que a clínica nova não faz, e não consegue
+   marcar os que ela faz.
+5. **O modo teste fica ligado.** Desligá-lo é decisão da clínica, não passo de
+   instalação — é o ato que coloca o agente na frente do público.
+
+Se o `.env` existe e está preenchido, o sistema já está instalado: siga com o
+resto deste documento, que é sobre **desenvolver**.
+
+---
+
 ## O que é este projeto
 
 Sistema de gestão para **clínica odontológica**, acoplado a um **Agente de IA**

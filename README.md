@@ -9,6 +9,31 @@ de desempenho do próprio agente.
 
 ---
 
+> # 👉 Acabou de receber acesso? Comece aqui.
+>
+> ## **[`INSTALACAO.md`](INSTALACAO.md)** — do zero até a secretária de IA atendendo
+>
+> São seis partes e cerca de uma hora e meia. Ele separa **o que você faz** (criar
+> as contas, colar as chaves, clicar nos painéis) do **que a IA da sua IDE faz
+> sozinha** (montar o banco, publicar as funções).
+>
+> **Usando Claude Code, Codex ou outra IDE com IA?** Abra o projeto e peça:
+>
+> ```
+> Leia o INSTALACAO.md e me guie pela instalação, do começo.
+> ```
+>
+> Ela conhece o repositório e conduz você passo a passo.
+>
+> ---
+>
+> ⚠️ **Uma coisa que quase todo mundo esquece, e que não é opcional:** o banco
+> nasce com os **20 procedimentos da clínica que originou este sistema** — e é
+> essa lista que a secretária de IA oferece aos seus pacientes. Trocá-la é a
+> **[parte 5](INSTALACAO.md)**, e ela vem antes de ligar o WhatsApp.
+
+---
+
 ## Índice
 
 - [O que o sistema faz](#o-que-o-sistema-faz)
