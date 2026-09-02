@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "prompt": "node agente-ia/gerar-prompt.mjs",
     "agente:deploy": "npm run prompt && node agente-ia/publicar.mjs deploy",
-    "agente:secrets": "node agente-ia/publicar.mjs secrets"
+    "agente:secrets": "node agente-ia/publicar.mjs secrets",
+    "agente:deploy-agenda": "node agente-ia/publicar.mjs deploy-agenda"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

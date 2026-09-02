@@ -68,6 +68,21 @@ const FRASES: Record<string, string> = {
   rota_invalida: MENSAGEM_GENERICA,
   corpo_invalido: 'Faltou alguma informação para eu concluir.',
   erro_interno: MENSAGEM_GENERICA,
+
+  // As duas recusas de NEGÓCIO das migrações 0018 e 0023. Sem elas aqui, o
+  // `?? MENSAGEM_GENERICA` respondia "não consegui acessar a agenda agora" —
+  // a frase de servidor fora do ar — para quem só tinha escrito o nome de um
+  // procedimento fora do catálogo. Manda procurar defeito na máquina, e o
+  // defeito está no pedido.
+  //
+  // A Letícia nunca caiu nisso: ela tem frase própria em `ferramentas.ts`.
+  // Foi a porta de fora que ficou para trás quando as regras entraram.
+  procedimento_desconhecido:
+    'Esse procedimento não está no catálogo da clínica. '
+    + 'Confira os nomes exatos em GET /procedimentos.',
+  exige_avaliacao:
+    'Esse tratamento passa antes por uma consulta de avaliação. '
+    + 'Marque a avaliação primeiro.',
 }
 
 /* ──────────────────────────────────────────────

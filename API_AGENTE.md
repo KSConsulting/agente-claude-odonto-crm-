@@ -220,8 +220,14 @@ São os 20 do catálogo atual, **em ordem alfabética** — a consulta ordena po
 nome, não por cadastro. Procedimento desativado em Configurações some da lista
 sem precisar mexer no agente.
 
-Sem ID de propósito: o campo `procedimento` do endpoint de marcar é texto livre,
-então um ID aqui não teria uso nenhum.
+Sem ID de propósito: `POST /marcar` recebe o **nome**, não um id — então um id
+aqui não teria uso nenhum.
+
+> ⚠️ **É por isto que este endpoint importa.** Desde a migração `0023` o nome
+> tem que bater com um procedimento **ativo** do catálogo, exatamente como
+> escrito aqui. Não é texto livre: `Limpeza` é recusado, `Limpeza e Profilaxia`
+> passa. Consulte esta lista antes de marcar, e não guarde os nomes — o
+> catálogo é editável na tela de Procedimentos.
 
 ```bash
 curl -X GET 'https://SEU_REF.supabase.co/functions/v1/agenda/procedimentos' \
@@ -315,7 +321,8 @@ curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/disponibilidade' \
 
 ### 3.4. Marcar consulta — `POST /marcar`
 
-**Precisa:** `nome`, `whatsapp`, `procedimento` (texto livre), `data_hora`.
+**Precisa:** `nome`, `whatsapp`, `procedimento` (**nome exato do catálogo** —
+veja `GET /procedimentos`), `data_hora`.
 **Opcionais:** `profissional_id`, `duracao_minutos`, `chave_externa`, `interesse`.
 
 > **`duracao_minutos` deixou de ter padrão fixo.** Omitido, vale a duração
@@ -359,9 +366,13 @@ o dentista abrir a agenda e já saber do que se trata.
 > frente do paciente. A Letícia não sofre disso porque lê o catálogo pela view
 > `procedimentos_clinica_agente`, que traz o fluxo escrito na linha.
 
-> **Procedimento fora do catálogo continua passando.** `procedimento` é texto
-> livre, e integração que marca algo que não está em `servicos_clinica` não
-> quebra: nome que não casa é nome sem regra a aplicar.
+> ⚠️ **Procedimento fora do catálogo é RECUSADO.** Isto mudou na migração
+> `0023`, e a regra anterior era a oposta — nome que não casava seguia adiante
+> com 60 minutos e **sem conferir a avaliação**, o que deixava marcar por fora
+> da porta de entrada em silêncio. Hoje volta `procedimento_desconhecido`.
+>
+> A recusa exige **existir e estar ativo**. Grafia é comparada como está
+> gravada: `Limpeza` não casa com `Limpeza e Profilaxia`.
 
 **Sucesso:**
 
@@ -378,9 +389,15 @@ o dentista abrir a agenda e já saber do que se trata.
 O `id` volta para o agente poder cancelar ou remarcar depois sem ter que
 procurar.
 
-**Recusas:** `exige_avaliacao`, `horario_ocupado`, `sem_profissional_livre`,
-`fora_expediente`, `whatsapp_invalido`, `dados_invalidos`, `data_invalida` —
-cada uma com a frase correspondente.
+**Recusas:** `procedimento_desconhecido`, `exige_avaliacao`,
+`horario_ocupado`, `sem_profissional_livre`, `fora_expediente`,
+`whatsapp_invalido`, `dados_invalidos`, `data_invalida` — cada uma com a frase
+correspondente.
+
+> **As duas primeiras não tinham frase própria até 02/09/2026**, e caíam na
+> genérica: *"Não consegui acessar a agenda agora."* Quem integrava reiniciava
+> servidor procurando um defeito que era o nome de um procedimento. Se você viu
+> esse sintoma, é isto — republique a função.
 
 ```bash
 curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/marcar' \
@@ -389,7 +406,7 @@ curl -X POST 'https://SEU_REF.supabase.co/functions/v1/agenda/marcar' \
   -d '{
     "nome": "Maria Pereira",
     "whatsapp": "5511987654321",
-    "procedimento": "Limpeza",
+    "procedimento": "Limpeza e Profilaxia",
     "data_hora": "2026-05-15T09:00",
     "profissional_id": "3f2a…",
     "chave_externa": "msg_abc123"

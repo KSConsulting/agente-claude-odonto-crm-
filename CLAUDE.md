@@ -51,8 +51,9 @@ E os do Agente de IA (ver [`agente-ia/README.md`](agente-ia/README.md)):
 
 ```bash
 npm run prompt          # agente-ia/prompt.md → _shared/prompt-oficial.ts
-npm run agente:secrets  # sobe as chaves de agente-ia/.env.agente.local
-npm run agente:deploy   # regera o prompt e publica a função whatsapp
+npm run agente:secrets       # sobe as chaves de agente-ia/.env.agente.local
+npm run agente:deploy        # regera o prompt e publica a função whatsapp
+npm run agente:deploy-agenda # publica a função agenda (a API externa)
 ```
 
 > **Os dois últimos passam por [`agente-ia/publicar.mjs`](agente-ia/publicar.mjs)**,
@@ -1850,6 +1851,17 @@ Quatro coisas para não descobrir do jeito difícil:
    quebraria o fluxo justamente na hora de dar a notícia.
 4. **Toda resposta traz frase pronta**, inclusive 401 e 500, onde ela é neutra.
    Quem consome vai falar com um paciente; sem frase, o agente improvisa.
+
+   > ⚠️ **E o mapa `FRASES` precisa acompanhar toda regra nova.** Ele ficou
+   > para trás duas vezes: `exige_avaliacao` (`0018`) e
+   > `procedimento_desconhecido` (`0023`) entraram no SQL e não aqui, então o
+   > `?? MENSAGEM_GENERICA` respondia *"não consegui acessar a agenda agora"* —
+   > a frase de **servidor fora do ar** — para uma recusa de **negócio**. Quem
+   > integrava ia reiniciar máquina por causa do nome de um procedimento.
+   >
+   > **A Letícia nunca caiu nisso**, porque tem frase própria em
+   > `ferramentas.ts`. É sempre a porta de fora que fica para trás: mexeu numa
+   > função `agenda_*`, confira o mapa.
 
 A lógica pesada mora em funções SQL (`0004`), não no TypeScript: remarcar precisa
 ser atômico e o cruzamento entre jornada e consulta só é confiável com o

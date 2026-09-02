@@ -25,11 +25,18 @@ Cada parte abaixo diz de quem é a vez:
 | 👤 | **2. Os arquivos** | Você cola esses valores em 3 arquivos | ~5 min |
 | 🤖 | **3. A IDE trabalha** | Você cola uma frase. Ela faz o banco e publica | ~10 min |
 | 👤 | **4. Os cliques** | 4 coisas que só se fazem em painel de terceiro | ~15 min |
-| 👤 | **5. Conferir e encerrar** | O teste final, e revogar o que sobrou | ~10 min |
+| 👤 | **5. A cara da sua clínica** | Dentro do sistema: a clínica, os horários, os procedimentos | ~30 min |
+| 👤 | **6. Conferir e encerrar** | O teste final, e revogar o que sobrou | ~10 min |
 
-**Você pode parar na parte 3.** O sistema de gestão — agenda, CRM, pacientes,
-faturamento — funciona inteiro sem a Letícia. A partir da parte 4 é o
-atendimento automático no WhatsApp, e ele é opcional.
+**O que é opcional:** só o webhook (4.3) e a Vercel (4.4). Sem o webhook, o
+sistema de gestão — agenda, CRM, pacientes, faturamento — funciona inteiro, e a
+equipe atende o WhatsApp à mão pela tela Conversas. Sem a Vercel, ele roda na
+sua máquina com `npm run dev`.
+
+> ⚠️ **A parte 5 não é opcional, e é a que mais se esquece.** O banco nasce com
+> o catálogo de procedimentos da clínica que originou este sistema — e é
+> exatamente essa lista que a Letícia oferece ao paciente. Instalar sem fazer a
+> parte 5 deixa o sistema **funcionando e falando de outra clínica**.
 
 ---
 
@@ -111,7 +118,7 @@ Em [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/accoun
 > **Por que isto existe:** o comando `supabase login` abre o navegador e espera
 > alguém colar um código. A IA da IDE não consegue fazer esse passo. Com o
 > token num arquivo, ela aplica as migrações e publica as funções sozinha —
-> **é a única razão.** Na parte 5 ele é revogado.
+> **é a única razão.** Na parte 6 ele é revogado.
 
 ### 1.3. A chave da OpenAI
 
@@ -212,7 +219,7 @@ SUPABASE_PROJECT_REF=       ← 3️⃣ as 20 letras
 ```
 
 ⛔ **Este arquivo nasce para morrer.** Ele existe só durante a instalação, e é
-apagado na parte 5.
+apagado na parte 6.
 
 ### `agente-ia/.env.agente.local` — a Letícia
 
@@ -256,8 +263,8 @@ Os três arquivos de chave já estão preenchidos. Faça a parte 3:
 3. Confira o resultado com as consultas da seção 10 do DATABASE.md
    e me mostre os números.
 4. Rode `npm run agente:secrets` para subir as chaves.
-5. Publique as duas Edge Functions, as duas com --no-verify-jwt:
-   `npm run agente:deploy` e a função `agenda`.
+5. Publique as duas Edge Functions:
+   `npm run agente:deploy` e `npm run agente:deploy-agenda`.
 6. Rode `npm run build` para confirmar que a tela compila.
 
 No fim, me diga o que deu certo e o que ainda falta eu fazer à mão.
@@ -418,18 +425,158 @@ link, ou seja, na frente de outra pessoa.
 
 ---
 
-## Parte 5 — 👤 Conferir e encerrar
+## Parte 5 — 👤 A cara da sua clínica
+
+Agora você **entra no sistema** e faz dele o da sua clínica. Tudo aqui é pela
+tela: nenhum comando, nenhum SQL, nenhuma linha de código.
+
+> ### ⚠️ Faça esta parte inteira ANTES de ligar a Letícia
+>
+> Ela não inventa nada — ela **lê** o que está aqui. O endereço que ela informa,
+> o horário que ela anuncia, os tratamentos que ela oferece e o preço que ela
+> fala saem todos destas telas.
+>
+> Com a parte 5 pela metade, ela atende com a identidade da clínica que
+> originou este sistema, e o paciente não tem como saber.
+
+A ordem abaixo importa: cada passo aparece nos seguintes.
+
+### 5.1. Configurações → Clínica
+
+**menu do usuário → Configurações → aba Clínica.**
+
+| Campo | Vira o quê |
+|---|---|
+| **Nome da clínica** | O nome na barra lateral, e o que a Letícia diz |
+| **Endereço**, **bairro**, **cidade/UF**, **CEP** | A resposta de *"onde vocês ficam?"* |
+| **Link do Google Maps** | O que ela manda para quem pede como chegar |
+| **Instagram** e **site** | Ela cita quando fazem sentido |
+
+**O rodapé dessa aba mostra a prévia do que a Letícia vai falar.** Não é
+ilustração — é uma consulta de verdade ao que ela lê. Se a prévia estiver
+estranha, o paciente vai ouvir estranho.
+
+> **Campo vazio não vira frase.** Deixar o Instagram em branco faz a linha
+> sumir, o que é o certo. Preenchido pela metade é que dá problema.
+
+A **logo** fica nessa mesma tela. Ela aparece na barra lateral e no login.
+
+### 5.2. Configurações → Horários
+
+**A grade de atendimento, e o fuso horário.**
+
+O fuso vem no card **acima** da grade, e não é detalhe: ele decide em que hora
+uma consulta cai. A conferência é uma só — **o campo tem que bater com o
+relógio do computador da recepção.**
+
+> ⚠️ **Se discordarem, a Letícia e a recepção discordam exatamente naquelas
+> horas.** Com jornada das 8h às 18h, um deslocamento para trás joga a manhã
+> inteira para fora do expediente, e ela responde *"não tenho horário"* para
+> horário livre.
+
+> ⚠️ **Esta grade é o que a clínica ANUNCIA, não o que a agenda oferece.** Quem
+> manda na disponibilidade é a jornada de cada dentista (5.4). Anunciar até as
+> 18:00 sem nenhum dentista depois das 17:00 faz a Letícia prometer horário que
+> a própria agenda recusa em seguida.
+
+### 5.3. Procedimentos — **o passo que muda tudo**
+
+**menu lateral → Procedimentos.**
+
+> ### 🔴 Os 20 procedimentos que você vê ali não são seus
+>
+> Eles vieram nas migrações, e são o catálogo da clínica que originou este
+> sistema. **A Letícia recita essa lista para os seus pacientes** — e desde a
+> migração `0022` ela é um **vocabulário fechado**: é o único conjunto de nomes
+> que o sistema consegue gravar e agendar.
+>
+> Um tratamento que a sua clínica faz e não está nessa lista **não pode ser
+> marcado por ninguém** — nem pela Letícia, nem pela API — até você cadastrá-lo.
+
+O que fazer, em ordem:
+
+1. **Desligue o que a sua clínica não faz.** O botão de liga/desliga fica no
+   próprio card. Desligado, o procedimento some da boca da Letícia na mensagem
+   seguinte — sem deploy, sem editar prompt.
+2. **Cadastre o que falta.** É o passo que ninguém lembra, e o sintoma de
+   esquecer é a Letícia não conseguir marcar algo que está no cartaz da
+   recepção.
+3. **Revise as descrições**, no botão Editar de cada card. A curta é o que ela
+   fala no catálogo; a longa é o que ela responde a *"como funciona?"*.
+4. **Confira os preços e as durações.** O preço só é falado quando o
+   procedimento **não** passa pela avaliação — a caixa está no mesmo modal.
+
+> ⚠️ **Os textos longos que vieram são rascunho.** Foram escritos para outra
+> clínica e **precisam da revisão de um dentista** antes de irem para a boca de
+> um paciente.
+
+#### A avaliação vem marcada como GRATUITA
+
+Fora da grade de cards existe a **porta de entrada** — a Avaliação
+Odontológica, por onde quase todo tratamento passa antes.
+
+**Ela vem com o valor `0`, e zero não é campo em branco: zero faz a Letícia
+dizer que a avaliação é gratuita.** Foi uma decisão comercial da clínica de
+origem, e ela vai ser afirmada ao seu paciente na primeira conversa.
+
+| Se na sua clínica ela é… | Preencha |
+|---|---|
+| **gratuita** | deixe `0` |
+| **paga** | o valor — ela passa a dizer *"a partir de R$ X"* |
+| **combinada caso a caso** | deixe **vazio** — ela não fala valor nenhum |
+
+#### ⚠️ Desative, não exclua — depois que o sistema estiver em uso
+
+Enquanto o banco está vazio (agora), **excluir é seguro**.
+
+Depois que a Letícia atender alguém, não é mais: o nome do procedimento fica
+gravado na ficha de quem se interessou por ele, e o banco recusa salvar uma
+ficha que aponte para um procedimento que saiu do catálogo. O sintoma é cruel —
+*"algum procedimento escolhido não está mais no catálogo"* **sem nenhuma caixa
+marcada na tela para desmarcar**, e a ficha para de aceitar até correção de
+nome e de WhatsApp.
+
+> **Se acontecer, dá para sair sem SQL:** recrie o procedimento com o **mesmo
+> nome**, abra a ficha, desmarque, salve — e só então apague.
+
+**Desativar não tem esse problema**, e é reversível com um clique. É para isso
+que o botão existe.
+
+### 5.4. Profissionais
+
+**menu lateral → Profissionais.** Cadastre os dentistas de verdade.
+
+- **Não existe tela de "criar agenda".** Cadastrar o profissional já cria a
+  agenda dele — e a cor escolhida aqui é a cor dos blocos no calendário.
+- **A jornada de cada um é o que manda na disponibilidade.** É ela, e não a
+  grade de 5.2, que decide o horário que a Letícia oferece.
+
+### 5.5. Configurações → Perfil
+
+Seu nome e sua foto, que aparecem no rodapé da barra lateral.
+
+---
+
+## Parte 6 — 👤 Conferir e encerrar
 
 ### O teste de aceite
 
 | # | Faça | Esperado |
 |:-:|---|---|
 | 1 | Entrar com o usuário criado em 4.1 | Cai no Dashboard |
-| 2 | Cadastrar um profissional em **Profissionais** | A agenda dele nasce junto |
-| 3 | Abrir `/agenda` **digitando na barra de endereço** | Abre (é o teste do rewrite) |
-| 4 | Dar F5 dentro da ficha de um paciente | Continua na ficha |
-| 5 | **menu → Token e API**, criar o primeiro token | Os cURLs mostram a **sua** URL, não `undefined` |
-| 6 | **menu → Secretária de IA** | Conexão "Conectado", webhook apontado |
+| 2 | Abrir `/agenda` **digitando na barra de endereço** | Abre (é o teste do rewrite) |
+| 3 | Dar F5 dentro da ficha de um paciente | Continua na ficha |
+| 4 | **menu → Token e API**, criar o primeiro token | Os cURLs mostram a **sua** URL, não `undefined` |
+| 5 | **menu → Secretária de IA** | Conexão "Conectado", webhook apontado |
+
+**E o teste da parte 5 — o que diz se o sistema é o da SUA clínica:**
+
+| # | Faça | Esperado |
+|:-:|---|---|
+| 6 | **Configurações → Clínica**, olhe a prévia no rodapé | As frases falam da sua clínica, não de outra |
+| 7 | **Procedimentos** | Só os que a sua clínica faz estão ligados, e os seus estão lá |
+| 8 | Abra a **Avaliação Odontológica** | O valor é o seu (`0` = ela dirá "gratuita") |
+| 9 | **Agenda** | A grade da semana bate com a jornada dos seus dentistas |
 
 **Se você ligou a Letícia**, faça também o teste de fogo:
 
@@ -505,7 +652,7 @@ que mora o número esperado.
 
 É o token, não o código. Confira se `.supabase-token.local` existe e se as duas
 linhas estão preenchidas — `SUPABASE_ACCESS_TOKEN` e `SUPABASE_PROJECT_REF`.
-Se o token já foi revogado (parte 5), gere outro.
+Se o token já foi revogado (parte 6), gere outro.
 </details>
 
 <details>
@@ -553,6 +700,7 @@ sempre o mesmo resultado.
 | **Adaptar o prompt para a sua clínica** | [`agente-ia/GUIA-DO-PROMPT.md`](agente-ia/GUIA-DO-PROMPT.md) |
 | Integrar outro sistema à agenda | [`API_AGENTE.md`](API_AGENTE.md) |
 
-**O primeiro lugar para ir depois de entrar** é **Configurações → Clínica**: o
-endereço, o horário e o fuso. Não é enfeite — é o que a Letícia fala com o
-paciente, e o fuso é o que decide em que hora a consulta cai.
+> **Não pulou a [parte 5](#parte-5--a-cara-da-sua-clínica), pulou?** É a que
+> transforma "o sistema instalou" em "o sistema é da minha clínica". Um sistema
+> no ar com o catálogo de outra clínica funciona perfeitamente — e fala coisa
+> errada para o seu paciente, sem nada na tela indicando isso.
