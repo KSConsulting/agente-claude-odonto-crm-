@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, Download, FileText, Users, UserCheck, UserPlus, X, ArrowRight, CalendarPlus } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Search, Download, FileText, Users, UserCheck, UserPlus, X, ArrowRight, CalendarPlus, Filter } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from '../lib/supabase'
@@ -585,10 +585,47 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
 
   const [allLeads, setAllLeads] = useState<LeadClinica[]>([])
   const [loading, setLoading] = useState(true)
-  const [period, setPeriod] = useState<PeriodKey>('this_month')
-  const [customRange, setCustomRange] = useState<DateRange>({ start: new Date(), end: new Date() })
+
+  /* O FILTRO POR ETAPA VEM DA URL, e não de um estado solto.
+
+     Quem chega aqui pelo "+ N outros" de uma coluna do CRM chega com
+     `?etapa=follow_up_2_feito&periodo=all`. Guardar isso na URL é o que faz o
+     link funcionar, o F5 preservar o recorte, e o "voltar" do navegador
+     desfazer o filtro sem precisar de um botão para isso.
+
+     ⚠️ O PERÍODO TAMBÉM VEM DE LÁ. Sem isso o CRM prometeria "+312 outros" e
+     esta tela abriria no padrão dela ("Este mês"), mostrando 40 — o número da
+     tela anterior viraria mentira no clique. */
+  const [params, setParams] = useSearchParams()
+  const etapa = params.get('etapa') as LeadStatus | null
+
+  const [period, setPeriod] = useState<PeriodKey>(
+    () => (params.get('periodo') as PeriodKey | null) ?? 'this_month',
+  )
+  const [customRange, setCustomRange] = useState<DateRange>(() => {
+    const de = params.get('de')
+    const ate = params.get('ate')
+    return de && ate
+      ? { start: new Date(de), end: new Date(ate) }
+      : { start: new Date(), end: new Date() }
+  })
   const [search, setSearch] = useState('')
   const [showNewLead, setShowNewLead] = useState(false)
+
+  /* Limpar a etapa tira só ela da URL — o período escolhido continua valendo,
+     que é o que a pessoa esperaria de um "✕" na etiqueta da etapa. */
+  const limparEtapa = () => {
+    const novo = new URLSearchParams(params)
+    novo.delete('etapa')
+    setParams(novo, { replace: true })
+  }
+
+  /* A etapa pedida pertence a esta página? "Consulta Realizada" e "Paciente
+     Recorrente" moram em Pacientes; o resto, em Contatos. O CRM já manda para
+     o lugar certo — isto cobre a URL digitada à mão, que sem aviso daria uma
+     lista vazia sem explicação. */
+  const etapaEhDaqui = etapa === null
+    || (mode === 'clientes' ? isPaciente(etapa) : !isPaciente(etapa))
 
   // Extraído para poder ser chamado de novo depois de uma baixa de consulta:
   // confirmar que a pessoa compareceu MUDA ELA DE TELA (vira Paciente), e a
@@ -625,9 +662,9 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
     )
   })
 
-  const displayed = searched.filter((l) =>
-    mode === 'clientes' ? isPaciente(l.status) : !isPaciente(l.status)
-  )
+  const displayed = searched
+    .filter((l) => (mode === 'clientes' ? isPaciente(l.status) : !isPaciente(l.status)))
+    .filter((l) => (etapa ? l.status === etapa : true))
 
   /* ── Export CSV ── */
   const exportCSV = () => {
@@ -740,14 +777,65 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
       </div>
 
       {/* Period filter */}
-      <div className="fade-in-2" style={{ marginBottom: 20 }}>
+      <div className="fade-in-2" style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
         <FiltroPeriodo
           periodo={period}
           onPeriodo={setPeriod}
           faixa={customRange}
           onFaixa={setCustomRange}
         />
+
+        {/* A ETAPA APARECE COMO ETIQUETA, e não como mais uma lista suspensa.
+
+            Ela não é um filtro que se escolhe aqui: é um recorte que veio de
+            outra tela. Etiqueta com "✕" diz as duas coisas de uma vez — o que
+            está valendo, e como sair. Uma lista com "Todas as etapas" ocuparia
+            espaço permanente por algo que quase nunca é escolhido daqui. */}
+        {etapa && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: '#EAF3F6', border: '1px solid #C6D6DC', borderRadius: 10,
+            padding: '7px 10px 7px 12px', fontSize: 13, fontWeight: 600, color: '#1E6E8C',
+          }}>
+            <Filter size={13} />
+            {STATUS_LABELS[etapa] ?? etapa}
+            <button
+              onClick={limparEtapa}
+              title="Tirar o filtro de etapa"
+              style={{
+                display: 'flex', alignItems: 'center', background: 'none', border: 'none',
+                padding: 2, borderRadius: 5, cursor: 'pointer', color: '#1E6E8C',
+              }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Etapa que não é desta página: acontece com URL digitada à mão. Sem
+          esta linha o resultado seria uma lista vazia sem motivo aparente. */}
+      {!etapaEhDaqui && etapa && (
+        <div className="fade-in-2" style={{
+          marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10,
+          padding: '10px 13px', fontSize: 12.5, color: '#B45309',
+        }}>
+          <span>
+            <strong>{STATUS_LABELS[etapa] ?? etapa}</strong> não aparece nesta página.
+          </span>
+          <button
+            onClick={() => navigate(`${cfg.outraPagina.rota}?${new URLSearchParams({ etapa, periodo: period })}`)}
+            style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              fontSize: 12.5, fontWeight: 700, color: '#1E6E8C',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+            }}
+          >
+            Ver em {cfg.outraPagina.label.replace('Ver ', '')} →
+          </button>
+        </div>
+      )}
 
       {/* Search + Export */}
       <div className="fade-in-3" style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>

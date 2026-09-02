@@ -1,7 +1,7 @@
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { CalendarRange } from 'lucide-react'
 import {
-  PERIODOS_FIXOS, endOfDay,
+  periodosFixos, endOfDay,
   type DateRange, type PeriodKey,
 } from '../lib/periodo'
 
@@ -44,6 +44,11 @@ const paraInput = (d: Date) => d.toISOString().split('T')[0]
 export default function FiltroPeriodo({ periodo, onPeriodo, faixa, onFaixa }: Props) {
   const personalizado = periodo === 'custom'
 
+  /* A lista tem três meses fechados no meio (Julho, Junho, Maio), e por isso
+     depende de que dia é hoje. Ler o relógio direto na renderização é impuro —
+     o inicializador do `useState` roda uma vez e resolve. */
+  const [opcoes] = useState(() => periodosFixos())
+
   const campoData: CSSProperties = {
     border: 'none', outline: 'none', fontSize: 13, fontFamily: FONTE,
     color: '#16232B', cursor: 'pointer', background: 'transparent',
@@ -65,7 +70,7 @@ export default function FiltroPeriodo({ periodo, onPeriodo, faixa, onFaixa }: Pr
         {/* Só existe enquanto o modo personalizado está ligado, e é inerte:
             serve para a lista não afirmar um período que não está valendo. */}
         {personalizado && <option value="" disabled>Período personalizado</option>}
-        {PERIODOS_FIXOS.map(({ chave, rotulo }) => (
+        {opcoes.map(({ chave, rotulo }) => (
           <option key={chave} value={chave}>{rotulo}</option>
         ))}
       </select>

@@ -17,9 +17,43 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
-import { Copy, Check, GripVertical, Inbox } from 'lucide-react'
+import { Copy, Check, GripVertical, Inbox, ArrowRight, TriangleAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { isPaciente } from '../lib/pessoas'
+import FiltroPeriodo from '../components/FiltroPeriodo'
+import { getPeriodRange, inRange, type DateRange, type PeriodKey } from '../lib/periodo'
 import type { LeadClinica, LeadStatus } from '../types'
+
+/**
+ * Quantos cards cada coluna desenha. O resto vira "+ N outros", com link.
+ *
+ * ── POR QUE UM TETO, E POR QUE ELE NÃO É PERDA ─────────────────────────────
+ *
+ * Cada card é um alvo de arrastar, e o `closestCorners` compara a posição do
+ * card na mão com a de **todos** os alvos registrados a cada movimento do
+ * mouse. O custo cresce junto com o número de cards, e quem sente é quem
+ * arrasta — não quem abre a página.
+ *
+ * Mas o motivo principal não é desempenho: **uma coluna com 300 cards já é
+ * inútil como interface.** Ninguém rola 300 cards procurando alguém. A coluna
+ * serve para ver quantos estão em cada etapa (o número no cabeçalho, que
+ * continua sendo o total de verdade) e mexer nos mais recentes. Procurar
+ * alguém é trabalho da lista, que tem busca.
+ *
+ * ⚠️ **O filtro de período NÃO substitui isto.** Ele é escolha de quem usa, e
+ * o padrão desta tela é "Todo o período" — sem o teto, o padrão seria o pior
+ * caso.
+ */
+const TETO_POR_COLUNA = 50
+
+/**
+ * O limite que o servidor impõe por conta própria (`max_rows`, hoje 1000).
+ *
+ * Não é uma escolha nossa: pedir "todos os leads" devolve no máximo isso, e
+ * **sem avisar** — nem erro, nem marcação, nada. A tela compara o que chegou
+ * com a contagem de verdade e diz quando estiver vendo um pedaço.
+ */
+const TETO_DO_SERVIDOR = 1000
 
 /* ──────────────────────────────────────────────
    Column config
@@ -68,6 +102,35 @@ const COLUMNS: ColumnConfig[] = [
 ]
 
 const STATUS_MAP = Object.fromEntries(COLUMNS.map((c) => [c.status, c])) as Record<LeadStatus, ColumnConfig>
+
+/**
+ * Para onde o "+ N outros" de uma coluna leva.
+ *
+ * ── POR QUE A LISTA, E NÃO UM SEGUNDO EXPORTADOR AQUI ──────────────────────
+ *
+ * Contatos e Pacientes já são essa lista: têm busca por nome e telefone, e os
+ * botões de exportar CSV e PDF — que já respeitam os filtros ligados. O que
+ * faltava era poder perguntar "quem está em Follow-up 2?", e isso passou a
+ * existir lá (`?etapa=`). Escrever um exportador próprio no CRM seria uma
+ * segunda cópia da mesma coisa, para responder pior.
+ *
+ * ⚠️ **O período viaja junto na URL.** Sem isso o CRM prometeria "+312 outros"
+ * e a lista abriria no padrão dela ("Este mês"), mostrando 40 — o número da
+ * tela anterior viraria mentira no clique.
+ *
+ * E o destino muda com a etapa: "Consulta Realizada" e "Paciente Recorrente"
+ * moram em Pacientes, não em Contatos. Quem sabe disso é `isPaciente()`, a
+ * mesma regra que decide o "voltar" da ficha.
+ */
+function linkDaEtapa(status: LeadStatus, periodo: PeriodKey, faixa: DateRange): string {
+  const base = isPaciente(status) ? '/clientes' : '/leads'
+  const p = new URLSearchParams({ etapa: status, periodo })
+  if (periodo === 'custom') {
+    p.set('de', faixa.start.toISOString())
+    p.set('ate', faixa.end.toISOString())
+  }
+  return `${base}?${p.toString()}`
+}
 
 /* ──────────────────────────────────────────────
    Helpers
@@ -217,10 +280,17 @@ interface KanbanColumnProps {
   cfg: ColumnConfig
   leads: LeadClinica[]
   isDraggingOver: boolean
+  /** Para onde o "+ N outros" leva: a lista, já filtrada nesta etapa. */
+  verTodos: string
 }
 
-function KanbanColumn({ cfg, leads, isDraggingOver }: KanbanColumnProps) {
+function KanbanColumn({ cfg, leads, isDraggingOver, verTodos }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id: cfg.status })
+  const navigate = useNavigate()
+
+  // O que a coluna desenha, e o que ficou de fora.
+  const visiveis = leads.slice(0, TETO_POR_COLUNA)
+  const escondidos = leads.length - visiveis.length
 
   return (
     <div
@@ -271,11 +341,35 @@ function KanbanColumn({ cfg, leads, isDraggingOver }: KanbanColumnProps) {
           minHeight: 80,
         }}
       >
-        <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-          {leads.map((lead) => (
+        {/* A lista do SortableContext tem que ser EXATAMENTE a que está na
+            tela: registrar como arrastável um card que não foi desenhado faz o
+            dnd-kit medir um elemento que não existe. */}
+        <SortableContext items={visiveis.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+          {visiveis.map((lead) => (
             <LeadCard key={lead.id} lead={lead} />
           ))}
         </SortableContext>
+
+        {/* "+ N outros" — e ele é um caminho, não um aviso de que falta coisa.
+            Leva para a lista já filtrada nesta etapa, onde há busca e os
+            botões de exportar. O número do cabeçalho continua sendo o total. */}
+        {escondidos > 0 && (
+          <button
+            onClick={() => navigate(verTodos)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              width: '100%', padding: '9px 10px', borderRadius: 9,
+              border: '1px dashed #C6D6DC', background: '#fff', cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, color: '#1E6E8C',
+              fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0,
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#EAF3F6'; e.currentTarget.style.borderColor = '#4C90A8' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#C6D6DC' }}
+          >
+            + {escondidos} {escondidos === 1 ? 'outro' : 'outros'} <ArrowRight size={13} />
+          </button>
+        )}
 
         {leads.length === 0 && (
           <div style={{
@@ -307,17 +401,47 @@ export default function CRM() {
   const [overId, setOverId] = useState<LeadStatus | null>(null)
   const dragStartColumnRef = useRef<LeadStatus | null>(null)
 
+  /* O PADRÃO AQUI É "TODO O PERÍODO", E NÃO "ESTE MÊS" COMO NAS OUTRAS TELAS.
+
+     Dashboard, Contatos e Pacientes são relatório: recortar um mês é a
+     pergunta normal. O CRM é quadro de trabalho — e um lead que chegou em
+     junho e ainda está em "Follow-up 2" é exatamente quem precisa ser
+     lembrado. Abrir escondendo essa pessoa seria esconder o trabalho.
+
+     Isto só é seguro por causa do TETO_POR_COLUNA: sem ele, o padrão seria o
+     pior caso possível para o desempenho. */
+  const [periodo, setPeriodo] = useState<PeriodKey>('all')
+  const [faixa, setFaixa] = useState<DateRange>(() => ({ start: new Date(), end: new Date() }))
+  /** Quantos existem no banco no período — para saber se o que veio é tudo. */
+  const [totalNoBanco, setTotalNoBanco] = useState(0)
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
-  /* Load leads */
+  /* Load leads
+
+     O RECORTE VAI NA CONSULTA, e não só na memória. As outras telas trazem
+     tudo e filtram depois — aqui isso seria trazer o ano inteiro para desenhar
+     uma semana. E `order` explícito não é enfeite: quando o servidor corta em
+     `max_rows`, é ele que decide QUAIS sobram. Sem ordem, sobram linhas
+     arbitrárias; com ela, sobram as mais recentes. */
   useEffect(() => {
-    supabase.from('crm_clinica').select('*').then(({ data }) => {
-      setLeads(data ?? [])
-      setLoading(false)
-    })
-  }, [])
+    let vivo = true
+    const range = getPeriodRange(periodo, faixa)
+    supabase.from('crm_clinica')
+      .select('*', { count: 'exact' })
+      .gte('created_at', range.start.toISOString())
+      .lte('created_at', range.end.toISOString())
+      .order('created_at', { ascending: false })
+      .then(({ data, count }) => {
+        if (!vivo) return
+        setLeads(data ?? [])
+        setTotalNoBanco(count ?? 0)
+        setLoading(false)
+      })
+    return () => { vivo = false }
+  }, [periodo, faixa])
 
   /* Supabase Realtime */
   useEffect(() => {
@@ -333,7 +457,11 @@ export default function CRM() {
               prev.map((l) => l.id === payload.new.id ? { ...l, ...payload.new } as LeadClinica : l)
             )
           } else if (payload.eventType === 'INSERT') {
-            setLeads((prev) => [...prev, payload.new as LeadClinica])
+            // O recorte vale também para quem chega agora: olhando "Junho", um
+            // lead criado neste instante não pertence à tela.
+            const novo = payload.new as LeadClinica
+            if (!inRange(novo.created_at, getPeriodRange(periodo, faixa))) return
+            setLeads((prev) => [novo, ...prev])
           } else if (payload.eventType === 'DELETE') {
             setLeads((prev) => prev.filter((l) => l.id !== payload.old.id))
           }
@@ -342,7 +470,7 @@ export default function CRM() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [periodo, faixa])
 
   /* Derived: leads grouped by status */
   const grouped = Object.fromEntries(
@@ -402,10 +530,17 @@ export default function CRM() {
 
     if (lead.status === targetStatus) return
 
-    // Optimistic update
-    setLeads((prev) =>
-      prev.map((l) => l.id === leadId ? { ...l, status: targetStatus } : l)
-    )
+    /* Optimistic update — E O CARD VAI PARA O TOPO DA LISTA.
+
+       A ordem da lista é a ordem dentro da coluna, e a lista vem por
+       `created_at` decrescente. Só trocar o status colocaria um lead antigo na
+       posição 150 da coluna de destino — atrás do teto de 50, ou seja, ele
+       **sumiria da tela** logo depois de você soltá-lo. Indo para o topo, o
+       card aparece onde a mão o deixou. */
+    setLeads((prev) => [
+      { ...lead, status: targetStatus },
+      ...prev.filter((l) => l.id !== leadId),
+    ])
 
     // Persist to Supabase
     const { error } = await supabase
@@ -414,7 +549,8 @@ export default function CRM() {
       .eq('id', leadId)
 
     if (error) {
-      // Rollback
+      // Rollback: só o status volta. A posição no topo fica, e é o certo — o
+      // card precisa continuar visível para a pessoa ver que ele não andou.
       setLeads((prev) =>
         prev.map((l) => l.id === leadId ? { ...l, status: lead.status } : l)
       )
@@ -445,6 +581,38 @@ export default function CRM() {
             </p>
           </div>
         </div>
+
+        {/* O recorte é por QUANDO O LEAD CHEGOU (`created_at`), igual às outras
+            três telas. É a leitura de funil: "dos que entraram em agosto, onde
+            eles estão agora?". */}
+        <div className="fade-in-2" style={{ marginTop: 18 }}>
+          <FiltroPeriodo
+            periodo={periodo}
+            onPeriodo={setPeriodo}
+            faixa={faixa}
+            onFaixa={setFaixa}
+          />
+        </div>
+
+        {/* O TETO DO SERVIDOR, DITO EM VOZ ALTA.
+
+            Ele corta em silêncio: sem erro, sem marcação, sem nada. A tela
+            compara o que chegou com a contagem de verdade — e prefere um aviso
+            feio a um quadro que esconde gente sem avisar. */}
+        {totalNoBanco > leads.length && (
+          <div style={{
+            marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 8,
+            background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10,
+            padding: '10px 13px', fontSize: 12.5, color: '#B45309', lineHeight: 1.55,
+          }}>
+            <TriangleAlert size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>
+              Mostrando os <strong>{leads.length}</strong> mais recentes de{' '}
+              <strong>{totalNoBanco}</strong> — o servidor não entrega mais de{' '}
+              {TETO_DO_SERVIDOR} de uma vez. Escolha um período menor para ver o resto.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Kanban board */}
@@ -463,6 +631,7 @@ export default function CRM() {
                 cfg={cfg}
                 leads={grouped[cfg.status]}
                 isDraggingOver={overId === cfg.status}
+                verTodos={linkDaEtapa(cfg.status, periodo, faixa)}
               />
             ))}
           </div>

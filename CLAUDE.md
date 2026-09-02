@@ -243,7 +243,7 @@ src/
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
     ├── Dashboard.tsx           métricas, gráficos, próximas consultas
-    ├── CRM.tsx                 Kanban do funil (drag and drop)
+    ├── CRM.tsx                 Kanban do funil (drag and drop, teto por coluna)
     ├── Conversas.tsx           o WhatsApp da clínica, em duas colunas
     ├── Agenda.tsx              calendário de todas as agendas + filtros
     ├── Profissionais.tsx       dentistas: nome, cor e jornada
@@ -346,6 +346,10 @@ diferentes:
   API não é quem atende o telefone. Enterrar as duas numa aba de Configurações
   escondia demais; deixar na barra lateral atrapalharia quem passa o dia na
   Agenda.
+
+> `/leads` e `/clientes` aceitam **`?etapa=` e `?periodo=`** na URL — e é por
+> onde o "+ N outros" de uma coluna do CRM chega, com a etapa e o recorte
+> juntos. O `?de=` e `?ate=` acompanham quando o período é personalizado.
 
 > `/leads/:id` atende **tanto leads quanto pacientes** — é a mesma entidade. O
 > botão "voltar" da tela de detalhe decide o destino pelo status, para não jogar
@@ -677,11 +681,15 @@ Letícia marca para o paciente.
 
 ### O filtro de período: uma lista, e um botão ao lado
 
-Dashboard, Leads e Pacientes recortam o mesmo período — agora com o mesmo
+Dashboard, CRM, Leads e Pacientes recortam o mesmo período — com o mesmo
 componente ([`FiltroPeriodo.tsx`](src/components/FiltroPeriodo.tsx)) sobre a
-mesma regra ([`src/lib/periodo.ts`](src/lib/periodo.ts)). As duas páginas
-tinham `getPeriodRange` copiada palavra por palavra, e já com formatação
-diferente uma da outra — que é como duas cópias começam a divergir.
+mesma regra ([`src/lib/periodo.ts`](src/lib/periodo.ts)). Duas páginas tinham
+`getPeriodRange` copiada palavra por palavra, e já com formatação diferente uma
+da outra — que é como duas cópias começam a divergir.
+
+Todas recortam por **`created_at`**: *quando a pessoa chegou*. É a leitura de
+funil — "dos que entraram em agosto, onde eles estão agora?" —, e não "quem se
+mexeu em agosto".
 
 Eram **nove pílulas** numa faixa que quebrava em duas linhas em tela estreita e
 empurrava a página para baixo. Nove opções lado a lado também não têm
@@ -698,6 +706,99 @@ de data — e as datas são a resposta.
 > ("Período personalizado") em vez de afirmar "Este mês" com outro recorte
 > valendo. **Escolher qualquer período nela desliga o modo** — é o caminho de
 > volta, sem precisar de um segundo botão para isso.
+
+#### Três meses fechados no meio, e "Todo o período" no fim
+
+A lista deixou de ser constante e virou `periodosFixos()`, **porque três dos
+itens dependem de que dia é hoje**: *Julho*, *Junho*, *Maio* — os três meses
+anteriores ao "Mês passado". Como constante, seriam montados uma vez quando o
+módulo carrega e ficariam **presos no mês em que a aba foi aberta**.
+
+| Detalhe | Por quê |
+|---|---|
+| A chave é `month:AAAA-MM`, e não "dois meses atrás" | Guardada numa URL ou num estado, uma chave relativa apontaria para outro mês no dia seguinte |
+| O ano só aparece quando não é o corrente | Em janeiro, "Novembro" pelado ao lado de "Este ano" faz pensar que é novembro deste ano |
+| `'all'` devolve uma faixa começando na origem do tempo | E não um "sem filtro": assim toda tela continua tendo **sempre** uma faixa, e nenhuma precisa de um caminho especial para "não filtrar" |
+
+> ⚠️ **`periodosFixos()` lê o relógio, então não pode ser chamada durante a
+> renderização** — o `react-hooks/purity` reprova, com razão. Use
+> `useState(() => periodosFixos())`.
+
+#### O padrão do CRM é outro, de propósito
+
+Dashboard, Contatos e Pacientes abrem em **"Este mês"**. O CRM abre em **"Todo
+o período"**.
+
+Os três primeiros são relatório: recortar um mês é a pergunta normal. O CRM é
+**quadro de trabalho** — e um lead que chegou em junho e ainda está em
+"Follow-up 2" é exatamente quem precisa ser lembrado. Abrir escondendo essa
+pessoa seria esconder o trabalho.
+
+Isso só é seguro por causa do teto por coluna, logo abaixo.
+
+### O CRM tem teto por coluna, e o resto é um caminho
+
+Uma coluna do Kanban desenha no máximo **50 cards** (`TETO_POR_COLUNA`, em
+[`CRM.tsx`](src/pages/CRM.tsx)). O que sobra vira um rodapé clicável:
+`+ 312 outros`.
+
+**O motivo principal não é desempenho — é que uma coluna com 300 cards já é
+inútil.** Ninguém rola 300 cards procurando alguém. A coluna serve para ver
+quantos estão em cada etapa (o número do cabeçalho continua sendo o **total**,
+não o desenhado) e mexer nos mais recentes. Procurar é trabalho da lista, que
+tem busca.
+
+O desempenho vem junto, e é real: cada card é um alvo de arrastar, e o
+`closestCorners` compara a posição do card na mão com a de **todos** os alvos
+registrados a cada movimento do mouse. Quem sente é quem arrasta, não quem
+abre.
+
+> ⚠️ **O filtro de período NÃO substitui o teto.** Filtro é escolha de quem
+> usa, e o padrão desta tela é "Todo o período": sem o teto, o padrão seria o
+> pior caso.
+
+**O "+ N outros" leva para a lista, e não abre um exportador aqui.** Contatos e
+Pacientes já são essa lista — com busca por nome e telefone e os botões de
+exportar CSV e PDF, que já respeitam os filtros ligados. O que faltava era
+poder perguntar *"quem está em Follow-up 2?"*, e isso passou a existir lá:
+
+```
+/leads?etapa=follow_up_2_feito&periodo=all
+```
+
+| Detalhe | Por quê |
+|---|---|
+| **O período viaja na URL junto com a etapa** | Sem isso o CRM prometeria "+312 outros" e a lista abriria no padrão dela ("Este mês") mostrando 40 — o número da tela anterior viraria mentira no clique |
+| **O destino muda com a etapa** | "Consulta Realizada" e "Paciente Recorrente" moram em **Pacientes**. Quem sabe disso é `isPaciente()`, a mesma regra do "voltar" da ficha |
+| **A etapa vira etiqueta com "✕", não uma lista suspensa** | Ela não é escolhida ali: é um recorte que veio de outra tela. A etiqueta diz o que está valendo e como sair, de uma vez — e não cobra espaço permanente por algo quase nunca escolhido dali |
+| **Etapa que não é daquela página tem aviso** | Acontece com URL digitada à mão. Sem a linha, o resultado seria uma lista vazia sem motivo aparente |
+
+**O card arrastado vai para o TOPO da lista.** A ordem da lista é a ordem
+dentro da coluna, e ela vem por `created_at` decrescente — só trocar o status
+colocaria um lead antigo na posição 150 da coluna de destino, ou seja, **atrás
+do teto**: ele sumiria da tela logo depois de você soltá-lo.
+
+### O teto de 1000 do servidor, dito em voz alta
+
+`max_rows` do projeto é **1000**. Pedir "todos os leads" devolve no máximo isso
+— **sem erro, sem marcação, sem nada**. No lead 1001 a tela mostra menos gente
+e ninguém fica sabendo.
+
+O CRM pede `count: 'exact'` junto com as linhas: o `Content-Range` traz o total
+de verdade mesmo quando as linhas são cortadas. Se o total for maior que o que
+chegou, uma faixa âmbar diz *"mostrando os 1000 mais recentes de 1240"*. Não
+sobe o teto; troca um erro invisível por um aviso.
+
+> **E o `order` explícito deixou de ser enfeite.** Quando o servidor corta, é
+> ele que decide **quais** sobram. Sem ordem, sobram linhas arbitrárias; com
+> `created_at` decrescente, sobram as mais recentes — que é a única resposta
+> defensável.
+
+> ⚠️ **O Dashboard tem o mesmo teto e ainda não foi tratado.** Lá é pior: as
+> contas ficam **erradas**, não incompletas. E o conserto é de outro tipo —
+> contar no banco (`count`) em vez de trazer as linhas e contar na tela. É
+> tarefa própria, e mexer nisso de raspão é a melhor forma de não perceber um
+> número errado.
 
 ### Procedimento é vocabulário fechado, em toda porta
 
