@@ -220,39 +220,52 @@ Cada linha traz o nome e a descrição. Algumas trazem mais, e é isso que manda
 
 ### O resumo
 
--   É a história do atendimento **contada do lado do paciente**. Quem vai ler é
-    a recepção, para entender o caso em dez segundos sem abrir a conversa.
--   **Escreva o que ELE disse, não o que você respondeu.** O que você falou já
-    está na conversa; o resumo existe para o que veio dele.
--   **Uma linha por ideia**, e cada linha começa com `- `. Nunca um parágrafo
-    corrido.
--   **O tamanho acompanha a conversa**, e isto é uma conta, não um gosto:
+-   É a **história do atendimento**, contada como se você estivesse explicando
+    o caso para uma colega que vai assumir. Quem lê é a recepção, e ela quer
+    entender em dez segundos sem abrir a conversa.
+-   **Texto corrido, na ordem em que as coisas aconteceram.** Nada de lista,
+    nada de tópicos, nada de linhas soltas — parágrafo, como se escreve para
+    uma pessoa.
+-   **Fale do paciente na terceira pessoa**, e use o nome dele assim que souber:
+    *"Rogério procurou a clínica porque…"*. Enquanto não souber, escreva "o
+    paciente" — e troque pelo nome na primeira vez que reescrever depois de
+    saber.
+-   **Conte o que realmente aconteceu, na ordem.** O resumo não pode contradizer
+    a conversa: se ele remarcou, o resumo diz o horário novo; se você não
+    conseguiu marcar, o resumo não diz que está marcado.
 
-    | A conversa tem | O resumo tem |
-    |---|---|
-    | até 4 mensagens | 1 a 2 linhas |
-    | 5 a 10 mensagens | 3 a 5 linhas |
-    | mais de 10 mensagens | **no mínimo 5 linhas**, e até 10 |
+O que entra, quando houver:
 
--   ⚠️ **O limite de 50 palavras é da sua RESPOSTA, não do resumo.** Aqui você
-    escreve o quanto a conversa pedir. Resumo espremido joga fora justamente o
-    que ninguém vai reler depois.
--   Cubra, quando houver: o que procura, por que agora, o que já fez antes, o
-    que o preocupa, restrição de horário ou de dinheiro, o que ele decidiu, e
-    em que pé ficou.
--   É **reescrito inteiro** a cada vez, não acrescentado. Escreva sempre a
-    versão atual da história completa — inclusive o que já estava lá.
+-   O que ele procura, e por que agora.
+-   O que ele contou de si: o que já fez, o que o incomoda, o que o preocupa.
+-   O que ele mandou (foto, áudio) e o que perguntou.
+-   Restrição de horário, de dinheiro, medo, objeção.
+-   O que ficou decidido, e em que pé está.
+
+-   **O tamanho acompanha a conversa.** Duas mensagens pedem uma frase. Numa
+    conversa com **mais de 10 mensagens, nunca escreva menos de 4 frases** —
+    abaixo disso você está jogando fora metade do que aconteceu. Trinta
+    mensagens pedem de quatro a seis. Não invente conteúdo para encher, e não
+    espreme o que aconteceu de verdade.
+-   ⚠️ **O limite de 50 palavras é da sua RESPOSTA ao paciente, não do resumo.**
+-   É **reescrito inteiro** a cada vez, não acrescentado — sempre a versão atual
+    da história completa, do começo até agora.
 
 Exemplo, para uma conversa de trinta mensagens:
 
-```
-- Procura lentes de contato, quer o sorriso mais bonito.
-- Mandou foto do próprio sorriso; incomodado com os espaços entre os dentes da frente.
-- Pediu opinião sobre lente ou clareamento, e insistiu depois de eu explicar que quem indica é o dentista.
-- Perguntou o endereço da clínica e quanto custa a avaliação.
-- Escolheu meio-dia, e meia hora depois pediu para remarcar para as 15h por causa de um compromisso.
-- Avaliação marcada para 02/09 às 15h, com o Dr. Alexandre.
-```
+> Rogério Cardoso procurou a clínica interessado em lentes de contato, porque
+> não gosta dos espaços entre os dentes da frente. Mandou uma foto do próprio
+> sorriso e insistiu para saber a minha opinião entre lente e clareamento;
+> expliquei que quem indica é o dentista. Perguntou o endereço e quanto custa a
+> avaliação. Aceitou marcar, escolheu o meio-dia e logo depois pediu para
+> remarcar por causa de um compromisso. Avaliação marcada para 02/09 às 15h,
+> com o Dr. Alexandre.
+
+E o mesmo caso, quando ele ainda não tinha dito o nome:
+
+> O paciente procurou a clínica interessado em lentes de contato, porque não
+> gosta dos espaços entre os dentes da frente. Mandou uma foto do próprio
+> sorriso e pediu a minha opinião sobre o que fazer. Ainda não agendou.
 
 -   Grave também o que **atrapalha**: medo, objeção, restrição de horário. É o que evita repetir uma oferta que já foi recusada.
 

@@ -1026,23 +1026,44 @@ frases"*. O modelo obedeceu.
 
 | Antes | Agora |
 |---|---|
-| "Resumo curto do que foi conversado" | Uma tabela de tamanho: acima de 10 mensagens, **no mínimo 5 linhas** |
-| Sem dizer de quem é a história | **Do lado do paciente** — o que ele disse, não o que ela respondeu |
-| Sem formato | Uma linha por ideia, cada uma começando com `- ` |
+| "Resumo curto do que foi conversado" | Com mais de 10 mensagens, **nunca menos de 4 frases** |
+| Sem dizer de quem é a história | **Do paciente, na terceira pessoa**, pelo nome assim que souber |
+| Sem formato | **Texto corrido, na ordem em que as coisas aconteceram** |
+| Sem exigência de fidelidade | **Não pode contradizer a conversa** — se a remarcação falhou, o resumo não diz que foi feita |
 
 > ⚠️ **A regra das 50 palavras estava vazando.** `# REGRAS INEGOCIÁVEIS` dizia
 > *"Máximo de 50 palavras"* pensando na resposta ao paciente, e o modelo
 > aplicava também ao resumo. Agora ela diz **na RESPOSTA ao paciente**, e a
 > seção do resumo repete que ele não entra nessa conta.
 
-> **E a quebra de linha virou determinística.** Às vezes o modelo escreve os
-> marcadores certos na mesma linha (`- quer lente. - pediu 15h. - marcou`).
-> É o mesmo conteúdo sem a quebra — recusar seria perder a memória por um
-> caractere. `arrumarResumo()` quebra em ` - ` **precedido de pontuação**, para
-> não partir "pós-operatório" nem um travessão.
+#### Por que narrativa, e não tópicos
 
-Medido com a conversa real, contra o `gpt-4.1-mini`: o resumo passou de 1 para
-5 linhas, do ponto de vista do paciente, e o nome voltou a ser gravado.
+A primeira versão pedia uma linha por ideia, começando com `- `. Funcionou, e
+foi trocada de propósito: **quem lê é uma pessoa**, e a ficha do lead é o lugar
+onde a recepção descobre o caso antes de atender. Lista responde *"o que foi
+falado"*; narrativa responde *"o que aconteceu"* — com a ordem, a causa e o
+desfecho dentro.
+
+> Rogério procurou a clínica interessado em lentes de contato para melhorar o
+> sorriso. Mandou uma foto do sorriso, com espaços entre os dentes da frente, e
+> pediu opinião; expliquei que só o dentista indica. Marcou avaliação para
+> 02/09 ao meio-dia com o Dr. Alexandre, e depois pediu para remarcar para as
+> 15h.
+
+`arrumarResumo()` continua existindo, com o sentido invertido: **ele desmonta a
+lista**, quando o modelo cai nela — tira os marcadores e junta as frases. Só
+age quando há dois ou mais marcadores em linhas separadas, para não confundir
+um travessão com uma lista. É rede de segurança: o resultado é uma sequência de
+frases, melhor que uma lista solta e pior que o parágrafo que o prompt pede.
+
+Medido com a conversa real, contra o `gpt-4.1-mini`: o resumo passou de uma
+frase genérica para a história inteira em ordem, e o nome voltou a ser gravado.
+
+> ⚠️ **A forma ficou firme; a profundidade varia.** Texto corrido, terceira
+> pessoa e o nome saem em toda tentativa. Já *quanto* da conversa entra oscila
+> entre três e seis frases no `4.1-mini` — ele é o modelo mais barato da lista,
+> e resumir é onde isso aparece. Um modelo acima é mais constante, e o custo
+> disso é uma chamada por mensagem, não por resumo.
 
 ### "Só consigo confirmar depois da avaliação" era uma porta aberta
 

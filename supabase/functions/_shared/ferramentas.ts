@@ -169,14 +169,24 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
         resumo: {
           type: 'string',
           description:
-            'A história do atendimento, do ponto de vista do PACIENTE: o que ' +
-            'ele procura, o que contou de si, o que perguntou, o que o ' +
-            'preocupa e em que pé ficou. NÃO descreva o que você respondeu. ' +
-            'Formato: uma linha por ideia, cada linha começando com "- ", ' +
-            'nunca um parágrafo corrido. Tamanho: numa conversa com mais de ' +
-            '10 mensagens, NO MÍNIMO 5 linhas (até 10); de 5 a 10 mensagens, ' +
-            '3 a 5 linhas. Reescreva o texto inteiro a cada vez, incluindo o ' +
-            'que já estava lá.',
+            'A história do atendimento em TEXTO CORRIDO, na ordem em que as ' +
+            'coisas aconteceram — um parágrafo, nunca lista nem tópicos. Fale ' +
+            'do paciente na terceira pessoa, pelo nome assim que souber ' +
+            '("Rogério procurou a clínica porque…"), e "o paciente" enquanto ' +
+            'não souber. Conte o que ele procura, o que contou de si, o que ' +
+            'mandou e perguntou, o que o preocupa, e em que pé ficou. O ' +
+            'tamanho acompanha a conversa: duas mensagens pedem uma frase. Com ' +
+            'MAIS DE 10 MENSAGENS, nunca menos de 4 frases — cada assunto da ' +
+            'conversa vira pelo menos uma oração. NÃO pode contradizer a ' +
+            'conversa. Reescreva o texto inteiro a cada vez, do começo até ' +
+            'agora. Exemplo do tom e da forma: "Rogério procurou a clínica ' +
+            'interessado em lentes de contato, porque não gosta dos espaços ' +
+            'entre os dentes da frente. Mandou uma foto do sorriso e insistiu ' +
+            'para saber minha opinião entre lente e clareamento. Perguntou o ' +
+            'endereço e quanto custa a avaliação. Aceitou marcar, escolheu o ' +
+            'meio-dia e depois pediu para remarcar por causa de um ' +
+            'compromisso. Avaliação marcada para 02/09 às 15h, com o Dr. ' +
+            'Alexandre."',
         },
       },
       additionalProperties: false,
@@ -224,26 +234,35 @@ function ehNomeGenerico(nome: string): boolean {
 }
 
 /**
- * O resumo, em linhas — mesmo quando o modelo entregou tudo numa linha só.
+ * O resumo, como texto corrido — mesmo quando o modelo entregou uma lista.
  *
- * O prompt e a descrição da ferramenta pedem "uma linha por ideia, começando
- * com `- `". Na maioria das vezes ele obedece. Nas outras, ele escreve os
- * mesmos marcadores **na mesma linha**: `- quer lente. - pediu 15h. - marcou`.
+ * O resumo é lido por uma pessoa, na ficha do lead, e a forma dele é
+ * **narrativa**: quem chegou, o que queria, o que aconteceu, em que pé ficou.
+ * Foi assim que a clínica pediu, e é como se conta um caso para a colega que
+ * vai assumir.
  *
- * Não é um resumo pior — é o mesmo conteúdo com a quebra faltando. Recusar
- * seria perder a memória da conversa por um caractere; pedir de novo depende
- * de o modelo colaborar na segunda tentativa. **Quebrar é determinístico, e
- * custa duas linhas.**
+ * Mas o modelo às vezes cai na lista — é o formato natural dele para "resuma".
+ * Recusar seria perder a memória da conversa por causa de um hífen; pedir de
+ * novo depende de ele colaborar na segunda tentativa. **Tirar os marcadores é
+ * determinístico.**
  *
- * Só divide em ` - ` **precedido de fim de frase ou de vírgula** — nunca no
- * hífen de "pós-operatório" nem no travessão de uma frase.
+ * O que sai daqui não vira uma boa narrativa por mágica: vira uma sequência de
+ * frases, que é bem melhor que uma lista solta e bem pior que o parágrafo que
+ * o prompt pede. É rede de segurança, não o caminho principal.
  */
 function arrumarResumo(bruto: string): string {
   const texto = bruto.trim()
-  if (!texto || texto.includes('\n')) return texto
+  if (!texto) return ''
 
-  const quebrado = texto.replace(/([.;:,!?])\s+-\s+/g, '$1\n- ')
-  return quebrado === texto ? texto : quebrado
+  // Só age quando é lista de verdade: duas ou mais linhas com marcador.
+  const linhas = texto.split('\n').map((l) => l.trim()).filter(Boolean)
+  const comMarcador = linhas.filter((l) => /^[-*•]\s+/.test(l))
+  if (comMarcador.length < 2) return texto
+
+  return linhas
+    .map((l) => l.replace(/^[-*•]\s+/, ''))
+    .map((l) => (/[.!?]$/.test(l) ? l : l + '.'))
+    .join(' ')
 }
 
 /** Nome digitado pelo paciente → uuid do profissional. Nulo se não achar. */
