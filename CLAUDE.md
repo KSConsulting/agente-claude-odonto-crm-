@@ -516,6 +516,28 @@ e `LeadDetail.tsx`.
 > Por isso `conversando` foi movido para índigo: os dois eram azuis e ficavam
 > indistinguíveis no Kanban.
 
+### A ordem das colunas do Kanban: o caminho inteiro, e depois o desvio
+
+O array `COLUMNS`, em [`CRM.tsx`](src/pages/CRM.tsx), **é a ordem que aparece
+na tela**. Ela tem dois trechos:
+
+```
+Iniciou Conversa → Conversando → Consulta Agendada → Consulta Realizada → Paciente Recorrente
+Consulta Cancelada → Follow-up 1 → Follow-up 2 → Follow-up 3
+```
+
+O quadro se lê da esquerda para a direita, e a leitura que importa é a do lead
+que **dá certo**: chegou, conversou, marcou, veio, voltou. Antes, "Consulta
+Cancelada" e os três follow-ups ficavam **no meio** dessa sequência, e
+"Consulta Realizada" — o desfecho — vinha depois deles: para ver quantos
+chegaram ao fim era preciso rolar por cima do que deu errado.
+
+Cancelada abre o segundo trecho porque é ela que **produz** os follow-ups —
+eles são a tentativa de trazer de volta quem cancelou.
+
+> As outras leituras do array (`STATUS_MAP`, os `some()` do arrastar-e-soltar)
+> são por chave e não dependem da ordem. **Reordenar mexe só na tela.**
+
 ### Cores das agendas — também são dado
 
 A cor de cada profissional segue a mesma lógica: distingue uma agenda da outra

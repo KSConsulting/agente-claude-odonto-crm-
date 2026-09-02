@@ -33,16 +33,38 @@ interface ColumnConfig {
   pulse?: boolean
 }
 
+/**
+ * As colunas do Kanban — e **esta ordem é a ordem que aparece na tela**.
+ *
+ * ── POR QUE O CAMINHO INTEIRO VEM PRIMEIRO ─────────────────────────────────
+ *
+ * O quadro se lê da esquerda para a direita, e a leitura que importa é a do
+ * lead que dá certo: chegou → conversou → marcou → veio → voltou. Antes,
+ * "Consulta Cancelada" e os três follow-ups ficavam **no meio** dessa
+ * sequência, e "Consulta Realizada" — o desfecho — vinha depois deles. Quem
+ * quisesse ver quantos chegaram ao fim precisava rolar por cima do que deu
+ * errado.
+ *
+ * Agora são dois trechos: o caminho completo, sem interrupção, e depois o que
+ * saiu dele. Cancelada abre o segundo trecho porque é o que produz os
+ * follow-ups — eles são a tentativa de trazer de volta quem cancelou.
+ *
+ * ⚠️ As outras leituras deste array (`STATUS_MAP`, os `some()` do
+ * arrastar-e-soltar) são por chave e não dependem da ordem. Reordenar mexe só
+ * na tela.
+ */
 const COLUMNS: ColumnConfig[] = [
+  // O caminho que dá certo, do começo ao fim.
   { status: 'iniciou_conversa',   label: 'Iniciou Conversa',   color: '#1E6E8C', bg: '#EAF3F6', dot: '#1E6E8C', pulse: true },
   { status: 'conversando',        label: 'Conversando',        color: '#4F46E5', bg: '#EEF2FF' },
   { status: 'consulta_agendada',  label: 'Consulta Agendada',  color: '#1A7A48', bg: '#E8F8EF' },
+  { status: 'consulta_realizada', label: 'Consulta Realizada', color: '#fff',    bg: '#14532D' },
+  { status: 'paciente_recorrente',label: 'Paciente Recorrente',color: '#7C3AED', bg: '#F3E8FF' },
+  // E quem saiu dele: o cancelamento, e as três tentativas de trazer de volta.
   { status: 'consulta_cancelada', label: 'Consulta Cancelada', color: '#DC2626', bg: '#FEF2F2' },
   { status: 'follow_up_1_feito',  label: 'Follow-up 1',        color: '#D97706', bg: '#FFFBEB' },
   { status: 'follow_up_2_feito',  label: 'Follow-up 2',        color: '#D97706', bg: '#FFFBEB' },
   { status: 'follow_up_3_feito',  label: 'Follow-up 3',        color: '#D97706', bg: '#FFFBEB' },
-  { status: 'consulta_realizada', label: 'Consulta Realizada', color: '#fff',    bg: '#14532D' },
-  { status: 'paciente_recorrente',label: 'Paciente Recorrente',color: '#7C3AED', bg: '#F3E8FF' },
 ]
 
 const STATUS_MAP = Object.fromEntries(COLUMNS.map((c) => [c.status, c])) as Record<LeadStatus, ColumnConfig>
