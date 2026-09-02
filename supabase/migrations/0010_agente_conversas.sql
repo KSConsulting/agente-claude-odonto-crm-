@@ -293,10 +293,17 @@ create policy "midias_whatsapp_equipe_grava" on storage.objects
 -- 9. DADOS INICIAIS
 -- =============================================================================
 
--- Agente DESLIGADO, modo teste LIGADO, com o número do responsável.
--- Ligar é ato consciente, feito na aba "Agente de IA" de Configurações.
+-- Agente DESLIGADO, modo teste LIGADO, e a lista de números VAZIA.
+--
+-- Ligar é ato consciente, feito na página Secretária de IA — e cadastrar o
+-- próprio número também. A lista nasce vazia de propósito: um número escrito
+-- aqui seria o do autor deste repositório, cadastrado na instalação de
+-- desconhecidos.
+--
+-- Vazia + modo teste ligado é o estado mais seguro possível: ela não responde
+-- ninguém até alguém escolher, na tela, quem pode receber resposta.
 insert into public.configuracoes_agente (ativo, modo_teste, numeros_teste)
-values (false, true, array['5511987654321'])
+values (false, true, array[]::text[])
 on conflict do nothing;
 
 
@@ -319,7 +326,8 @@ on conflict do nothing;
 --          public.agente_deve_responder('5511999999999'),
 --          public.agente_deve_responder(null);
 
--- Depois de ligar o agente na tela, o mesmo select deve dar: true, false, false.
+-- Depois de ligar o agente E cadastrar o primeiro número na tela, o mesmo
+-- select com AQUELE número deve dar true.
 
 -- Realtime ligado na tabela certa? Devolve 1 linha.
 --   select tablename from pg_publication_tables

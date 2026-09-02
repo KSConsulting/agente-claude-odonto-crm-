@@ -652,8 +652,8 @@ export default function PessoasPage({ mode }: { mode: PessoasMode }) {
   const searched = periodFiltered.filter((l) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
-    // O telefone é comparado só por dígitos: quem busca digita "(11) 98525" ou
-    // "11985254512", e o banco guarda "5511987654321". Comparar o texto cru
+    // O telefone é comparado só por dígitos: quem busca digita "(11) 98765" ou
+    // "11987654321", e o banco guarda "5511987654321". Comparar o texto cru
     // faria a busca por telefone nunca achar nada.
     const digitos = apenasDigitos(search)
     return (

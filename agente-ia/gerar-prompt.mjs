@@ -10,7 +10,7 @@
  *
  *     npm run prompt
  *
- * O deploy da função (`npm run deploy:agente`) já roda isto antes.
+ * O deploy da função (`npm run agente:deploy`) já roda isto antes.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'

@@ -9,8 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "prompt": "node agente-ia/gerar-prompt.mjs",
-    "agente:deploy": "npm run prompt && npx supabase functions deploy whatsapp --project-ref wrdwoqtsyqcndgdeflgb --no-verify-jwt",
-    "agente:secrets": "npx supabase secrets set --project-ref wrdwoqtsyqcndgdeflgb --env-file agente-ia/.env.agente.local"
+    "agente:deploy": "npm run prompt && node agente-ia/publicar.mjs deploy",
+    "agente:secrets": "node agente-ia/publicar.mjs secrets"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -65,3 +65,26 @@
 
 # Cole o token aqui. Formato: sbp_...
 SUPABASE_ACCESS_TOKEN=
+
+
+# =============================================================================
+#  E O SEU PROJETO — a outra metade
+# =============================================================================
+#
+#  O identificador do projeto: as 20 letras que aparecem na URL do painel.
+#
+#      https://supabase.com/dashboard/project/AQUI
+#
+#  É a mesma coisa que aparece no seu VITE_SUPABASE_URL, antes do
+#  `.supabase.co`.
+#
+#  ⚠️  ESTA LINHA NÃO MORRE JUNTO COM O TOKEN. Ela não é credencial — não dá
+#      acesso a nada sozinha. Se você apagar este arquivo ao revogar o token,
+#      e um dia precisar publicar de novo, copie o ref de volta para cá junto
+#      com o token novo.
+#
+#  POR QUE ELE MORA AQUI, e não no package.json: aquele arquivo é versionado.
+#  Com o ref escrito lá dentro, quem clonasse o repositório mandaria publicar
+#  no projeto de OUTRA pessoa — e o erro que voltava era de permissão, sem
+#  dizer a causa. Quem lê esta linha é o `agente-ia/publicar.mjs`.
+SUPABASE_PROJECT_REF=
