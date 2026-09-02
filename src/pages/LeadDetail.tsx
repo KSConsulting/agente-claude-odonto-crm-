@@ -8,6 +8,7 @@ import { useCatalogoProcedimentos } from '../lib/procedimentos'
 import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
 import { STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
 import CampoTelefone from '../components/CampoTelefone'
+import ApagarEstaPessoa from '../components/ApagarEstaPessoa'
 import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -716,6 +717,15 @@ export default function LeadDetail() {
           </div>
 
         </SectionCard>
+      </div>
+
+      {/* A ZONA DE PERIGO É A ÚLTIMA COISA DA PÁGINA.
+
+          Não é o fim por descuido: é a ação mais destrutiva que a ficha
+          oferece, e ação destrutiva não fica no caminho do olho de quem só
+          veio conferir um telefone. */}
+      <div className="fade-in-4">
+        <ApagarEstaPessoa pessoa={lead} />
       </div>
 
       {showModal && (

@@ -229,7 +229,8 @@ src/
 │   ├── FiltroPeriodo.tsx       a lista de períodos + o botão "Personalizado"
 │   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
 │   ├── AvisoWhatsAppCaiu.tsx   faixa vermelha no topo do sistema — só depois de 1 min caído
-│   ├── ApagarPessoa.tsx        zona de perigo: apaga uma pessoa inteira
+│   ├── ApagarPessoa.tsx        zona de perigo por BUSCA (Secretária de IA)
+│   ├── ApagarEstaPessoa.tsx    zona de perigo da FICHA (/leads/:id)
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
@@ -1169,6 +1170,33 @@ que aparece a cada piscada é uma faixa que a equipe aprende a ignorar.
 > irmã dela dentro de um flex em coluna; sem isso, ela empurraria a barra e o
 > conteúdo para fora da janela — o mesmo defeito que o `height: 100vh` do
 > Layout existe para evitar.
+
+### Apagar uma pessoa: dois cartões, uma regra
+
+O gesto existe em dois lugares, e não é repetição:
+
+| Onde | O gesto | Para quem |
+|---|---|---|
+| **Secretária de IA** ([`ApagarPessoa`](src/components/ApagarPessoa.tsx)) | Uma **busca**: digite o número, descubra quem é, apague | O número errado que ninguém abriu, e o lixo de teste |
+| **Ficha do lead** ([`ApagarEstaPessoa`](src/components/ApagarEstaPessoa.tsx)) | A pessoa **já está aberta** na tela | Quem chegou até a ficha é quem sabe que ela precisa sair |
+
+Sem o segundo, a saída era copiar o telefone, abrir outra página e colar — um
+desvio que só existia porque o botão não estava ali.
+
+**A regra é uma só**, e mora em
+[`apagarPessoa.ts`](src/lib/apagarPessoa.ts): a contagem antes, o
+`ConfirmDeleteModal` no meio, e a Edge Function apagando. A ficha usa
+`preverExclusaoDe()` em vez de `preverExclusao()` — ela **já tem a pessoa na
+mão**, e procurar pelo telefone ali seria uma ida ao banco para descobrir o que
+o componente já sabe (e quebraria em quem não tem número gravado).
+
+> **O `navigate` depois de apagar leva `replace: true`.** Sem isso, o botão
+> "voltar" do navegador traz a pessoa de volta para a ficha de alguém que não
+> existe mais — e a tela fica em "Lead não encontrado" sem explicar por quê.
+
+> **O botão fica trancado enquanto a contagem não chega.** O número é a parte
+> que faz alguém parar a tempo; liberar o clique antes dele é oferecer
+> exatamente o botão irreversível sem número que a contagem existe para evitar.
 
 ### Apagar uma pessoa apaga a mídia por fora
 

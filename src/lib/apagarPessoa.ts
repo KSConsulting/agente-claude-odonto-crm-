@@ -42,7 +42,21 @@ export interface Previsao {
 export async function preverExclusao(canonico: string): Promise<Previsao | null> {
   const pessoa = await buscarPorWhatsapp(canonico)
   if (!pessoa) return null
+  return contar(pessoa)
+}
 
+/**
+ * A mesma previsão, para quem **já tem a pessoa na mão** — é o caso da ficha,
+ * que está aberta nela.
+ *
+ * Procurar pelo telefone ali seria uma ida ao banco para descobrir o que o
+ * componente já sabe, e quebraria justamente em quem não tem número gravado.
+ */
+export async function preverExclusaoDe(pessoa: PessoaResumo): Promise<Previsao> {
+  return contar(pessoa)
+}
+
+async function contar(pessoa: PessoaResumo): Promise<Previsao> {
   const [msgs, todas, feitas] = await Promise.all([
     supabase.from('mensagens_whatsapp')
       .select('id', { count: 'exact', head: true }).eq('lead_id', pessoa.id),
