@@ -91,7 +91,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **vinte e um arquivos, nesta ordem**:
+A migração é aplicada em **vinte e três arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -114,7 +114,10 @@ que pode ser dito, e o que o paciente procura gravado na consulta) e
 `0019_nome_do_agente.sql` (o nome do agente vira dado, lido pelas telas e pelo
 prompt) e `0020_apagar_foto_e_logo.sql` (as políticas de DELETE que faltavam em
 `avatars` e `logos`) e `0021_nome_do_paciente.sql` (o `agenda_marcar` passa a
-preencher o `nome_lead` vazio com o nome dado ao marcar).
+preencher o `nome_lead` vazio com o nome dado ao marcar) e
+`0022_procedimentos_padronizados.sql` (o procedimento vira vocabulário fechado,
+e o interesse do lead vira lista) e `0023_marcar_so_do_catalogo.sql` (o
+`agenda_marcar` recusa o que não está no catálogo).
 
 > ⚠️ **A `0021` recria a `agenda_marcar` inteira**, porque `create or replace`
 > exige o corpo todo. O arquivo foi **gerado a partir do
@@ -193,7 +196,7 @@ src/
 │   ├── cores.ts                paleta das agendas (cor do profissional)
 │   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
 │   ├── periodo.ts              o recorte de datas dos filtros (3 telas, 1 regra)
-│   ├── procedimentos.ts        o dinheiro na tela: ler e formatar o "a partir de"
+│   ├── procedimentos.ts        o "a partir de" na tela, e o catálogo dos campos
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
 │   ├── contatos.ts             busca de pessoa por WhatsApp (duplicidade)
 │   ├── conversas.ts            ler, enviar, assumir, devolver; e a etiqueta "Agendada"
@@ -661,6 +664,62 @@ de data — e as datas são a resposta.
 > ("Período personalizado") em vez de afirmar "Este mês" com outro recorte
 > valendo. **Escolher qualquer período nela desliga o modo** — é o caminho de
 > volta, sem precisar de um segundo botão para isso.
+
+### Procedimento é vocabulário fechado, nas quatro portas
+
+"Qual o procedimento mais procurado?" não tinha resposta. A mesma coisa entrava
+como `Lentes de Contato`, `lente de contato`, `lentes` e `lente pro dente` —
+quatro linhas do mesmo tratamento num relatório, sem nada avisar que era uma só.
+
+Eram quatro portas de texto livre, e todas foram fechadas:
+
+| Porta | Agora |
+|---|---|
+| Modal **Novo Paciente** | Caixas de seleção com os procedimentos ativos |
+| Modal **Novo Agendamento** | Lista suspensa, **sem campo livre** |
+| `atualizar_ficha` (a Letícia) | `enum` no JSON Schema, montado a cada mensagem |
+| `agenda_marcar` (Letícia e API) | Recusa com `procedimento_desconhecido` |
+
+E o banco confere por baixo, nas duas tabelas (migração `0022`).
+
+**`enum` não é um pedido, é uma trava.** "Use o nome exato" no prompt é
+instrução, e instrução às vezes é atendida. `enum` no schema faz os dois
+fornecedores restringirem a saída à lista — o modelo **não consegue** escrever
+outra coisa. Medido em 01/09/2026 com o `gpt-4.1-mini`:
+
+| O paciente disse | Ela gravou |
+|---|---|
+| "colocar aquela lente no dente" | `Lentes de Contato` |
+| "aparelho invisível" | `Alinhadores Transparentes` |
+| "arrancar o siso" | `Extração de Siso` |
+| "lente E clarear os dentes" | `Lentes de Contato`, `Clareamento Dental` |
+| "botox e preenchimento labial" | *(nada)* — e não o mais parecido |
+| "implante de cabelo" | *(nada)* — não virou `Implante Unitário` |
+
+Os dois últimos são o teste que importa: **traduzir é bom, forçar é pior que
+não gravar.**
+
+> ⚠️ **A lista entra no schema a cada mensagem**, lida de `servicos_clinica`.
+> Fixa no código, ela envelheceria no dia em que a clínica cadastrasse mais um
+> procedimento — e o sintoma seria a Letícia não conseguir marcar algo que está
+> na tela dela. Se a leitura falhar, o campo volta a ser texto livre: `enum`
+> vazio é recusado pelos fornecedores, e o resultado seria ela parar de
+> responder. Grafia solta é ruim; secretária muda é pior.
+
+**A pessoa quer mais de uma coisa, e agora cabe.** `procedimentos_interesse` é
+`text[]`. `procedimento_interesse` continua existindo **calculada na view**
+(os itens juntados por vírgula), e é por isso que CRM, Dashboard, exportação,
+ficha e prompt não mudaram uma linha. **Nunca grave nela** — é o mesmo aviso de
+`minutos_ultima_mensagem`.
+
+**No agendamento não há escape de "Outro".** O catálogo é editável em
+Procedimentos e cadastrar o que falta leva dez segundos; um campo livre de
+emergência vira o caminho normal em duas semanas. O modal diz onde cadastrar.
+
+> **A trava do banco exige EXISTIR, não estar ativo.** Desativar um
+> procedimento não pode quebrar o reagendamento de quem já marcou. Já o
+> `agenda_marcar` exige ativo — ele cria consulta nova, e isso é outra
+> pergunta.
 
 ### A avaliação é a porta, e por isso não é um card
 

@@ -31,7 +31,7 @@ import {
 } from '../_shared/llm.ts'
 import { montarPrompt, montarFicha } from '../_shared/prompt.ts'
 import { PROMPT_OFICIAL } from '../_shared/prompt-oficial.ts'
-import { FERRAMENTAS, executar, type Contexto } from '../_shared/ferramentas.ts'
+import { ferramentasCom, executar, type Contexto } from '../_shared/ferramentas.ts'
 import { ponteAtiva } from '../_shared/pontes.ts'
 import { avaliarWebhook } from '../_shared/whatsapp.ts'
 import type { MensagemRecebida, Ponte } from '../_shared/whatsapp.ts'
@@ -312,13 +312,27 @@ async function processar(
   const mensagens = await montarHistorico(lead.id)
   const ctx: Contexto = { leadId: lead.id, whatsapp, fuso }
 
+  // O CATÁLOGO ENTRA NO SCHEMA DAS FERRAMENTAS, e não só no texto do prompt.
+  //
+  // Assim o modelo não consegue escrever "lente pro dente": o `enum` do JSON
+  // Schema restringe a saída aos nomes cadastrados. É o que faz "qual o
+  // procedimento mais procurado?" ter resposta.
+  //
+  // Lido a cada mensagem, e de propósito: uma lista fixa envelheceria no dia em
+  // que a clínica cadastrasse mais um, e o sintoma seria a Letícia não
+  // conseguir marcar algo que está na tela dela.
+  const catalogo = await selecionar<{ nome: string }>(
+    'servicos_clinica?select=nome&ativo=is.true&order=nome',
+  )
+  const ferramentas = ferramentasCom(catalogo.map((s) => s.nome))
+
   let resposta = ''
   for (let volta = 0; volta < MAX_VOLTAS; volta++) {
     const r = await conversar({
       modelo: cfg[0]?.modelo ?? 'gpt-4.1-mini',
       sistema,
       mensagens,
-      ferramentas: FERRAMENTAS,
+      ferramentas,
     })
 
     if (!r.chamadas.length) {

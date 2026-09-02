@@ -118,6 +118,23 @@ export interface LeadClinica {
   id: string
   nome_lead: string | null
   whatsapp_lead: string | null
+  /**
+   * O que a pessoa procura. **Cada item existe em `servicos_clinica.nome`** —
+   * a trigger `crm_procedimentos_validos` recusa o resto e normaliza a grafia.
+   *
+   * É a coluna que responde "qual o procedimento mais procurado?". Texto livre
+   * não respondia: "Lentes de Contato", "lentes" e "lente pro dente" contavam
+   * como três tratamentos diferentes.
+   */
+  procedimentos_interesse: string[]
+  /**
+   * ⚠️ **CALCULADA na view `crm_clinica`** — os itens acima juntados por
+   * vírgula. Existe para as telas que mostram uma linha só (CRM, Dashboard,
+   * exportação) e para a ficha que a Letícia lê.
+   *
+   * **Nunca grave aqui.** Escrever nesta coluna é escrever numa expressão da
+   * view; quem recebe o valor é `procedimentos_interesse`.
+   */
   procedimento_interesse: string | null
   resumo_conversa: string | null
   status: LeadStatus

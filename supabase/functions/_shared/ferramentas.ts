@@ -25,6 +25,66 @@ export interface Contexto {
 
 const TEXTO = { type: 'string' }
 
+/**
+ * A lista de ferramentas, com o catálogo da clínica **dentro do schema**.
+ *
+ * ── POR QUE `enum`, E NÃO UM PEDIDO NO PROMPT ──────────────────────────────
+ *
+ * "Use o nome exato do procedimento" é um pedido, e pedido o modelo às vezes
+ * atende. `enum` no JSON Schema é outra coisa: os dois fornecedores obrigam a
+ * saída a ser um dos valores da lista. Ele **não consegue** escrever "lente pro
+ * dente" nem "Clareamento" sem o "Dental" — a escolha é entre os vinte nomes
+ * cadastrados, ou nada.
+ *
+ * Isso é o que transforma "qual o procedimento mais procurado?" numa pergunta
+ * com resposta. Grafia livre não soma: "Lentes de Contato", "lentes" e "lente
+ * de contato" viram três linhas do mesmo tratamento, e o relatório mente sem
+ * avisar.
+ *
+ * ⚠️ **A lista é montada a cada mensagem**, com os procedimentos ATIVOS. Uma
+ * lista fixa no código envelheceria no dia em que a clínica cadastrasse o
+ * vigésimo primeiro — e o sintoma seria a Letícia não conseguir marcar algo que
+ * está na tela dela.
+ *
+ * O banco continua conferindo por baixo (`0022` e `0023`): `enum` é o que
+ * impede o erro, a trigger é o que garante que ele não passe.
+ */
+export function ferramentasCom(procedimentos: string[]): DefinicaoFerramenta[] {
+  // Sem catálogo (falha de leitura), volta ao texto livre em vez de travar a
+  // secretária inteira. Um `enum` vazio é recusado pelos dois fornecedores, e o
+  // resultado seria ela parar de responder — muito pior que uma grafia solta.
+  const lista = procedimentos.filter((p) => p.trim())
+  const doCatalogo = lista.length
+    ? { type: 'string', enum: lista }
+    : { type: 'string' }
+
+  return FERRAMENTAS.map((f) => {
+    const props = f.parametros.properties as Record<string, unknown> | undefined
+    if (!props) return f
+
+    const novas: Record<string, unknown> = { ...props }
+    let mudou = false
+
+    for (const campo of ['procedimento', 'interesse'] as const) {
+      if (campo in novas) {
+        novas[campo] = { ...doCatalogo, description: (novas[campo] as { description?: string }).description }
+        mudou = true
+      }
+    }
+    if ('procedimentos_interesse' in novas) {
+      const atual = novas.procedimentos_interesse as { description?: string }
+      novas.procedimentos_interesse = {
+        type: 'array',
+        items: doCatalogo,
+        description: atual.description,
+      }
+      mudou = true
+    }
+
+    return mudou ? { ...f, parametros: { ...f.parametros, properties: novas } } : f
+  })
+}
+
 export const FERRAMENTAS: DefinicaoFerramenta[] = [
   {
     nome: 'ver_horarios_livres',
@@ -165,7 +225,14 @@ export const FERRAMENTAS: DefinicaoFerramenta[] = [
             'O nome que o PACIENTE disse. Nunca um rótulo genérico como ' +
             '"cliente", "paciente" ou "lead" — sem o nome dito, não mande este campo.',
         },
-        procedimento_interesse: TEXTO,
+        procedimentos_interesse: {
+          type: 'array',
+          items: TEXTO,
+          description:
+            'TUDO o que esta pessoa procura, e não só o assunto de agora. ' +
+            'Mande a lista inteira toda vez — ela substitui a anterior, não ' +
+            'soma. Só nomes exatos do catálogo da clínica.',
+        },
         resumo: {
           type: 'string',
           description:
@@ -300,6 +367,9 @@ const RECUSAS: Record<string, string> = {
   nao_encontrada: 'Essa consulta não foi encontrada.',
   sem_consulta: 'Este paciente não tem consulta marcada.',
   varias_consultas: 'Ele tem mais de uma consulta marcada — pergunte qual.',
+  procedimento_desconhecido:
+    'Esse procedimento não está no catálogo da clínica. Use um dos nomes da ' +
+    'lista de PROCEDIMENTOS, exatamente como está escrito lá.',
 }
 
 /** Aceita só o formato de uuid. Qualquer outra coisa é um id que não existe. */
@@ -612,8 +682,14 @@ export async function executar(
         // qual o `pushName` do WhatsApp é ignorado.
         const nome = String(args.nome ?? '').trim()
         if (nome && !ehNomeGenerico(nome)) campos.nome_lead = nome.slice(0, 120)
-        if (args.procedimento_interesse) {
-          campos.procedimento_interesse = String(args.procedimento_interesse).slice(0, 120)
+        // A LISTA SUBSTITUI, e por isso um array vazio é diferente de campo
+        // ausente: vazio apaga o que havia, ausente não mexe. Sem essa
+        // diferença não haveria como corrigir um interesse gravado errado.
+        if (Array.isArray(args.procedimentos_interesse)) {
+          campos.procedimentos_interesse = (args.procedimentos_interesse as unknown[])
+            .map((p) => String(p).trim())
+            .filter(Boolean)
+            .slice(0, 20)
         }
         const resumo = arrumarResumo(String(args.resumo ?? ''))
         if (resumo) campos.resumo_conversa = resumo.slice(0, 2000)

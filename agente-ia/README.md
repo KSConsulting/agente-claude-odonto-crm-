@@ -526,7 +526,7 @@ O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
 | `ver_minhas_consultas` | Antes de remarcar ou cancelar, e no "que dia mesmo é a minha?" | Sim |
 | `detalhes_do_procedimento` | "como funciona o clareamento?", "tenho medo de doer" | Sim — lê `descricao_longa` de `servicos_clinica` |
 | `historico_do_paciente` | "da última vez", "o que eu fiz mesmo?" | Sim — as consultas realizadas, canceladas e as faltas (`faltou`, migração 0015) |
-| `atualizar_ficha` | Quando descobre nome, procedimento de interesse, ou o funil avança | Escrita direta no CRM |
+| `atualizar_ficha` | Quando descobre nome, procedimentos de interesse, ou o funil avança | Escrita direta no CRM. O campo de procedimentos é **lista com `enum`** — ver abaixo |
 
 > ⚠️ **O agente nunca escreve consulta direto no banco.** Sempre pelas funções
 > acima. `INSERT` direto pularia a conferência de jornada do dentista, a escolha
@@ -950,6 +950,54 @@ Por isso a correção tem duas metades, e a segunda é a que importa:
 > silêncio, o modelo lia a ausência do texto como "a foto está aí" e seguia o
 > roteiro. Ele sabe pedir de novo; o que ele não sabe é adivinhar que está
 > cego.
+
+### O procedimento é um `enum`, não um pedido
+
+O prompt sempre disse "use o nome exato da lista". Instrução é atendida na
+maioria das vezes, e a minoria custa caro: `Lentes de Contato`, `lentes` e
+`lente pro dente` viram três tratamentos diferentes num relatório, e a pergunta
+que a clínica faz — *qual o mais procurado?* — passa a não ter resposta, sem que
+nada avise.
+
+Hoje o catálogo entra **dentro do JSON Schema** das ferramentas, como `enum`.
+Os dois fornecedores restringem a saída à lista: o modelo **não consegue**
+escrever outra coisa.
+
+`ferramentasCom(procedimentos)`, em
+[`ferramentas.ts`](../supabase/functions/_shared/ferramentas.ts), injeta a lista
+em três campos: `procedimento` e `interesse` (do `marcar_consulta`) e
+`procedimentos_interesse` (da `atualizar_ficha`, que virou **array** — quem quer
+lentes e clareamento tem os dois).
+
+Medido em 01/09/2026 com o `gpt-4.1-mini`, o paciente falando do jeito dele:
+
+| Ele disse | Ela gravou |
+|---|---|
+| "colocar aquela lente no dente" | `Lentes de Contato` |
+| "quero clarear meus dentes" | `Clareamento Dental` |
+| "tô querendo pôr aparelho invisível" | `Alinhadores Transparentes` |
+| "preciso arrancar o siso" | `Extração de Siso` |
+| "queria lente E também clarear" | `Lentes de Contato`, `Clareamento Dental` |
+| "botox e preenchimento labial" | *(nada)* |
+| "implante de cabelo" | *(nada)* |
+
+**Os dois últimos são o teste que importa.** Traduzir a fala do paciente para o
+catálogo é o trabalho; forçar o mais parecido é pior que não gravar — "implante
+de cabelo" virando `Implante Unitário` seria um lead com interesse falso, e
+ninguém descobriria.
+
+> ⚠️ **A lista é montada a cada mensagem**, lida de `servicos_clinica` (só os
+> ativos). Fixa no código, envelheceria no dia em que a clínica cadastrasse o
+> vigésimo primeiro — e o sintoma seria a Letícia não conseguir marcar algo que
+> está na tela dela.
+>
+> **Se a leitura falhar, o campo volta a texto livre.** `enum` vazio é recusado
+> pelos dois fornecedores, e o resultado seria ela parar de responder. Grafia
+> solta é ruim; secretária muda é pior.
+
+> **O `enum` impede; a trigger garante.** As migrações `0022` e `0023` conferem
+> no banco, para as outras portas (a recepção, a API externa, um `insert` à mão)
+> não escaparem pela grafia. Uma trava só nunca é uma trava.
 
 ### Três defeitos de um teste só, e o mais caro era invisível
 

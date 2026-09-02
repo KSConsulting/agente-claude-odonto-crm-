@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Search, UserPlus, AlertTriangle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useCatalogoProcedimentos } from '../lib/procedimentos'
 import {
   bloqueioNoPeriodo, dentroDoExpediente, haConflito, paraDatetimeLocal, somarMinutos,
 } from '../lib/agenda'
@@ -74,6 +75,7 @@ export default function NovoAgendamentoModal({
   const [quando, setQuando] = useState(paraDatetimeLocal(dataInicial ?? proximaHoraCheia()))
   const [duracao, setDuracao] = useState(60)
   const [procedimento, setProcedimento] = useState('')
+  const catalogo = useCatalogoProcedimentos()
   const [observacoes, setObservacoes] = useState('')
 
   const [busca, setBusca] = useState('')
@@ -147,7 +149,7 @@ export default function NovoAgendamentoModal({
 
   const handleSalvar = async () => {
     if (!inicio || isNaN(inicio.getTime())) { setErro('Escolha a data e o horário.'); return }
-    if (!procedimento.trim()) { setErro('Descreva o procedimento.'); return }
+    if (!procedimento.trim()) { setErro('Escolha o procedimento.'); return }
     if (!paciente && !(modoNovo && novoNome.trim())) { setErro('Escolha o paciente ou cadastre um novo.'); return }
     if (!paciente && !novoWhatsappValido) { setErro('Informe um WhatsApp válido, com o código do país.'); return }
     if (!paciente && duplicado) { setErro('Esse WhatsApp já é de outra pessoa — use o contato existente.'); return }
@@ -395,12 +397,40 @@ export default function NovoAgendamentoModal({
             )}
           </div>
 
-          {/* Procedimento */}
+          {/* PROCEDIMENTO: LISTA FECHADA, SEM CAMPO LIVRE.
+
+              O que a recepção digitava aqui é o que responde "qual o
+              procedimento mais realizado?" — e digitado ele não responde nada:
+              "limpeza", "Limpeza" e "Limpeza e Profilaxia" viram três coisas.
+
+              Sem escape de "Outro", por escolha: o catálogo é editável em
+              Procedimentos, e cadastrar o que falta leva dez segundos. Um campo
+              livre de emergência vira o caminho normal em duas semanas.
+
+              O banco confere de novo (trigger `consultas_procedimento_valido`,
+              migração 0022) — o select impede o erro, a trigger garante que ele
+              não passe por outra porta. */}
           <div>
             <label style={labelStyle}>Procedimento *</label>
-            <input value={procedimento} onChange={(e) => { setProcedimento(e.target.value); setErro('') }}
-              placeholder="Ex: Avaliação inicial, Limpeza, Canal..." style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
+            <select
+              value={procedimento}
+              onChange={(e) => { setProcedimento(e.target.value); setErro('') }}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
+              onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}
+            >
+              <option value="">
+                {catalogo.length ? 'Escolha o procedimento...' : 'Carregando...'}
+              </option>
+              {catalogo.map((nome) => (
+                <option key={nome} value={nome}>{nome}</option>
+              ))}
+            </select>
+            {catalogo.length > 0 && (
+              <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 5 }}>
+                Falta algum? Cadastre em <strong>Procedimentos</strong> e ele aparece aqui.
+              </div>
+            )}
           </div>
 
           <div>

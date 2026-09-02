@@ -105,6 +105,28 @@ ordem**:
     > exige o corpo todo. O arquivo foi **gerado do `pg_get_functiondef()` do
     > banco** e só o bloco do paciente mudou — reescrever 130 linhas à mão é
     > copiar e torcer para não mover uma vírgula.
+22. `supabase/migrations/0022_procedimentos_padronizados.sql` — o procedimento
+    vira **vocabulário fechado**. `crm_clinica_dados.procedimentos_interesse`
+    (`text[]`) substitui a coluna de texto, que passa a ser **calculada na view
+    `crm_clinica`** (os itens juntados por vírgula, como
+    `minutos_ultima_mensagem`). Duas triggers recusam o que não está em
+    `servicos_clinica` — no array do lead e no `procedimento`/`interesse` da
+    consulta — e **normalizam a grafia** para o nome exato do catálogo.
+
+    > **Por que trigger e não FK:** o Postgres não tem chave estrangeira de
+    > elemento de array, e `CHECK` não consulta outra tabela. Tabela de ligação
+    > seria pior: `crm_clinica` é VIEW, e um `join` a mais a torna
+    > somente-leitura — derrubando todo o cadastro do sistema.
+    >
+    > ⚠️ As triggers exigem **existir**, não estar ativo: desativar um
+    > procedimento não pode quebrar o reagendamento de quem já marcou.
+23. `supabase/migrations/0023_marcar_so_do_catalogo.sql` — `agenda_marcar`
+    devolve `procedimento_desconhecido` em vez de marcar. Antes, nome que não
+    batia seguia adiante com 60 minutos e **sem conferir a avaliação**: marcar
+    "Lente de Contato" no singular passava por fora da porta de entrada, em
+    silêncio. A trigger da `0022` já barraria, mas com exceção `23514` — que na
+    ferramenta vira "não consegui acessar a agenda" e manda procurar defeito no
+    lugar errado.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 

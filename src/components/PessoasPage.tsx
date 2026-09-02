@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
 import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
 import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
+import { useCatalogoProcedimentos } from '../lib/procedimentos'
 import CampoTelefone from './CampoTelefone'
 import AvisoBaixaConsulta from './AvisoBaixaConsulta'
 import FiltroPeriodo from './FiltroPeriodo'
@@ -136,7 +137,7 @@ interface NewLeadForm {
   tipo: 'lead' | 'paciente'
   nome: string
   whatsapp: string
-  procedimento: string
+  procedimentos: string[]
   data_nascimento: string
   anotacoes: string
 }
@@ -150,15 +151,17 @@ interface NewLeadModalProps {
 
 function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProps) {
   const [form, setForm] = useState<NewLeadForm>({
-    tipo: tipoPadrao, nome: '', whatsapp: '', procedimento: '', data_nascimento: '', anotacoes: '',
+    tipo: tipoPadrao, nome: '', whatsapp: '', procedimentos: [], data_nascimento: '', anotacoes: '',
   })
   const [whatsappValido, setWhatsappValido] = useState(false)
   const [duplicado, setDuplicado] = useState<PessoaResumo | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const catalogo = useCatalogoProcedimentos()
 
-  const set = (field: keyof NewLeadForm, value: string) => setForm((f) => ({ ...f, [field]: value }))
+  const set = <C extends keyof NewLeadForm>(field: C, value: NewLeadForm[C]) =>
+    setForm((f) => ({ ...f, [field]: value }))
 
   const handleWhatsapp = (canonico: string, valido: boolean) => {
     set('whatsapp', canonico)
@@ -182,7 +185,7 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
       nome_lead: form.nome.trim(),
       whatsapp_lead: form.whatsapp,
       status,
-      procedimento_interesse: form.procedimento.trim() || null,
+      procedimentos_interesse: form.procedimentos,
       data_nascimento: form.data_nascimento || null,
       anotacoes: form.anotacoes.trim() || null,
     }).select().single()
@@ -279,13 +282,57 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
             )}
           />
 
-          {/* Procedimento */}
+          {/* PROCEDIMENTOS: CAIXAS, E NÃO TEXTO LIVRE.
+
+              Digitado, o mesmo tratamento vira "Lentes de Contato", "lente de
+              contato" e "lente pro dente" — três linhas do mesmo no relatório,
+              e a pergunta "qual o mais procurado?" fica sem resposta.
+
+              Caixas e não lista suspensa porque uma pessoa quer mais de uma
+              coisa: lentes E clareamento é o caso normal, não a exceção. */}
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>
-              Procedimento de Interesse <span style={{ color: '#6B818C', fontWeight: 400 }}>(opcional)</span>
+              Procedimentos de Interesse <span style={{ color: '#6B818C', fontWeight: 400 }}>(opcional)</span>
             </label>
-            <input value={form.procedimento} onChange={(e) => set('procedimento', e.target.value)} placeholder="Ex: Prótese Dentária" style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')} onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')} />
+            {catalogo.length === 0 ? (
+              <div style={{ ...inputStyle, color: '#6B818C', display: 'flex', alignItems: 'center' }}>
+                Carregando os procedimentos da clínica...
+              </div>
+            ) : (
+              <div style={{
+                border: '1px solid #DCE6EA', borderRadius: 9, padding: 8,
+                maxHeight: 190, overflowY: 'auto',
+                display: 'grid', gap: 2,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              }}>
+                {catalogo.map((nome) => {
+                  const marcado = form.procedimentos.includes(nome)
+                  return (
+                    <label key={nome} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 8px', borderRadius: 7, cursor: 'pointer',
+                      background: marcado ? '#EAF3F6' : 'transparent',
+                      fontSize: 13, color: marcado ? '#16232B' : '#6B818C',
+                      fontWeight: marcado ? 600 : 400,
+                    }}>
+                      <input
+                        type="checkbox" checked={marcado}
+                        onChange={() => set('procedimentos', marcado
+                          ? form.procedimentos.filter((p) => p !== nome)
+                          : [...form.procedimentos, nome])}
+                        style={{ accentColor: '#1E6E8C', cursor: 'pointer', flexShrink: 0 }}
+                      />
+                      {nome}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+            <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 5 }}>
+              {form.procedimentos.length === 0
+                ? 'Pode marcar mais de um, ou nenhum.'
+                : `${form.procedimentos.length} marcado${form.procedimentos.length > 1 ? 's' : ''}.`}
+            </div>
           </div>
 
           {/* Data de nascimento */}

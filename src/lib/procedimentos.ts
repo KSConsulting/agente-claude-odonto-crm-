@@ -14,6 +14,9 @@
  * vazio, ela não fala; zero, é gratuita.
  */
 
+import { useEffect, useState } from 'react'
+import { supabase } from './supabase'
+
 /** `1500.5` → `"R$ 1.500,50"`. Espelha a função `reais()` do banco. */
 export function formatarReais(valor: number): string {
   return valor.toLocaleString('pt-BR', {
@@ -49,4 +52,45 @@ export function lerPreco(texto: string): number | null {
 export function precoParaCampo(valor: number | null): string {
   if (valor === null || valor === undefined) return ''
   return valor.toFixed(2).replace('.', ',')
+}
+
+// ---------------------------------------------------------------------------
+// O catálogo, para os campos que precisam dele
+// ---------------------------------------------------------------------------
+
+/**
+ * Os procedimentos ativos, em ordem, para preencher lista e caixas de seleção.
+ *
+ * ── POR QUE O CAMPO DEIXOU DE SER TEXTO LIVRE ──────────────────────────────
+ *
+ * Porque texto livre não soma. "Lentes de Contato", "lente de contato" e
+ * "lente pro dente" são a mesma coisa para quem digitou e três linhas
+ * diferentes num relatório — e a pergunta que a clínica faz ("qual o
+ * procedimento mais procurado?") passa a não ter resposta, sem que nada avise.
+ *
+ * O banco trava por baixo (migrações `0022` e `0023`), e a Letícia escolhe de
+ * uma lista fechada. Isto aqui é a mesma trava do lado de quem digita: ela
+ * existe para o erro **não ser possível**, e não para ser corrigido depois.
+ *
+ * ⚠️ Vem do banco a cada montagem, e não de uma lista no código: cadastrar um
+ * procedimento novo em Procedimentos precisa valer nas outras telas na hora,
+ * sem publicar nada.
+ */
+export function useCatalogoProcedimentos(): string[] {
+  const [nomes, setNomes] = useState<string[]>([])
+
+  useEffect(() => {
+    let vivo = true
+    void supabase
+      .from('servicos_clinica')
+      .select('nome')
+      .eq('ativo', true)
+      .order('nome')
+      .then(({ data }) => {
+        if (vivo && data) setNomes(data.map((s) => s.nome as string))
+      })
+    return () => { vivo = false }
+  }, [])
+
+  return nomes
 }
