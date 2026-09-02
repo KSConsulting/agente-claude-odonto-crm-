@@ -91,7 +91,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **vinte e três arquivos, nesta ordem**:
+A migração é aplicada em **vinte e quatro arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -117,7 +117,9 @@ prompt) e `0020_apagar_foto_e_logo.sql` (as políticas de DELETE que faltavam em
 preencher o `nome_lead` vazio com o nome dado ao marcar) e
 `0022_procedimentos_padronizados.sql` (o procedimento vira vocabulário fechado,
 e o interesse do lead vira lista) e `0023_marcar_so_do_catalogo.sql` (o
-`agenda_marcar` recusa o que não está no catálogo).
+`agenda_marcar` recusa o que não está no catálogo) e
+`0024_dashboard_no_banco.sql` (as cinco funções que fazem o Dashboard contar no
+banco em vez de trazer todo mundo).
 
 > ⚠️ **A `0021` recria a `agenda_marcar` inteira**, porque `create or replace`
 > exige o corpo todo. O arquivo foi **gerado a partir do
@@ -242,7 +244,7 @@ src/
 │   └── ConfirmDeleteModal.tsx  modal de confirmação reutilizável
 └── pages/
     ├── Login.tsx               tela dividida (marca + formulário)
-    ├── Dashboard.tsx           métricas, gráficos, próximas consultas
+    ├── Dashboard.tsx           métricas e gráficos — tudo contado no banco (0024)
     ├── CRM.tsx                 Kanban do funil (drag and drop, teto por coluna)
     ├── Conversas.tsx           o WhatsApp da clínica, em duas colunas
     ├── Agenda.tsx              calendário de todas as agendas + filtros
@@ -503,8 +505,12 @@ verboso, mas é o padrão da base.
 ### Cores de status — não são cores de marca
 
 Comunicam significado e **não devem ser trocadas** junto com a identidade
-visual. Definidas de forma duplicada em `CRM.tsx`, `Dashboard.tsx`, `Leads.tsx`
-e `LeadDetail.tsx`.
+visual. Definidas de forma duplicada em `CRM.tsx`, `PessoasPage.tsx` (que
+atende `/leads` e `/clientes`) e `LeadDetail.tsx` — e a fonte para código novo
+é [`src/lib/statusLead.ts`](src/lib/statusLead.ts).
+
+> A quarta cópia era do `Dashboard.tsx` e saiu com a reescrita da `0024`: a
+> coluna que ela vestia virou "Profissional".
 
 | Status | Cor | Fundo |
 |---|---|---|
@@ -519,6 +525,85 @@ e `LeadDetail.tsx`.
 > `iniciou_conversa` usa deliberadamente a cor da marca (lead novo = destaque).
 > Por isso `conversando` foi movido para índigo: os dois eram azuis e ficavam
 > indistinguíveis no Kanban.
+
+### O Dashboard não carrega pessoas — ele faz perguntas
+
+Ele pedia `select * from crm_clinica`, sem limite, e contava **tudo no
+navegador**. Três defeitos moravam nisso, e só um era o teto de 1000:
+
+| Defeito | Quando doía |
+|---|---|
+| O corte de `max_rows` | A partir do lead **1001**. As contas não ficariam incompletas — ficariam **erradas**, e nada avisaria |
+| **Dois gráficos ignoravam o filtro** | **Hoje.** "Dias com mais movimento" e a rosca de horário contavam a clínica inteira. Trocar de "Este mês" para "Hoje" não mexia uma barra |
+| "Próximas Consultas" lia o lugar errado | **Hoje.** Lia `crm_clinica.data_agendamento` — reflexo mantido por trigger, uma data por pessoa. Sem ordem, sem limite, dentro de um `select` cortado em 1000 |
+
+Agora são cinco funções SQL (migração
+[`0024`](supabase/migrations/0024_dashboard_no_banco.sql)) devolvendo números
+**já contados**: dezenas de linhas, tenha a clínica cem ou cem mil leads.
+Contagem não tem teto — `max_rows` é para linhas.
+
+#### O fuso é o detalhe que decide tudo
+
+Agrupar "por dia" exige saber onde o dia começa. O navegador usava o relógio
+dele; **a sessão do PostgREST roda em UTC**. Um contato das 23h de São Paulo é
+02h do dia seguinte em UTC — e cairia no dia errado do gráfico, sempre, para
+todo mundo que escreve à noite.
+
+Por isso o agrupamento usa `at time zone` com o
+`configuracoes_clinica.fuso_horario` — o mesmo campo da `agenda_marcar`, e é
+para isso que ele existe. Conferido no banco em 02/09/2026:
+
+```sql
+select (timestamptz '2026-09-01 23:30-03' at time zone 'America/Sao_Paulo')::date;  -- 2026-09-01
+select (timestamptz '2026-09-01 23:30-03')::date;                                    -- 2026-09-02
+```
+
+> **As BORDAS do período não precisam de fuso.** Elas chegam como instante
+> absoluto, e comparar instantes independe de fuso. Só o **balde** — de que dia
+> é esta linha — precisa.
+
+> ⚠️ E na tela, `rotuloDia()` corta a string em vez de usar `new Date()`:
+> `new Date('2026-09-02')` é meia-noite **em UTC**, que em qualquer fuso
+> negativo — o Brasil inteiro — volta como 1º de setembro. O gráfico sairia um
+> dia atrasado depois de todo o cuidado no SQL.
+
+#### A rosca de horário comercial saiu, e dois gráficos entraram
+
+| | |
+|---|---|
+| **Saiu** | "Horário dos Contatos" (dentro/fora do expediente). Era o argumento da própria Letícia existir — *"X pessoas escreveram fora do horário, e só ela respondeu"* —, mas a clínica não usava. Saiu junto uma consulta a `horario_comercial` e uma regra de horário que dependia do relógio do computador |
+| **Entrou** | **Consultas por profissional**, cada barra na **cor do próprio dentista** — a mesma da Agenda, para o gráfico e o calendário falarem a mesma língua |
+| **Entrou** | **Procedimentos: procurado x realizado**, duas barras por procedimento |
+
+**No gráfico de procedimentos, a distância entre as duas barras é a
+informação.** "120 procuraram lentes, 14 fizeram" é uma conversa sobre preço,
+agenda ou argumento de venda que nenhum dos dois números sozinho começa. É
+também a pergunta que **não tinha resposta** antes da `0022` fechar o
+vocabulário: com texto livre, `lentes` e `Lentes de Contato` eram dois
+tratamentos.
+
+> ⚠️ **O mesmo filtro significa duas coisas nesta página, e tem que
+> significar.** Os KPIs e o "procurado" contam por **quando a pessoa chegou**;
+> "Consultas por Profissional" e o "realizado" contam por **quando a consulta
+> acontece**. Quem chegou em agosto pode ter feito em setembro — forçar a mesma
+> data faria metade dos blocos responder a pergunta errada. Cada subtítulo diz
+> qual está usando.
+
+#### Dois tetos, e nenhum silencioso
+
+| Teto | Onde | Como aparece |
+|---|---|---|
+| **370 dias** na série do gráfico de linha | `dashboard_por_dia` | "Todo o período" começa na origem do tempo: sem teto seriam vinte mil pontos. A tela compara o primeiro dia devolvido com o pedido e mostra uma faixa âmbar |
+| **10 procedimentos** no ranking | A tela | Rodapé: *"Mostrando os 10 mais procurados, de 17 com movimento"* |
+
+#### E painel que não sabe diz que não sabe
+
+`supabase.rpc()` **não lança** em erro do banco: devolve `{ data: null, error }`.
+Com `?? 0` no caminho de leitura, uma função que falhasse pintaria **zero** em
+todos os cartões — e zero é um número, indistinguível de uma clínica parada.
+Seria trocar o corte silencioso de mil linhas por um silêncio pior. Hoje o erro
+vira faixa vermelha, e o `.catch()` existe para a queda de rede não deixar o
+carregador girando para sempre.
 
 ### A ordem das colunas do Kanban: o caminho inteiro, e depois o desvio
 
@@ -1164,16 +1249,25 @@ preenche a semana inteira sem se fazer a pergunta — e ela só aparece quando a
 secretária marca uma consulta três horas fora. Por isso o `fuso_horario` ficou
 num card **acima** da grade, e não na aba Clínica junto do endereço.
 
-**Ele existe para o servidor, não para as telas.** Agenda, Dashboard e Leads
-rodam no fuso do navegador, que no uso real é o da clínica — a recepção está
-dentro dela. O campo alimenta quem não tem navegador para consultar:
+**Ele existe para o servidor, e para um pedaço de uma tela.** Agenda, Leads e
+Pacientes rodam no fuso do navegador, que no uso real é o da clínica — a
+recepção está dentro dela. O campo alimenta quem não tem navegador para
+consultar:
 
 | Usa o campo | Usa o relógio do navegador |
 |---|---|
-| `{{DATA_HOJE}}` do prompt | Agenda, Dashboard, Leads, Pacientes |
+| `{{DATA_HOJE}}` do prompt | Agenda, Leads, Pacientes, CRM |
 | `paraInstante()` — "quinta às 14h" vira instante | `NovoAgendamentoModal`: a consulta marcada pela recepção |
-| `agenda_disponibilidade` e `agenda_marcar` | |
+| `agenda_disponibilidade` e `agenda_marcar` | As bordas dos filtros de período, em todas as telas |
 | As frases que a API devolve | |
+| **Os baldes do Dashboard** (`dashboard_por_dia` e `dashboard_dia_semana`, migração `0024`) | |
+
+> ⚠️ **O Dashboard usa os dois, e é o único que usa.** As **bordas** do período
+> saem do navegador; os **baldes** ("de que dia é esta linha") saem do campo,
+> porque a sessão do PostgREST roda em UTC e um contato das 23h cairia no dia
+> seguinte. Se o campo discordar do relógio da recepção, o gráfico fica
+> deslocado em relação ao período escolhido — mais um motivo para a conferência
+> abaixo.
 
 > ⚠️ **Trocar o fuso não move consulta nenhuma que já existe.**
 > `consultas.data_consulta` é `timestamptz`: guarda um **instante**, não
@@ -1497,15 +1591,20 @@ Ao mudar o banco, **prefira verificar contra o banco real** (consultas da seçã
 
 Problemas reais que já existiam e ainda não foram tratados. Não são regressões.
 
-### ESLint acusa 9 erros
+### ESLint acusa 7 erros
 
 - **4x — `ErrorMsg` declarado dentro do render** em
   [`Configuracoes.tsx:192`](src/pages/Configuracoes.tsx#L192). Não é só estilo:
   componentes criados durante o render são recriados a cada renderização e
   **perdem o estado**. É um bug esperando acontecer. A correção é mover a
   declaração para fora do componente.
-- **4x — uso de `any`** em `CRM.tsx` e `Dashboard.tsx`, além de uma variável
-  não utilizada (`_e` em `CRM.tsx:123`).
+- **2x — uso de `any`** em `CRM.tsx` e `Configuracoes.tsx`, além de uma
+  variável não utilizada (`_e` em `CRM.tsx`).
+
+> **Eram 9.** Os dois `any` do `Dashboard.tsx` eram o tooltip da recharts, e
+> saíram junto com a reescrita da `0024` — viraram a interface `DadosTooltip`,
+> com só os campos que aquela tela lê. **Compare com o número, não com
+> "limpo".**
 
 ### Bundle de 2.2 MB (812 KB gzip)
 
@@ -1516,18 +1615,21 @@ splitting.
 ### Duplicação das cores de status
 
 [`src/lib/statusLead.ts`](src/lib/statusLead.ts) é a fonte, e **código novo
-importa de lá**. As quatro cópias antigas continuam de pé:
+importa de lá**. Sobraram três cópias antigas:
 
 | Arquivo | Formato | Por que ainda não migrou |
 |---|---|---|
 | `LeadDetail.tsx` | `{bg, color, pulse}` | Idêntico ao módulo — migração mecânica |
 | `PessoasPage.tsx` | `{bg, color, pulse}` | Idêntico ao módulo — migração mecânica |
-| `Dashboard.tsx` | `{bg, text, dot}` + rótulos **curtos** | "Agendada" em vez de "Consulta Agendada", porque o rótulo longo estoura o gráfico |
 | `CRM.tsx` | array | Também define a **ordem das colunas** do Kanban |
 
-Os dois primeiros trocam por um `import`. Os dois últimos exigem decidir o que
-fazer com os rótulos curtos e com a ordem do Kanban — e isso é tarefa própria,
-não efeito colateral de outra.
+Os dois primeiros trocam por um `import`. O terceiro exige decidir o que fazer
+com a ordem do Kanban — e isso é tarefa própria, não efeito colateral de outra.
+
+> **A quarta cópia era do `Dashboard.tsx`, e sumiu.** Ela vestia a coluna
+> "Status" de "Próximas Consultas", com rótulos curtos ("Agendada"). A coluna
+> virou **"Profissional"** na reescrita da `0024`: numa lista em que toda linha
+> é uma consulta agendada, o status do funil era ruído — quem atende, não.
 
 ### Arquivos mortos
 
@@ -1596,8 +1698,16 @@ Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.
 > da conversa, por `atualizar_ficha`, e de mais lugar nenhum. Até ela perguntar,
 > as telas mostram o número formatado.
 
-O Dashboard exibe métricas de impacto do agente: contatos dentro e fora do
-horário comercial, distribuição por dia da semana e taxa de conversão do funil.
+O Dashboard exibe métricas de impacto do agente: distribuição dos contatos por
+dia da semana, consultas por profissional, o ranking de procedimentos
+(procurado x realizado) e a taxa de conversão do funil.
+
+> **A rosca "dentro e fora do horário comercial" existiu e foi removida** a
+> pedido da clínica, em 02/09/2026. Ela era o argumento mais direto da Letícia
+> existir — *"X pessoas escreveram fora do expediente, e só ela respondeu"*.
+> Quem quiser de volta: o dado é `inicio_atendimento` cruzado com
+> `horario_comercial`, e agora seria uma sexta função na `0024`, no fuso da
+> clínica em vez do relógio do navegador.
 
 ### A foto não vai para o modelo — a descrição dela vai
 

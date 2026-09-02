@@ -127,6 +127,16 @@ ordem**:
     silêncio. A trigger da `0022` já barraria, mas com exceção `23514` — que na
     ferramenta vira "não consegui acessar a agenda" e manda procurar defeito no
     lugar errado.
+24. `supabase/migrations/0024_dashboard_no_banco.sql` — o Dashboard para de
+    trazer pessoas e passa a **fazer perguntas**. Cinco funções de contagem
+    (`dashboard_numeros`, `dashboard_por_dia`, `dashboard_dia_semana`,
+    `dashboard_profissionais`, `dashboard_procedimentos`) mais a auxiliar
+    `fuso_da_clinica()`, e o índice
+    `crm_clinica_marcacao_idx` em `data_marcacao_agendamento`. Detalhes em 4.19.
+
+    > A tela fazia `select * from crm_clinica` e contava no navegador. Com
+    > `max_rows = 1000`, a partir do lead 1001 as contas não ficariam
+    > incompletas — ficariam **erradas**, sem erro e sem aviso.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -364,7 +374,8 @@ WhatsApp, ou um paciente cadastrado manualmente.
 | **Dados do paciente** ||||
 | `nome_lead` | `text` | sim | — | |
 | `whatsapp_lead` | `text` | sim | — | **ÚNICO.** Só dígitos com DDI — ver abaixo |
-| `procedimento_interesse` | `text` | sim | — | Texto livre |
+| `procedimentos_interesse` | `text[]` | não | `'{}'` | **Vocabulário fechado** (`0022`). É o que a tabela guarda; cada item existe em `servicos_clinica.nome`, garantido pela trigger `crm_procedimentos_validos` |
+| `procedimento_interesse` | `text` | — | — | ⚠️ **CALCULADA na view** — os itens acima juntados por vírgula. **Nunca grave nela** |
 | `data_nascimento` | `date` | sim | — | Só a data, sem hora |
 | `anotacoes` | `text` | sim | — | Campo livre da equipe |
 | **Conversa / Agente de IA** ||||
@@ -443,7 +454,8 @@ Fulano" e oferecem abrir ou usar o contato existente.
 | `crm_clinica_conversa_cw_idx` | `id_conversa_chatwoot` | ⚠️ **Sem uso.** Era como o n8n achava o lead da conversa; hoje a busca é por `whatsapp_lead` |
 | `crm_clinica_created_at_idx` | `created_at DESC` | Listagem em `Leads.tsx` |
 | `crm_clinica_status_idx` | `status` | Colunas do Kanban |
-| `crm_clinica_inicio_idx` | `inicio_atendimento` | Métricas do Dashboard |
+| `crm_clinica_inicio_idx` | `inicio_atendimento` | Métricas do Dashboard (`dashboard_numeros`, `dashboard_por_dia`, `dashboard_dia_semana`) |
+| `crm_clinica_marcacao_idx` | `data_marcacao_agendamento` | KPI "Consultas Agendadas" e a série de agendamentos do gráfico de linha (`0024`) |
 | `crm_clinica_agendamento_idx` | `data_agendamento` | Próximas consultas |
 | `crm_clinica_whatsapp_unico` | `whatsapp_lead` parcial | **Impede duas pessoas com o mesmo número** e atende a busca por telefone |
 
@@ -454,7 +466,10 @@ Fulano" e oferecem abrir ou usar o contato existente.
 Agendamentos. Um lead tem N consultas; um profissional tem N consultas — e é
 esse segundo vínculo que forma a agenda dele.
 
-**Usada em:** `Agenda.tsx`, `NovoAgendamentoModal.tsx`, `LeadDetail.tsx`
+**Usada em:** `Agenda.tsx`, `NovoAgendamentoModal.tsx`, `LeadDetail.tsx`,
+`PessoasPage.tsx` (a consulta criada no cadastro) e `Dashboard.tsx` — que lê
+direto em "Próximas Consultas" e por `dashboard_profissionais` /
+`dashboard_procedimentos` (4.19).
 
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
@@ -649,7 +664,12 @@ Sem ele, um duplo clique no upload de logo criaria uma segunda linha e o
 
 Grade de atendimento — **uma linha por dia da semana**.
 
-**Usada em:** `Configuracoes.tsx` (edição), `Dashboard.tsx` (só os ativos)
+**Usada em:** `Configuracoes.tsx` (edição) e `jornada_texto(null)` (4.15), que
+monta a linha `Atendimento:` da view `informacoes_clinica_agente` (4.12) — a
+frase que a Letícia fala.
+
+> **O Dashboard lia esta tabela e não lê mais.** Era a rosca "dentro x fora do
+> horário comercial", removida em 02/09/2026 a pedido da clínica.
 
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
@@ -798,7 +818,9 @@ Daí as duas réguas, ambas avisadas na tela de edição:
 
 Os dentistas da clínica.
 
-**Usada em:** `Profissionais.tsx`, `Agenda.tsx`, `NovoAgendamentoModal.tsx`,
+**Usada em:** `Dashboard.tsx` (via `dashboard_profissionais`, 4.19 — e ⚠️ o
+inativo continua aparecendo nos períodos em que atendeu),
+`Profissionais.tsx`, `Agenda.tsx`, `NovoAgendamentoModal.tsx`,
 `LeadDetail.tsx`
 
 | Coluna | Tipo | Nulo | Default | Observação |
@@ -1341,6 +1363,70 @@ Os três índices que ela usa já vieram da `0010`, e não por acaso:
 > tabela; a lista precisa da última mensagem, do contador de não lidas e do nome
 > de quem assumiu — três coisas calculadas na view. É a mesma decisão da Agenda,
 > que recarrega o período em vez de aplicar o payload.
+
+---
+
+### 4.19. Funções do Dashboard (migração 0024)
+
+Seis funções, todas **somente leitura** e **`security invoker`** — rodam com as
+permissões de quem chamou, e o RLS já libera leitura para `authenticated`.
+Elevar privilégio aqui só ampliaria o estrago de uma chamada indevida.
+
+| Função | Devolve | Recorta por |
+|---|---|---|
+| `fuso_da_clinica()` | `text` — o fuso, com `America/Sao_Paulo` de padrão | — |
+| `dashboard_numeros(ini, fim)` | `novos_contatos`, `consultas_agendadas` | `inicio_atendimento` / `data_marcacao_agendamento` |
+| `dashboard_por_dia(ini, fim)` | uma linha por dia: `dia`, `atendimentos`, `agendamentos` | idem |
+| `dashboard_dia_semana(ini, fim)` | 7 linhas: `dia_semana` (0=domingo), `contatos` | `inicio_atendimento` |
+| `dashboard_profissionais(ini, fim)` | `profissional_id`, `nome`, `cor`, `consultas` | **`data_consulta`** |
+| `dashboard_procedimentos(ini, fim)` | `procedimento`, `procurado`, `realizado` | `inicio_atendimento` **e** `data_consulta` |
+
+**A taxa de conversão não é calculada aqui**, de propósito: é a divisão de dois
+números que já estão na resposta. Devolvê-la seria uma terceira versão da mesma
+verdade, pronta para divergir no dia em que alguém mudar o arredondamento.
+
+#### O fuso, e por que ele não é detalhe
+
+Agrupar por dia exige saber onde o dia começa, e **a sessão do PostgREST roda em
+UTC**. Um contato das 23h de São Paulo é 02h do dia seguinte em UTC:
+
+```sql
+select (timestamptz '2026-09-01 23:30-03' at time zone 'America/Sao_Paulo')::date;  -- 2026-09-01
+select (timestamptz '2026-09-01 23:30-03')::date;                                    -- 2026-09-02
+```
+
+Sem `at time zone`, todo mundo que escreve à noite cairia no dia seguinte do
+gráfico — sistematicamente, e sem nada na tela sugerindo isso.
+
+**As bordas do período não passam por fuso**: chegam como `timestamptz`, e
+comparar instantes independe de fuso. Só o balde precisa.
+
+> ⚠️ Se o `fuso_horario` da clínica discordar do relógio do computador da
+> recepção, os baldes saem deslocados em relação às bordas escolhidas na tela. É
+> a mesma conferência da aba Horários.
+
+#### Três decisões que parecem sobrar
+
+1. **`dashboard_por_dia` limita a série a 370 dias.** "Todo o período" começa na
+   origem do tempo — sem teto, vinte mil pontos num gráfico de 260px. A tela
+   compara o primeiro dia devolvido com o que pediu e **avisa** quando cortou.
+2. **`dashboard_profissionais` inclui profissional ativo com zero consultas.**
+   "Ninguém marcou com a Dra. X neste mês" é um achado, não um vazio. E inclui
+   uma linha `Sem profissional` quando existe: a agenda aceita consulta sem
+   dentista, e sem essa linha a soma das barras não bateria com o total.
+3. **`dashboard_procedimentos` usa `full outer join`.** Procedimento realizado
+   por quem nunca declarou interesse (o dentista indicou na avaliação) existe, e
+   é o caso mais interessante do gráfico. Um `left join` o apagaria.
+
+#### Conferência (rodada em 02/09/2026, com 6 leads)
+
+| Função | Devolveu | Contagem à mão |
+|---|---|---|
+| `dashboard_numeros` | 6 / 3 | 6 / 3 |
+| `dashboard_por_dia('1970-01-01', now())` | 370 pontos | o teto |
+| `dashboard_dia_semana` | 7 linhas, soma 6 | 6 |
+| `dashboard_profissionais` | Alexandre 3, Débora 1, Sem profissional 1 | idem |
+| `dashboard_procedimentos` | Carga Imediata 2/1, Extração de Siso 2/1 | idem |
 
 ---
 

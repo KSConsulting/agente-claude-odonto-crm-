@@ -1,58 +1,104 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  Users, Calendar, TrendingUp,
+  Users, Calendar, TrendingUp, TriangleAlert,
 } from 'lucide-react'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { formatarParaExibicao } from '../lib/telefones'
 import FiltroPeriodo from '../components/FiltroPeriodo'
+import { COR_SEM_PROFISSIONAL } from '../lib/cores'
 import {
-  getPeriodRange, inRange, startOfDay, endOfDay,
+  getPeriodRange,
   type DateRange, type PeriodKey,
 } from '../lib/periodo'
-import type { LeadClinica, HorarioComercial, LeadStatus } from '../types'
 
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+/* ──────────────────────────────────────────────
+   O DASHBOARD NÃO CARREGA PESSOAS — ELE FAZ PERGUNTAS.
+
+   Antes, esta tela pedia `select * from crm_clinica` e contava tudo aqui. O
+   PostgREST corta em `max_rows` (1000 neste projeto) **sem avisar**: a partir
+   do lead 1001 as contas não ficariam incompletas, ficariam ERRADAS — e erro
+   de contagem não grita, fica na tela parecendo certo.
+
+   Agora são cinco chamadas de função SQL (migração `0024`), cada uma
+   devolvendo números já contados. Dezenas de linhas, independente de a clínica
+   ter cem ou cem mil leads.
+
+   ⚠️ O AGRUPAMENTO POR DIA MORA NO BANCO, E É DE PROPÓSITO. Ele precisa saber
+   onde o dia começa, e a sessão do PostgREST roda em UTC: um contato das 23h
+   de São Paulo cairia no dia seguinte, sempre. As funções usam o
+   `configuracoes_clinica.fuso_horario` — o mesmo campo da `agenda_marcar`.
+────────────────────────────────────────────── */
+
+/* ──────────────────────────────────────────────
+   O que cada função devolve
+────────────────────────────────────────────── */
+interface Numeros { novos_contatos: number; consultas_agendadas: number }
+interface PontoDia { dia: string; atendimentos: number; agendamentos: number }
+interface BarraSemana { dia_semana: number; contatos: number }
+interface BarraProfissional {
+  profissional_id: string | null
+  nome: string
+  /**
+   * `null` na linha "Sem profissional" — e é de propósito.
+   *
+   * O SQL devolve a cor **do dentista**, que é dado. A cor do "sem dentista" é
+   * decisão de tela, e quem é dono dela é `COR_SEM_PROFISSIONAL`, em
+   * [`cores.ts`](../lib/cores.ts) — o mesmo que as três telas da Agenda usam.
+   * Um hex escrito no SQL seria uma segunda paleta, num lugar onde ninguém
+   * procuraria ao trocar a identidade visual.
+   */
+  cor: string | null
+  consultas: number
+}
+interface LinhaProcedimento { procedimento: string; procurado: number; realizado: number }
+
+interface ProximaConsulta {
+  id: string
+  data_consulta: string
+  procedimento: string
+  duracao_minutos: number
+  lead: { id: string; nome_lead: string | null; whatsapp_lead: string | null } | null
+  profissional: { nome: string; sobrenome: string; cor: string } | null
 }
 
-function getDaysArray(range: DateRange): Date[] {
-  const days: Date[] = []
-  const cur = new Date(startOfDay(range.start))
-  while (cur <= range.end) {
-    days.push(new Date(cur))
-    cur.setDate(cur.getDate() + 1)
-  }
-  return days
+/* ──────────────────────────────────────────────
+   Helpers
+────────────────────────────────────────────── */
+
+/**
+ * `2026-09-02` → `02/09`.
+ *
+ * ⚠️ **Sem passar por `new Date()`, de propósito.** `new Date('2026-09-02')` é
+ * interpretado como meia-noite em UTC; em qualquer fuso negativo — o Brasil
+ * inteiro — isso vira **1º de setembro** na hora de formatar, e o gráfico sai
+ * um dia atrasado. A data já vem pronta do banco, no fuso da clínica; cortar a
+ * string é a única leitura que não a move.
+ */
+function rotuloDia(iso: string): string {
+  const [, mes, dia] = iso.split('-')
+  return `${dia}/${mes}`
+}
+
+function fmtDataHora(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
 }
 
 const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-const STATUS_LABELS: Record<LeadStatus, string> = {
-  iniciou_conversa: 'Iniciou conversa',
-  conversando: 'Conversando',
-  consulta_agendada: 'Agendada',
-  consulta_cancelada: 'Cancelada',
-  follow_up_1_feito: 'Follow-up 1',
-  follow_up_2_feito: 'Follow-up 2',
-  follow_up_3_feito: 'Follow-up 3',
-  consulta_realizada: 'Realizada',
-  paciente_recorrente: 'Recorrente',
-}
+/** Quantos procedimentos o ranking mostra. O resto é rodapé, nunca silêncio. */
+const TETO_PROCEDIMENTOS = 10
 
-const STATUS_COLORS: Record<LeadStatus, { bg: string; text: string; dot?: string }> = {
-  iniciou_conversa: { bg: '#EAF3F6', text: '#1E6E8C', dot: '#1E6E8C' },
-  conversando: { bg: '#EEF2FF', text: '#4F46E5' },
-  consulta_agendada: { bg: '#E8F8EF', text: '#1A7A48' },
-  consulta_cancelada: { bg: '#FEF2F2', text: '#DC2626' },
-  follow_up_1_feito: { bg: '#FFFBEB', text: '#D97706' },
-  follow_up_2_feito: { bg: '#FFFBEB', text: '#D97706' },
-  follow_up_3_feito: { bg: '#FFFBEB', text: '#D97706' },
-  consulta_realizada: { bg: '#14532D', text: '#FFFFFF' },
-  paciente_recorrente: { bg: '#F3E8FF', text: '#7C3AED' },
+const CARTAO: React.CSSProperties = {
+  background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA',
+  padding: '24px', transition: 'box-shadow 0.2s',
 }
 
 /* ──────────────────────────────────────────────
@@ -79,18 +125,52 @@ function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: strin
 /* ──────────────────────────────────────────────
    Custom Tooltip for Line Chart
 ────────────────────────────────────────────── */
-function LineTooltip({ active, payload, label }: any) {
+/**
+ * O que a recharts entrega ao tooltip — só o que esta tela usa.
+ *
+ * Era `any`, e estava na lista de débito técnico do CLAUDE.md. O tipo da
+ * biblioteca é genérico demais para ser útil aqui; um formato mínimo e honesto
+ * pega o que importa: campo renomeado, série removida, `value` que virou
+ * string.
+ */
+interface DadosTooltip {
+  active?: boolean
+  label?: string | number
+  payload?: { name?: string; value?: number | string; color?: string }[]
+}
+
+function LineTooltip({ active, payload, label }: DadosTooltip) {
   if (!active || !payload?.length) return null
   return (
     <div style={{ background: '#fff', border: '1px solid #DCE6EA', borderRadius: 10, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', fontSize: 13 }}>
       <div style={{ fontWeight: 600, color: '#16232B', marginBottom: 6 }}>{label}</div>
-      {payload.map((p: any) => (
+      {payload.map((p) => (
         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, color: p.color, marginBottom: 2 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color }} />
           <span style={{ color: '#6B818C' }}>{p.name}:</span>
           <span style={{ fontWeight: 600, color: '#16232B' }}>{p.value}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────
+   Cabeçalho de cartão de gráfico
+────────────────────────────────────────────── */
+function TituloGrafico({ titulo, explicacao }: { titulo: string; explicacao: string }) {
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>{titulo}</h3>
+      <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>{explicacao}</p>
+    </div>
+  )
+}
+
+function Vazio({ texto }: { texto: string }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '48px 0', color: '#B9C8CE', fontSize: 13 }}>
+      {texto}
     </div>
   )
 }
@@ -107,16 +187,7 @@ function KpiCard({
   return (
     <div
       className={`fade-in-${delay}`}
-      style={{
-        background: '#fff',
-        borderRadius: 14,
-        border: '1px solid #DCE6EA',
-        padding: '22px 24px',
-        flex: 1,
-        minWidth: 0,
-        transition: 'box-shadow 0.2s ease',
-        cursor: 'default',
-      }}
+      style={{ ...CARTAO, padding: '22px 24px', flex: 1, minWidth: 0, cursor: 'default' }}
       onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)')}
       onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
     >
@@ -140,94 +211,150 @@ function KpiCard({
    Main Component
 ────────────────────────────────────────────── */
 export default function Dashboard() {
-  const [leads, setLeads] = useState<LeadClinica[]>([])
-  const [horarios, setHorarios] = useState<HorarioComercial[]>([])
-  const [period, setPeriod] = useState<PeriodKey>('this_month')
-  const [customRange, setCustomRange] = useState<DateRange>({ start: new Date(), end: new Date() })
+  const navigate = useNavigate()
+
+  const [periodo, setPeriodo] = useState<PeriodKey>('this_month')
+  const [faixa, setFaixa] = useState<DateRange>(() => ({ start: new Date(), end: new Date() }))
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function loadData() {
-      const [{ data: leadsData }, { data: horariosData }] = await Promise.all([
-        supabase.from('crm_clinica').select('*'),
-        supabase.from('horario_comercial').select('*').eq('ativo', true),
-      ])
+  const [numeros, setNumeros] = useState<Numeros>({ novos_contatos: 0, consultas_agendadas: 0 })
+  const [porDia, setPorDia] = useState<PontoDia[]>([])
+  const [porSemana, setPorSemana] = useState<BarraSemana[]>([])
+  const [profissionais, setProfissionais] = useState<BarraProfissional[]>([])
+  const [procedimentos, setProcedimentos] = useState<LinhaProcedimento[]>([])
+  const [proximas, setProximas] = useState<ProximaConsulta[]>([])
+  /* Calculado no efeito, junto com os dados que ele descreve.
 
-      setLeads(leadsData ?? [])
-      setHorarios(horariosData ?? [])
+     Comparar aqui embaixo o primeiro dia devolvido com `range.start` tinha dois
+     defeitos: o `range` é recalculado a cada renderização, então entre trocar o
+     filtro e a resposta chegar a comparação misturava o período novo com os
+     dados velhos; e as duas datas vinham de fusos diferentes — a do banco no
+     fuso da clínica, a da tela no do navegador. */
+  const [serieCortada, setSerieCortada] = useState(false)
+  /* PAINEL QUE NÃO SABE TEM QUE DIZER QUE NÃO SABE.
+
+     `supabase.rpc()` não lança em erro do banco: devolve `{ data: null, error }`.
+     Com `?? 0` no caminho de leitura, uma função que falhasse pintaria **zero**
+     em todos os cartões — e zero é um número, indistinguível de uma clínica
+     parada. Seria trocar o corte silencioso de 1000 linhas por um silêncio
+     pior. */
+  const [falhou, setFalhou] = useState(false)
+
+  /* Os cinco números do período — todos vêm contados do banco. */
+  useEffect(() => {
+    let vivo = true
+    const range = getPeriodRange(periodo, faixa)
+    const p = { p_inicio: range.start.toISOString(), p_fim: range.end.toISOString() }
+
+    void Promise.all([
+      supabase.rpc('dashboard_numeros', p),
+      supabase.rpc('dashboard_por_dia', p),
+      supabase.rpc('dashboard_dia_semana', p),
+      supabase.rpc('dashboard_profissionais', p),
+      supabase.rpc('dashboard_procedimentos', p),
+    ]).then(([n, dia, semana, profs, procs]) => {
+      if (!vivo) return
+
+      const erro = [n, dia, semana, profs, procs].find((r) => r.error)
+      if (erro) {
+        console.error('dashboard:', erro.error)
+        setFalhou(true)
+        setLoading(false)
+        return
+      }
+      setFalhou(false)
+      // `count()` volta como bigint; o Number() aqui é cinto de segurança para
+      // o dia em que uma delas passar a somar (numeric vem como string).
+      setNumeros({
+        novos_contatos: Number(n.data?.[0]?.novos_contatos ?? 0),
+        consultas_agendadas: Number(n.data?.[0]?.consultas_agendadas ?? 0),
+      })
+      const dias = (dia.data ?? []) as PontoDia[]
+      setPorDia(dias.map((r) => ({
+        dia: r.dia,
+        atendimentos: Number(r.atendimentos),
+        agendamentos: Number(r.agendamentos),
+      })))
+      /* Quantos dias cabiam no período pedido, contra quantos vieram. Menos
+         quer dizer que o teto de 370 da `dashboard_por_dia` entrou em ação.
+         As duas pontas do cálculo saem do MESMO `range` desta consulta. */
+      const diasPedidos = Math.round(
+        (range.end.getTime() - range.start.getTime()) / 86_400_000,
+      )
+      setSerieCortada(dias.length > 0 && diasPedidos > dias.length)
+      setPorSemana((semana.data ?? []).map((r: BarraSemana) => ({
+        dia_semana: Number(r.dia_semana),
+        contatos: Number(r.contatos),
+      })))
+      setProfissionais((profs.data ?? []).map((r: BarraProfissional) => ({
+        ...r, consultas: Number(r.consultas),
+      })))
+      setProcedimentos((procs.data ?? []).map((r: LinhaProcedimento) => ({
+        procedimento: r.procedimento,
+        procurado: Number(r.procurado),
+        realizado: Number(r.realizado),
+      })))
       setLoading(false)
-    }
-    loadData()
+    }).catch((e) => {
+      // Rede caindo no meio: o `.then` acima nunca roda, e sem este ramo a
+      // tela ficaria girando o carregador para sempre.
+      if (!vivo) return
+      console.error('dashboard:', e)
+      setFalhou(true)
+      setLoading(false)
+    })
+
+    return () => { vivo = false }
+  }, [periodo, faixa])
+
+  /* PRÓXIMAS CONSULTAS — DA TABELA `consultas`, E NÃO DA FICHA DO LEAD.
+
+     Ela lia `crm_clinica.data_agendamento`, que é reflexo mantido por trigger:
+     traz UMA data por pessoa, não a consulta. Sem ordem e sem limite, dentro de
+     um `select *` cortado em 1000, um paciente com consulta amanhã podia
+     simplesmente não aparecer.
+
+     Aqui é a fonte, ordenada e limitada — e não depende do filtro de período,
+     porque "próximas" é sempre sobre o futuro. */
+  useEffect(() => {
+    let vivo = true
+    void supabase
+      .from('consultas')
+      .select('id, data_consulta, procedimento, duracao_minutos, lead:crm_clinica_dados(id, nome_lead, whatsapp_lead), profissional:profissionais(nome, sobrenome, cor)')
+      .eq('status', 'agendada')
+      .gt('data_consulta', new Date().toISOString())
+      .order('data_consulta', { ascending: true })
+      .limit(10)
+      .then(({ data }) => {
+        if (vivo) setProximas((data ?? []) as unknown as ProximaConsulta[])
+      })
+    return () => { vivo = false }
   }, [])
 
-  const range = getPeriodRange(period, customRange)
+  const taxaConversao = numeros.novos_contatos > 0
+    ? Math.round((numeros.consultas_agendadas / numeros.novos_contatos) * 100)
+    : 0
 
-  /* KPIs */
-  const novosContatos = leads.filter((l) => inRange(l.inicio_atendimento, range)).length
-  const consultasAgendadas = leads.filter((l) => inRange(l.data_marcacao_agendamento, range)).length
-  const taxaConversao = novosContatos > 0 ? Math.round((consultasAgendadas / novosContatos) * 100) : 0
-
-  /* Chart 1: Atendimentos vs Agendamentos */
-  const days = getDaysArray(range)
-  const lineData = days.map((day) => {
-    const label = formatDate(day)
-    const dayStart = startOfDay(day)
-    const dayEnd = endOfDay(day)
-    const atendimentos = leads.filter((l) => {
-      if (!l.inicio_atendimento) return false
-      const d = new Date(l.inicio_atendimento)
-      return d >= dayStart && d <= dayEnd
-    }).length
-    const agendamentos = leads.filter((l) => {
-      if (!l.data_marcacao_agendamento) return false
-      const d = new Date(l.data_marcacao_agendamento)
-      return d >= dayStart && d <= dayEnd
-    }).length
-    return { date: label, Atendimentos: atendimentos, Agendamentos: agendamentos }
-  })
-
-  /* Chart 2: Dias da semana */
-  const dayOfWeekCounts = Array(7).fill(0)
-  leads.forEach((l) => {
-    if (!l.inicio_atendimento) return
-    const d = new Date(l.inicio_atendimento)
-    dayOfWeekCounts[d.getDay()]++
-  })
-  const maxDayCount = Math.max(...dayOfWeekCounts)
-  const barData = DAY_NAMES.map((name, i) => ({
-    name,
-    Contatos: dayOfWeekCounts[i],
-    isMax: dayOfWeekCounts[i] === maxDayCount && maxDayCount > 0,
+  const dadosLinha = porDia.map((p) => ({
+    date: rotuloDia(p.dia),
+    Atendimentos: p.atendimentos,
+    Agendamentos: p.agendamentos,
   }))
 
-  /* Chart 3: Dentro/Fora do horário comercial */
-  const isWithinBusinessHours = useCallback((dateStr: string | null): boolean => {
-    if (!dateStr || horarios.length === 0) return false
-    const d = new Date(dateStr)
-    const diaSemana = d.getDay()
-    const horario = horarios.find((h) => h.dia_semana === diaSemana)
-    if (!horario) return false
-    const hh = d.getHours()
-    const mm = d.getMinutes()
-    const totalMin = hh * 60 + mm
-    const [sh, sm] = horario.hora_inicio.split(':').map(Number)
-    const [eh, em] = horario.hora_fim.split(':').map(Number)
-    return totalMin >= sh * 60 + sm && totalMin <= eh * 60 + em
-  }, [horarios])
+  const maxSemana = Math.max(0, ...porSemana.map((s) => s.contatos))
+  const dadosSemana = porSemana.map((s) => ({
+    name: DAY_NAMES[s.dia_semana] ?? '?',
+    Contatos: s.contatos,
+    isMax: s.contatos === maxSemana && maxSemana > 0,
+  }))
 
-  const leadsComAtendimento = leads.filter((l) => l.inicio_atendimento)
-  const dentroHorario = leadsComAtendimento.filter((l) => isWithinBusinessHours(l.inicio_atendimento)).length
-  const foraHorario = leadsComAtendimento.length - dentroHorario
-  const donutData = [
-    { name: 'Dentro do horário', value: dentroHorario, color: '#1A7A48' },
-    { name: 'Fora do horário', value: foraHorario, color: '#E8955A' },
-  ]
-
-  /* Próximas consultas */
-  const now = new Date()
-  const proximasConsultas = leads
-    .filter((l) => l.data_agendamento && new Date(l.data_agendamento) > now)
-    .sort((a, b) => new Date(a.data_agendamento!).getTime() - new Date(b.data_agendamento!).getTime())
+  const dadosProcedimentos = procedimentos
+    .slice(0, TETO_PROCEDIMENTOS)
+    .map((p) => ({
+      procedimento: p.procedimento,
+      Procurado: p.procurado,
+      Realizado: p.realizado,
+    }))
 
   const greeting = () => {
     const h = new Date().getHours()
@@ -261,144 +388,226 @@ export default function Dashboard() {
       {/* Period Filter */}
       <div className="fade-in-2" style={{ marginBottom: 28 }}>
         <FiltroPeriodo
-          periodo={period}
-          onPeriodo={setPeriod}
-          faixa={customRange}
-          onFaixa={setCustomRange}
+          periodo={periodo}
+          onPeriodo={setPeriodo}
+          faixa={faixa}
+          onFaixa={setFaixa}
         />
       </div>
 
+      {falhou && (
+        <div className="fade-in-3" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 24,
+          background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12,
+          padding: '13px 16px', fontSize: 13, color: '#DC2626', lineHeight: 1.55,
+        }}>
+          <TriangleAlert size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>
+            <strong>Não consegui carregar os números.</strong> O que está na tela
+            abaixo não é da sua clínica — pode ser uma queda de rede. Escolha o
+            período de novo ou recarregue a página.
+          </span>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="fade-in-3" style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-        <KpiCard icon={Users} label="Novos Contatos" value={novosContatos} description="Pessoas que entraram em contato no período" delay="3" />
-        <KpiCard icon={Calendar} label="Consultas Agendadas" value={consultasAgendadas} description="Total de consultas marcadas no período" delay="4" />
+        <KpiCard icon={Users} label="Novos Contatos" value={numeros.novos_contatos} description="Pessoas que entraram em contato no período" delay="3" />
+        <KpiCard icon={Calendar} label="Consultas Agendadas" value={numeros.consultas_agendadas} description="Total de consultas marcadas no período" delay="4" />
         <KpiCard icon={TrendingUp} label="Taxa de Conversão" value={taxaConversao} suffix="%" description="Percentual de novos contatos que agendaram uma consulta" delay="5" />
       </div>
 
-      {/* Chart 1: Line Chart */}
-      <div className="fade-in-4" style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', marginBottom: 24 }}
+      {/* Gráfico 1: linha */}
+      <div className="fade-in-4" style={{ ...CARTAO, marginBottom: 24 }}
         onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
       >
-        <div style={{ marginBottom: 4 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Atendimentos vs Agendamentos</h3>
-          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>Compare quantas pessoas entraram em contato e quantas marcaram consulta por dia no período selecionado</p>
-        </div>
+        <TituloGrafico
+          titulo="Atendimentos vs Agendamentos"
+          explicacao="Quantas pessoas chegaram e quantas marcaram consulta, por dia do período"
+        />
+
+        {serieCortada && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8, margin: '10px 0 2px',
+            background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 9,
+            padding: '9px 12px', fontSize: 12, color: '#B45309', lineHeight: 1.5,
+          }}>
+            <TriangleAlert size={13} style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>
+              Período longo demais para um ponto por dia — mostrando os últimos{' '}
+              <strong>{porDia.length}</strong> dias. Os números acima continuam sendo
+              do período inteiro.
+            </span>
+          </div>
+        )}
+
         <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={lineData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+          <LineChart data={dadosLinha} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} minTickGap={16} />
             <YAxis tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip content={<LineTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
-              iconType="circle"
-              iconSize={8}
-            />
+            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} iconType="circle" iconSize={8} />
             <Line type="monotone" dataKey="Atendimentos" stroke="#1E6E8C" strokeWidth={2.5} dot={{ r: 3, fill: '#1E6E8C' }} activeDot={{ r: 5 }} />
             <Line type="monotone" dataKey="Agendamentos" stroke="#1A7A48" strokeWidth={2.5} dot={{ r: 3, fill: '#1A7A48' }} activeDot={{ r: 5 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Charts 2 & 3 */}
+      {/* Gráficos 2 e 3, lado a lado */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
 
-        {/* Bar Chart */}
-        <div className="fade-in-5"
-          style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', transition: 'box-shadow 0.2s' }}
+        {/* Dias da semana */}
+        <div className="fade-in-5" style={CARTAO}
           onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
           onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
         >
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Dias com Mais Movimento</h3>
-          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4, marginBottom: 16 }}>Veja em quais dias a clínica recebe mais contatos</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={barData} barSize={28} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B818C' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                cursor={{ fill: '#F2F6F7' }}
-              />
-              <Bar dataKey="Contatos" radius={[6, 6, 0, 0]}>
-                {barData.map((entry, i) => (
-                  <Cell key={i} fill={entry.isMax ? '#1E6E8C' : '#EAF3F6'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <TituloGrafico
+            titulo="Dias com Mais Movimento"
+            explicacao="Em quais dias da semana a clínica recebeu contatos, no período"
+          />
+          {maxSemana === 0 ? (
+            <Vazio texto="Nenhum contato no período." />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={dadosSemana} barSize={28} margin={{ top: 12, right: 4, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B818C' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  cursor={{ fill: '#F2F6F7' }}
+                />
+                <Bar dataKey="Contatos" radius={[6, 6, 0, 0]}>
+                  {dadosSemana.map((entry, i) => (
+                    <Cell key={i} fill={entry.isMax ? '#1E6E8C' : '#EAF3F6'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Donut Chart */}
-        <div className="fade-in-6"
-          style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', transition: 'box-shadow 0.2s' }}
+        {/* Consultas por profissional — NO LUGAR DA ROSCA DE HORÁRIO COMERCIAL.
+
+            Barras deitadas, e não em pé: nome de dentista com sobrenome não cabe
+            embaixo de uma barra de meia largura de tela sem virar de lado ou ser
+            cortado.
+
+            Cada barra usa a COR DO PRÓPRIO PROFISSIONAL — a mesma da Agenda.
+            Assim o gráfico e o calendário falam a mesma língua, e a cor deixa de
+            ser enfeite: ela identifica. */}
+        <div className="fade-in-6" style={CARTAO}
           onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
           onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
         >
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Horário dos Contatos</h3>
-          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4, marginBottom: 8 }}>Contatos dentro e fora do horário de funcionamento da clínica</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <ResponsiveContainer width={160} height={160}>
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={48}
-                  outerRadius={72}
-                  paddingAngle={3}
-                  dataKey="value"
-                  animationBegin={0}
-                  animationDuration={800}
-                >
-                  {donutData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13 }}
+          <TituloGrafico
+            titulo="Consultas por Profissional"
+            explicacao="Consultas marcadas ou realizadas no período, pela data da consulta"
+          />
+          {profissionais.length === 0 ? (
+            <Vazio texto="Nenhum profissional ativo cadastrado." />
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(180, profissionais.length * 46)}>
+              <BarChart
+                data={profissionais}
+                layout="vertical"
+                barSize={22}
+                margin={{ top: 12, right: 20, bottom: 0, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis
+                  type="category" dataKey="nome" width={124}
+                  tick={{ fontSize: 11.5, fill: '#16232B' }} axisLine={false} tickLine={false}
                 />
-              </PieChart>
+                <Tooltip
+                  contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  cursor={{ fill: '#F2F6F7' }}
+                />
+                <Bar dataKey="consultas" name="Consultas" radius={[0, 6, 6, 0]}>
+                  {profissionais.map((p) => (
+                    <Cell key={p.profissional_id ?? 'sem'} fill={p.cor ?? COR_SEM_PROFISSIONAL.hex} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
-
-            <div style={{ flex: 1 }}>
-              {donutData.map((entry) => (
-                <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: entry.color, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B' }}>{entry.name}</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: entry.color, lineHeight: 1.2 }}>{entry.value}</div>
-                  </div>
-                </div>
-              ))}
-              <div style={{ fontSize: 11, color: '#6B818C', marginTop: 8, lineHeight: 1.4 }}>
-                * Horários geridos em <span style={{ color: '#1E6E8C', fontWeight: 600 }}>Configurações</span>
-              </div>
-            </div>
-          </div>
-
-          {foraHorario > 0 && (
-            <div style={{ marginTop: 16, background: '#EAF3F6', borderRadius: 10, padding: '12px 16px', borderLeft: '3px solid #1E6E8C' }}>
-              <span style={{ fontSize: 13.5, fontWeight: 800, color: '#1E6E8C' }}>{foraHorario} {foraHorario === 1 ? 'lead atendido' : 'leads atendidos'} fora do expediente.</span>
-              <span style={{ fontSize: 13, color: '#3A5560', fontWeight: 400 }}> Cada um deles poderia ter ido para a concorrência — o Agente de IA garantiu que não fossem.</span>
-            </div>
           )}
         </div>
       </div>
 
+      {/* PROCEDIMENTOS: PROCURADO x REALIZADO.
+
+          Duas barras, e a distância entre elas é a informação. "120 procuraram
+          lentes, 14 fizeram" é uma conversa sobre preço, agenda ou argumento de
+          venda que nenhum dos dois números sozinho começa.
+
+          ⚠️ As duas barras respondem a recortes DIFERENTES do mesmo período, e
+          têm que responder: "procurado" conta por quando a PESSOA chegou (o
+          mesmo campo do KPI "Novos Contatos"); "realizado", por quando a
+          CONSULTA aconteceu. Quem chegou em agosto pode ter feito em setembro. */}
+      <div className="fade-in-6" style={{ ...CARTAO, marginBottom: 24 }}
+        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
+        onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
+      >
+        <TituloGrafico
+          titulo="Procedimentos: procurado x realizado"
+          explicacao="Quantas pessoas declararam interesse (pela chegada delas) e quantas consultas aconteceram (pela data da consulta)"
+        />
+        {dadosProcedimentos.length === 0 ? (
+          <Vazio texto="Nenhum procedimento procurado ou realizado no período." />
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={Math.max(200, dadosProcedimentos.length * 46)}>
+              <BarChart
+                data={dadosProcedimentos}
+                layout="vertical"
+                barSize={13}
+                barGap={3}
+                margin={{ top: 12, right: 24, bottom: 0, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#E7EEF0" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#6B818C' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis
+                  type="category" dataKey="procedimento" width={186}
+                  tick={{ fontSize: 11.5, fill: '#16232B' }} axisLine={false} tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{ borderRadius: 10, border: '1px solid #DCE6EA', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  cursor={{ fill: '#F2F6F7' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} iconType="circle" iconSize={8} />
+                <Bar dataKey="Procurado" fill="#4C90A8" radius={[0, 5, 5, 0]} />
+                <Bar dataKey="Realizado" fill="#1A7A48" radius={[0, 5, 5, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+
+            {/* Teto dito em voz alta: lista cortada sem aviso lê-se como
+                "é isso que existe". */}
+            {procedimentos.length > TETO_PROCEDIMENTOS && (
+              <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6 }}>
+                Mostrando os {TETO_PROCEDIMENTOS} mais procurados, de{' '}
+                {procedimentos.length} com movimento no período.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Próximas Consultas */}
-      <div className="fade-in-6"
-        style={{ background: '#fff', borderRadius: 14, border: '1px solid #DCE6EA', padding: '24px', marginBottom: 32, transition: 'box-shadow 0.2s' }}
+      <div className="fade-in-6" style={{ ...CARTAO, marginBottom: 32 }}
         onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)')}
         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = 'none')}
       >
         <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#16232B', margin: 0 }}>Próximas Consultas</h3>
-          <p style={{ fontSize: 12.5, color: '#6B818C', marginTop: 4 }}>Consultas já agendadas que ainda estão por acontecer</p>
+          <TituloGrafico
+            titulo="Próximas Consultas"
+            explicacao="As 10 primeiras que ainda vão acontecer — independente do filtro de período acima"
+          />
         </div>
 
-        {proximasConsultas.length === 0 ? (
+        {proximas.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 0', color: '#6B818C', fontSize: 13.5 }}>
             Nenhuma consulta futura agendada.
           </div>
@@ -407,62 +616,41 @@ export default function Dashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #DCE6EA' }}>
-                  {['Paciente', 'Procedimento', 'Status', 'Data da Consulta'].map((h) => (
+                  {['Paciente', 'Procedimento', 'Profissional', 'Data da Consulta'].map((h) => (
                     <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#6B818C', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {proximasConsultas.map((lead) => {
-                  const statusStyle = STATUS_COLORS[lead.status]
-                  const isPulse = lead.status === 'iniciou_conversa'
-                  return (
-                    <tr
-                      key={lead.id}
-                      style={{ borderBottom: '1px solid #EDF2F4', transition: 'background 0.15s' }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = '#F7FAFB')}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '12px 12px' }}>
-                        <div style={{ fontWeight: 600, color: '#16232B' }}>{lead.nome_lead ?? '—'}</div>
-                        <div style={{ fontSize: 12, color: '#6B818C' }}>{formatarParaExibicao(lead.whatsapp_lead)}</div>
-                      </td>
-                      <td style={{ padding: '12px 12px', color: '#6B818C' }}>{lead.procedimento_interesse ?? '—'}</td>
-                      <td style={{ padding: '12px 12px' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 5,
-                          padding: '3px 10px',
-                          borderRadius: 20,
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          background: statusStyle.bg,
-                          color: statusStyle.text,
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {isPulse && (
-                            <span style={{
-                              width: 6, height: 6, borderRadius: '50%',
-                              background: statusStyle.dot,
-                              display: 'inline-block',
-                              animation: 'pulse-badge 1.4s ease infinite',
-                            }} />
-                          )}
-                          {STATUS_LABELS[lead.status]}
+                {proximas.map((c) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => c.lead && navigate(`/leads/${c.lead.id}`)}
+                    style={{ borderBottom: '1px solid #EDF2F4', transition: 'background 0.15s', cursor: c.lead ? 'pointer' : 'default' }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = '#F7FAFB')}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '12px 12px' }}>
+                      <div style={{ fontWeight: 600, color: '#16232B' }}>{c.lead?.nome_lead ?? '—'}</div>
+                      <div style={{ fontSize: 12, color: '#6B818C' }}>{formatarParaExibicao(c.lead?.whatsapp_lead ?? null)}</div>
+                    </td>
+                    <td style={{ padding: '12px 12px', color: '#6B818C' }}>
+                      {c.procedimento}
+                      <span style={{ color: '#B9C8CE' }}> · {c.duracao_minutos} min</span>
+                    </td>
+                    <td style={{ padding: '12px 12px', color: '#6B818C', whiteSpace: 'nowrap' }}>
+                      {c.profissional ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.profissional.cor, display: 'inline-block', flexShrink: 0 }} />
+                          {`${c.profissional.nome} ${c.profissional.sobrenome}`.trim()}
                         </span>
-                      </td>
-                      <td style={{ padding: '12px 12px', color: '#16232B', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                        {lead.data_agendamento
-                          ? new Date(lead.data_agendamento).toLocaleString('pt-BR', {
-                            day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit',
-                          })
-                          : '—'}
-                      </td>
-                    </tr>
-                  )
-                })}
+                      ) : '—'}
+                    </td>
+                    <td style={{ padding: '12px 12px', color: '#16232B', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      {fmtDataHora(c.data_consulta)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -471,7 +659,6 @@ export default function Dashboard() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse-badge { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.3); } }
       `}</style>
     </div>
   )

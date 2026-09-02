@@ -31,11 +31,16 @@ Visão geral da operação, com filtro por período (hoje, últimos 7 dias, este
 intervalo personalizado…).
 
 - Novos contatos, consultas agendadas e taxa de conversão
-- Distribuição dos leads pelo funil
+- Atendimentos × agendamentos, dia a dia do período
 - Gráfico de contatos por dia da semana
-- **Dentro × fora do horário comercial** — mostra quantos pacientes chegaram
-  quando a clínica estava fechada e foram atendidos mesmo assim pelo agente
+- **Consultas por profissional**, cada barra na cor do próprio dentista
+- **Procedimentos: procurado × realizado** — quantos declararam interesse e
+  quantos de fato aconteceram; a distância entre as duas barras é a informação
 - Lista das próximas consultas
+
+> Todos os números são contados **no banco** (migração `0024`): a tela não
+> carrega os leads para somar. Antes carregava, e o servidor cortava em mil
+> linhas sem avisar.
 
 ### 🗂️ CRM (Kanban)
 
@@ -99,7 +104,9 @@ CSV**.
 - **Perfil** — nome e foto do usuário, nome e logotipo da clínica
 - **Clínica** — endereço, bairro, cidade, UF, CEP, Google Maps, Instagram e
   site, com a prévia exata do que o Agente de IA lê
-- **Horários** — grade de atendimento por dia da semana, usada pelo Dashboard
+- **Horários** — grade de atendimento por dia da semana, e o fuso da clínica.
+  É o que a Secretária de IA anuncia ao paciente, e o fuso em que o Dashboard
+  agrupa os dias
 - **Procedimentos** — catálogo de serviços oferecidos
 - **Senha** — troca com medidor de força
 - **Token e API** — chaves de acesso do Agente de IA e a documentação dos sete
@@ -182,7 +189,7 @@ Aguarde alguns minutos até o projeto ficar pronto.
 
 No painel do Supabase, abra o **SQL Editor** → **New query**.
 
-São **vinte arquivos, nesta ordem** — cada um depende do anterior:
+São **vinte e quatro arquivos, nesta ordem** — cada um depende do anterior:
 
 1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
 2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
@@ -204,6 +211,10 @@ São **vinte arquivos, nesta ordem** — cada um depende do anterior:
 18. [`supabase/migrations/0018_avaliacao_e_precos.sql`](supabase/migrations/0018_avaliacao_e_precos.sql)
 19. [`supabase/migrations/0019_nome_do_agente.sql`](supabase/migrations/0019_nome_do_agente.sql)
 20. [`supabase/migrations/0020_apagar_foto_e_logo.sql`](supabase/migrations/0020_apagar_foto_e_logo.sql)
+21. [`supabase/migrations/0021_nome_do_paciente.sql`](supabase/migrations/0021_nome_do_paciente.sql)
+22. [`supabase/migrations/0022_procedimentos_padronizados.sql`](supabase/migrations/0022_procedimentos_padronizados.sql)
+23. [`supabase/migrations/0023_marcar_so_do_catalogo.sql`](supabase/migrations/0023_marcar_so_do_catalogo.sql)
+24. [`supabase/migrations/0024_dashboard_no_banco.sql`](supabase/migrations/0024_dashboard_no_banco.sql)
 
 Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
 
@@ -211,11 +222,12 @@ Ao final você terá:
 
 ```
 12 tabelas + 5 views     estrutura de dados
-21 índices               desempenho e integridade (um deles impede
+23 índices               desempenho e integridade (um deles impede
                          duas pessoas com o mesmo WhatsApp)
 21 políticas de RLS      controle de acesso (13 no banco + 8 no Storage)
 3 buckets de Storage     perfil, logotipo e as mídias do WhatsApp
-15 funções + 8 triggers  automações internas e as regras da agenda
+25 funções + 10 triggers automações internas, as regras da agenda e as
+                         contagens do Dashboard
 1 restrição de exclusão  impede duas consultas no mesmo horário
 3 tabelas no Realtime    atualização automática da tela
 ```
