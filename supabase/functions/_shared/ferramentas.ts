@@ -229,6 +229,20 @@ const NOMES_GENERICOS = new Set([
 
 function ehNomeGenerico(nome: string): boolean {
   const limpo = nome.trim().toLowerCase().replace(/\s+/g, ' ')
+
+  // ⚠️ `�` É TEXTO JÁ ESTRAGADO, e ele volta pela ficha.
+  //
+  // O caractere de substituição aparece quando alguma etapa leu bytes UTF-8
+  // com a codificação errada — "Rogério" vira "Rog�rio". Aconteceu numa
+  // escrita manual pelo terminal do Windows, não pelo agente: as 44 mensagens
+  // da conversa estavam intactas.
+  //
+  // O perigo não é a escrita original, é a CÓPIA. A Letícia lê o nome na ficha
+  // e o repete de boa-fé na próxima `atualizar_ficha` — e aí o erro deixa de
+  // ter culpado e passa a se manter sozinho. Recusar aqui faz a ficha voltar a
+  // ficar vazia, e vazia ela pergunta de novo.
+  if (limpo.includes('�')) return true
+
   // Só dígitos também não é nome: é o telefone voltando pela porta dos fundos.
   return NOMES_GENERICOS.has(limpo) || /^[\d\s()+-]+$/.test(limpo)
 }
