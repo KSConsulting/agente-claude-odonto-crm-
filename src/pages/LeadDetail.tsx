@@ -4,7 +4,10 @@ import { ArrowLeft, Phone, Clock, Save, Plus, X, CalendarDays, ClipboardList, Me
 import { supabase } from '../lib/supabase'
 import { isPaciente } from '../lib/pessoas'
 import { formatarParaExibicao } from '../lib/telefones'
+import { useCatalogoProcedimentos } from '../lib/procedimentos'
+import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
 import { STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
+import CampoTelefone from '../components/CampoTelefone'
 import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional } from '../types'
 
 /* ──────────────────────────────────────────────
@@ -42,6 +45,12 @@ function fmtDate(str: string | null) {
   return new Date(str).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+const campoStyle: React.CSSProperties = {
+  padding: '7px 10px', borderRadius: 8, border: '1px solid #DCE6EA', fontSize: 13.5,
+  fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none',
+  background: '#fff',
+}
+
 function fmtCurrency(v: number | null) {
   if (v === null || v === undefined) return '—'
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -64,11 +73,18 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: Rea
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: string | React.ReactNode }) {
+/**
+ * Uma linha da ficha: rótulo à esquerda, campo à direita.
+ *
+ * A coluna de 180px é a mesma do resto do cartão, e é ela que faz os campos
+ * ficarem alinhados entre si em vez de cada um começar onde seu rótulo acabou.
+ * Em tela estreita a linha quebra e o campo desce inteiro.
+ */
+function LinhaFicha({ rotulo, topo = false, children }: { rotulo: string; topo?: boolean; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-      <span style={{ fontSize: 12.5, color: '#6B818C', minWidth: 180, flexShrink: 0, paddingTop: 1 }}>{label}</span>
-      <span style={{ fontSize: 13.5, color: '#16232B', fontWeight: 500 }}>{value || '—'}</span>
+    <div style={{ display: 'flex', gap: 12, alignItems: topo ? 'flex-start' : 'center', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 12.5, color: '#6B818C', minWidth: 180, flexShrink: 0, paddingTop: topo ? 7 : 0 }}>{rotulo}</span>
+      <div style={{ flex: 1, minWidth: 240 }}>{children}</div>
     </div>
   )
 }
@@ -218,11 +234,29 @@ export default function LeadDetail() {
   const [notesSaved, setNotesSaved] = useState(false)
   const [notesError, setNotesError] = useState('')
 
+  /* A FICHA EDITÁVEL.
+
+     Nome, WhatsApp e procedimentos eram só leitura aqui: um nome que a Letícia
+     entendeu errado, ou um número digitado torto, só tinham conserto no banco.
+     Tudo isto entra no MESMO "Salvar Ficha" que já existia — um botão por
+     assunto, e não um por campo. */
+  const [nome, setNome] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [whatsappValido, setWhatsappValido] = useState(false)
+  /* Sem isto não dá para separar "apagou o número" de "está no meio de
+     digitar": o CampoTelefone manda '' nos dois casos. Enquanto ninguém tocar
+     no campo, o WhatsApp nem entra no update — e não há como zerá-lo sem
+     querer. */
+  const [whatsappTocado, setWhatsappTocado] = useState(false)
+  const [duplicado, setDuplicado] = useState<PessoaResumo | null>(null)
+  const [procedimentos, setProcedimentos] = useState<string[]>([])
   const [dataNascimento, setDataNascimento] = useState('')
   const [valorPago, setValorPago] = useState('')
   const [savingFicha, setSavingFicha] = useState(false)
   const [fichaSaved, setFichaSaved] = useState(false)
   const [fichaError, setFichaError] = useState('')
+
+  const catalogo = useCatalogoProcedimentos()
 
   const [showModal, setShowModal] = useState(false)
 
@@ -238,6 +272,10 @@ export default function LeadDetail() {
         setLead(leadData)
         setSelectedStatus(leadData.status)
         setAnotacoes(leadData.anotacoes ?? '')
+        setNome(leadData.nome_lead ?? '')
+        setWhatsapp(leadData.whatsapp_lead ?? '')
+        setWhatsappValido(!!leadData.whatsapp_lead)
+        setProcedimentos(leadData.procedimentos_interesse ?? [])
         setDataNascimento(leadData.data_nascimento ? leadData.data_nascimento.slice(0, 10) : '')
         setValorPago(leadData.valor_pago_acumulado !== null && leadData.valor_pago_acumulado !== undefined ? String(leadData.valor_pago_acumulado) : '')
       }
@@ -273,18 +311,68 @@ export default function LeadDetail() {
     setTimeout(() => setStatusSaved(false), 2000)
   }
 
+  /* O WhatsApp mudou: confere se o número novo já é de outra pessoa antes de
+     alguém clicar em salvar e levar um 23505 sem explicação. */
+  const handleWhatsapp = (canonico: string, valido: boolean) => {
+    setWhatsapp(canonico)
+    setWhatsappValido(valido)
+    setWhatsappTocado(true)
+    setDuplicado(null)
+    setFichaError('')
+    if (valido && canonico !== lead?.whatsapp_lead) {
+      void buscarPorWhatsapp(canonico).then((p) => setDuplicado(p && p.id !== lead?.id ? p : null))
+    }
+  }
+
   /* Save ficha */
   const handleSaveFicha = async () => {
     if (!lead) return
+    if (whatsappTocado && !whatsappValido) {
+      setFichaError('Informe um WhatsApp válido, com o código do país.')
+      return
+    }
+    if (duplicado) { setFichaError('Esse WhatsApp já pertence a outra pessoa.'); return }
+
     setSavingFicha(true); setFichaError('')
     const valorNum = valorPago ? parseFloat(valorPago.replace(',', '.')) : null
-    const { error } = await supabase.from('crm_clinica').update({
+    const campos: Record<string, unknown> = {
+      nome_lead: nome.trim() || null,
+      // O array é que se grava. `procedimento_interesse` é calculada na view —
+      // escrever nela é escrever numa expressão.
+      procedimentos_interesse: procedimentos,
       data_nascimento: dataNascimento || null,
       valor_pago_acumulado: valorNum,
-    }).eq('id', lead.id)
+    }
+    if (whatsappTocado) campos.whatsapp_lead = whatsapp
+
+    /* `.select()` traz a linha DE VOLTA, e é ela que vale — não o que foi
+       enviado. A trigger `crm_procedimentos_validos` normaliza a grafia e
+       reordena o array, e `procedimento_interesse` é calculada na leitura.
+       Espelhar isso à mão daria uma tela que discorda do banco até o F5. */
+    const { data: salvo, error } = await supabase.from('crm_clinica')
+      .update(campos).eq('id', lead.id).select().single()
     setSavingFicha(false)
-    if (error) { setFichaError('Erro ao salvar. Tente novamente.'); return }
-    setLead((prev) => prev ? { ...prev, data_nascimento: dataNascimento || null, valor_pago_acumulado: valorNum } : prev)
+    if (error) {
+      if (error.code === ERRO_DUPLICADO) {
+        setFichaError('Esse WhatsApp acabou de ser cadastrado para outra pessoa.')
+        void buscarPorWhatsapp(whatsapp).then(setDuplicado)
+        return
+      }
+      // 23514 = a trigger `crm_procedimentos_validos`, do banco: procedimento
+      // que não existe mais no catálogo.
+      setFichaError(error.code === '23514'
+        ? 'Algum procedimento escolhido não está mais no catálogo da clínica.'
+        : 'Erro ao salvar. Tente novamente.')
+      return
+    }
+
+    const atualizado = salvo as LeadClinica
+    setLead(atualizado)
+    // E os campos acompanham o que o banco gravou: quem digitou "lentes de
+    // contato" vê a caixa certa marcada, sem a ficha continuar "alterada".
+    setNome(atualizado.nome_lead ?? '')
+    setProcedimentos(atualizado.procedimentos_interesse ?? [])
+    setWhatsappTocado(false)
     setFichaSaved(true)
     setTimeout(() => setFichaSaved(false), 2000)
   }
@@ -320,6 +408,18 @@ export default function LeadDetail() {
   }
 
   const statusStyle = STATUS_STYLE[lead.status]
+
+  /* O botão só acende quando há o que salvar — e a pendência é comparada com o
+     que está GRAVADO, não com um sinalizador de "mexeu". Mexer e voltar ao
+     valor original deixa de contar, e o `setLead` do salvar zera tudo sozinho.
+     A ordem das caixas não conta como diferença: elas entram na ordem em que
+     foram marcadas, e o banco devolve na ordem em que foram gravadas. */
+  const fichaAlterada =
+    nome.trim() !== (lead.nome_lead ?? '') ||
+    (whatsappTocado && whatsapp !== (lead.whatsapp_lead ?? '')) ||
+    [...procedimentos].sort().join('|') !== [...(lead.procedimentos_interesse ?? [])].sort().join('|') ||
+    dataNascimento !== (lead.data_nascimento ? lead.data_nascimento.slice(0, 10) : '') ||
+    valorPago !== (lead.valor_pago_acumulado !== null && lead.valor_pago_acumulado !== undefined ? String(lead.valor_pago_acumulado) : '')
 
   return (
     <div style={{ padding: '28px 36px', maxWidth: 900, margin: '0 auto' }}>
@@ -438,8 +538,9 @@ export default function LeadDetail() {
       <div className="fade-in-3">
         <SectionCard title="Visão Completa do Contato" icon={ClipboardList}>
 
-          {/* Informações da IA */}
-          <InfoRow label="Procedimento de Interesse" value={lead.procedimento_interesse} />
+          {/* O RESUMO CONTINUA SÓ LEITURA: quem escreve é a Letícia, pela
+              ferramenta `atualizar_ficha`. Editá-lo aqui seria apagar na mão o
+              que ela vai reescrever na próxima mensagem. */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <span style={{ fontSize: 12.5, color: '#6B818C', minWidth: 180, flexShrink: 0, paddingTop: 2 }}>Resumo da Conversa</span>
             <span style={{ fontSize: 13.5, color: '#16232B', lineHeight: 1.6 }}>{lead.resumo_conversa || '—'}</span>
@@ -447,21 +548,99 @@ export default function LeadDetail() {
 
           <div style={{ borderTop: '1px solid #EDF2F4', margin: '18px 0' }} />
 
-          {/* Ficha Adicional */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12.5, color: '#6B818C', minWidth: 180, flexShrink: 0 }}>Data de Nascimento</span>
+          {/* A FICHA, EDITÁVEL — E COM UM BOTÃO SÓ.
+
+              Um "Salvar" por campo seria seis botões num cartão; o assunto é um
+              só ("os dados desta pessoa"), então o botão é um só. É a mesma
+              divisão que já valia aqui: Status e Anotações têm o seu, porque
+              são outras perguntas. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            <LinhaFicha rotulo="Nome">
+              <input
+                value={nome}
+                onChange={(e) => { setNome(e.target.value); setFichaError('') }}
+                placeholder="Nome completo"
+                style={{ ...campoStyle, width: '100%', boxSizing: 'border-box' }}
+                onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
+                onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}
+              />
+            </LinhaFicha>
+
+            {/* O MESMO CampoTelefone das telas de cadastro: a regra de país e de
+                contagem de dígitos mora num lugar só, e o que sai daqui já é o
+                canônico do banco (dígitos com DDI). */}
+            <LinhaFicha rotulo="WhatsApp" topo>
+              <CampoTelefone
+                valor={whatsapp}
+                onChange={handleWhatsapp}
+                rotulo=""
+                marcador={false}
+                aviso={duplicado && (
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: '#B45309', lineHeight: 1.5 }}>
+                    Esse número já é de <strong>{duplicado.nome_lead ?? 'um contato sem nome'}</strong>.
+                    <button
+                      onClick={() => navigate(`/leads/${duplicado.id}`)}
+                      style={{ display: 'block', marginTop: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#1E6E8C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    >
+                      Abrir a ficha dessa pessoa →
+                    </button>
+                  </div>
+                )}
+              />
+            </LinhaFicha>
+
+            {/* Caixas, e não texto livre — a mesma trava do cadastro e da
+                Letícia. O banco confere de novo (trigger
+                `crm_procedimentos_validos`, migração 0022). */}
+            <LinhaFicha rotulo="Procedimentos de Interesse" topo>
+              {catalogo.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: '#6B818C', paddingTop: 6 }}>Carregando os procedimentos da clínica...</div>
+              ) : (
+                <div style={{
+                  border: '1px solid #DCE6EA', borderRadius: 9, padding: 8, background: '#fff',
+                  maxHeight: 180, overflowY: 'auto',
+                  display: 'grid', gap: 2,
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                }}>
+                  {catalogo.map((p) => {
+                    const marcado = procedimentos.includes(p)
+                    return (
+                      <label key={p} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '6px 8px', borderRadius: 7, cursor: 'pointer',
+                        background: marcado ? '#EAF3F6' : 'transparent',
+                        fontSize: 13, color: marcado ? '#16232B' : '#6B818C',
+                        fontWeight: marcado ? 600 : 400,
+                      }}>
+                        <input
+                          type="checkbox" checked={marcado}
+                          onChange={() => {
+                            setProcedimentos((atual) => marcado ? atual.filter((x) => x !== p) : [...atual, p])
+                            setFichaError('')
+                          }}
+                          style={{ accentColor: '#1E6E8C', cursor: 'pointer', flexShrink: 0 }}
+                        />
+                        {p}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </LinhaFicha>
+
+            <LinhaFicha rotulo="Data de Nascimento">
               <input
                 type="date"
                 value={dataNascimento}
                 onChange={(e) => { setDataNascimento(e.target.value); setFichaError('') }}
-                style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #DCE6EA', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', background: '#fff' }}
+                style={campoStyle}
                 onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
                 onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}
               />
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12.5, color: '#6B818C', minWidth: 180, flexShrink: 0 }}>Valor Pago Acumulado (R$)</span>
+            </LinhaFicha>
+
+            <LinhaFicha rotulo="Valor Pago Acumulado (R$)">
               <input
                 type="number"
                 min="0"
@@ -469,19 +648,25 @@ export default function LeadDetail() {
                 value={valorPago}
                 onChange={(e) => { setValorPago(e.target.value); setFichaError('') }}
                 placeholder="0,00"
-                style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #DCE6EA', fontSize: 13.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#16232B', outline: 'none', background: '#fff', width: 160 }}
+                style={{ ...campoStyle, width: 160 }}
                 onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
                 onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}
               />
-            </div>
+            </LinhaFicha>
+
             {fichaError && (
               <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#DC2626' }}>{fichaError}</div>
             )}
-            <div>
-              <button onClick={handleSaveFicha} disabled={savingFicha}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, border: 'none', background: fichaSaved ? '#1A7A48' : (savingFicha ? '#4C90A8' : '#1E6E8C'), color: '#fff', cursor: savingFicha ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button onClick={handleSaveFicha} disabled={savingFicha || !fichaAlterada || !!duplicado}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, border: 'none', background: fichaSaved ? '#1A7A48' : (!fichaAlterada || duplicado) ? '#DCE6EA' : (savingFicha ? '#4C90A8' : '#1E6E8C'), color: (!fichaSaved && (!fichaAlterada || duplicado)) ? '#6B818C' : '#fff', cursor: (savingFicha || !fichaAlterada || duplicado) ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'background 0.2s' }}>
                 <Save size={13} /> {fichaSaved ? 'Salvo!' : savingFicha ? 'Salvando...' : 'Salvar Ficha'}
               </button>
+              {/* Botão apagado sem motivo escrito parece botão quebrado. */}
+              {!fichaSaved && !fichaAlterada && (
+                <span style={{ fontSize: 12, color: '#6B818C' }}>Nada mudou por aqui.</span>
+              )}
             </div>
           </div>
 

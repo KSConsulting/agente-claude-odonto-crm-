@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Download, FileText, Users, UserCheck, UserPlus, X, ArrowRight } from 'lucide-react'
+import { Search, Download, FileText, Users, UserCheck, UserPlus, X, ArrowRight, CalendarPlus } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from '../lib/supabase'
@@ -15,7 +15,7 @@ import {
   getPeriodRange, inRange,
   type DateRange, type PeriodKey,
 } from '../lib/periodo'
-import type { LeadClinica, LeadStatus } from '../types'
+import type { LeadClinica, LeadStatus, Profissional } from '../types'
 
 /* ──────────────────────────────────────────────
    Implementação compartilhada entre /leads e /clientes.
@@ -142,6 +142,24 @@ interface NewLeadForm {
   anotacoes: string
 }
 
+/**
+ * A consulta que o cadastro pode criar junto com a pessoa.
+ *
+ * Note que NÃO há aqui um campo dizendo se ela já aconteceu ou vai acontecer.
+ * Quem responde isso é o **Tipo**, no topo do formulário, com essas mesmas
+ * palavras: "Ainda não realizou consulta" / "Consulta já realizada". Um segundo
+ * par de botões faria a mesma pergunta duas vezes — e duas respostas para uma
+ * pergunta só é contradição esperando ser digitada.
+ */
+interface NewConsulta {
+  quando: string
+  procedimento: string
+  profissional_id: string
+  duracao: string
+}
+
+const DURACOES = [15, 30, 45, 60, 90, 120]
+
 interface NewLeadModalProps {
   titulo: string
   tipoPadrao: 'lead' | 'paciente'
@@ -160,8 +178,27 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
   const navigate = useNavigate()
   const catalogo = useCatalogoProcedimentos()
 
+  const [consulta, setConsulta] = useState<NewConsulta>({
+    quando: '', procedimento: '', profissional_id: '', duracao: '60',
+  })
+  const [profissionais, setProfissionais] = useState<Profissional[]>([])
+  /* A pessoa que JÁ foi criada, quando só a consulta falhou. Sem guardar isto,
+     tentar de novo bateria no WhatsApp duplicado — e o erro apontaria para o
+     lugar errado, culpando o número de quem acabou de ser cadastrado. */
+  const [jaCriado, setJaCriado] = useState<LeadClinica | null>(null)
+
+  useEffect(() => {
+    void supabase.from('profissionais').select('*').eq('ativo', true).order('nome')
+      .then(({ data }) => setProfissionais((data ?? []) as Profissional[]))
+  }, [])
+
+  const ehPaciente = form.tipo === 'paciente'
+
   const set = <C extends keyof NewLeadForm>(field: C, value: NewLeadForm[C]) =>
     setForm((f) => ({ ...f, [field]: value }))
+
+  const setC = <C extends keyof NewConsulta>(field: C, value: NewConsulta[C]) =>
+    setConsulta((c) => ({ ...c, [field]: value }))
 
   const handleWhatsapp = (canonico: string, valido: boolean) => {
     set('whatsapp', canonico)
@@ -177,32 +214,85 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
     if (!form.nome.trim()) { setError('O nome é obrigatório.'); return }
     if (!whatsappValido) { setError('Informe um WhatsApp válido, com o código do país.'); return }
     if (duplicado) { setError('Esse WhatsApp já pertence a outra pessoa.'); return }
-    setSaving(true); setError('')
 
-    const status: LeadStatus = form.tipo === 'paciente' ? 'consulta_realizada' : 'iniciou_conversa'
-
-    const { data, error: err } = await supabase.from('crm_clinica').insert({
-      nome_lead: form.nome.trim(),
-      whatsapp_lead: form.whatsapp,
-      status,
-      procedimentos_interesse: form.procedimentos,
-      data_nascimento: form.data_nascimento || null,
-      anotacoes: form.anotacoes.trim() || null,
-    }).select().single()
-
-    setSaving(false)
-    if (err) {
-      // Rede de segurança: entre a busca acima e este insert, o Agente de IA
-      // pode ter criado a mesma pessoa. Quem decide é o índice do banco.
-      if (err.code === ERRO_DUPLICADO) {
-        setError('Esse WhatsApp acabou de ser cadastrado para outra pessoa.')
-        buscarPorWhatsapp(form.whatsapp).then(setDuplicado)
-        return
-      }
-      setError('Erro ao cadastrar. Tente novamente.')
+    // A consulta é opcional. Com data preenchida, ela passa a ter exigências
+    // próprias — e `procedimento` é `not null` no banco.
+    const inicio = consulta.quando ? new Date(consulta.quando) : null
+    if (inicio && isNaN(inicio.getTime())) { setError('A data da consulta não é válida.'); return }
+    if (inicio && !consulta.procedimento) { setError('Escolha o procedimento da consulta.'); return }
+    // Consulta realizada no futuro não quer dizer nada — e é o engano fácil de
+    // quem está cadastrando um paciente e quer marcar o RETORNO dele.
+    if (inicio && ehPaciente && inicio.getTime() > Date.now()) {
+      setError('Uma consulta já realizada não pode estar no futuro. Para marcar um retorno, cadastre a pessoa e use a Agenda.')
       return
     }
-    onSaved(data as LeadClinica)
+
+    setSaving(true); setError('')
+
+    const status: LeadStatus = ehPaciente ? 'consulta_realizada' : 'iniciou_conversa'
+
+    let pessoa = jaCriado
+    if (!pessoa) {
+      const { data, error: err } = await supabase.from('crm_clinica').insert({
+        nome_lead: form.nome.trim(),
+        whatsapp_lead: form.whatsapp,
+        status,
+        procedimentos_interesse: form.procedimentos,
+        data_nascimento: form.data_nascimento || null,
+        anotacoes: form.anotacoes.trim() || null,
+      }).select().single()
+
+      if (err) {
+        setSaving(false)
+        // Rede de segurança: entre a busca acima e este insert, o Agente de IA
+        // pode ter criado a mesma pessoa. Quem decide é o índice do banco.
+        if (err.code === ERRO_DUPLICADO) {
+          setError('Esse WhatsApp acabou de ser cadastrado para outra pessoa.')
+          buscarPorWhatsapp(form.whatsapp).then(setDuplicado)
+          return
+        }
+        setError('Erro ao cadastrar. Tente novamente.')
+        return
+      }
+      pessoa = data as LeadClinica
+      setJaCriado(pessoa)
+    }
+
+    if (inicio) {
+      const { error: errConsulta } = await supabase.from('consultas').insert({
+        lead_id: pessoa.id,
+        profissional_id: consulta.profissional_id || null,
+        procedimento: consulta.procedimento,
+        data_consulta: inicio.toISOString(),
+        duracao_minutos: Number(consulta.duracao),
+        // O Tipo decide, e é a única coisa que decide.
+        status: ehPaciente ? 'realizada' : 'agendada',
+        origem: 'equipe',
+      })
+
+      if (errConsulta) {
+        setSaving(false)
+        // A PESSOA JÁ ESTÁ NO BANCO. Dizer só "erro ao cadastrar" mandaria
+        // alguém cadastrar de novo e bater no WhatsApp duplicado, procurando
+        // defeito no número de quem acabou de entrar.
+        const nome = form.nome.trim()
+        setError(errConsulta.code === '23P01'
+          // 23P01 = a restrição `consultas_sem_sobreposicao`.
+          ? `${nome} foi cadastrado, mas a consulta não: esse profissional já tem consulta nesse horário. Marque pela Agenda.`
+          : `${nome} foi cadastrado, mas a consulta não foi salva. Marque pela Agenda.`)
+        return
+      }
+
+      // Consulta agendada move o funil pelo trigger `consultas_sincroniza_lead`.
+      // Reler é o que impede a lista de mostrar o status de antes — e de deixar
+      // a pessoa na página errada.
+      const { data: atualizado } = await supabase.from('crm_clinica')
+        .select('*').eq('id', pessoa.id).single()
+      if (atualizado) pessoa = atualizado as LeadClinica
+    }
+
+    setSaving(false)
+    onSaved(pessoa)
     onClose()
   }
 
@@ -333,6 +423,101 @@ function NewLeadModal({ titulo, tipoPadrao, onClose, onSaved }: NewLeadModalProp
                 ? 'Pode marcar mais de um, ou nenhum.'
                 : `${form.procedimentos.length} marcado${form.procedimentos.length > 1 ? 's' : ''}.`}
             </div>
+          </div>
+
+          {/* A CONSULTA, DENTRO DO CADASTRO.
+
+              Cadastrar um Paciente gravava "consulta realizada" sem dizer
+              QUANDO: a coluna "Última Consulta" ficava em "Cadastrado à mão"
+              para sempre, e a pessoa não tinha uma linha sequer no histórico.
+
+              Só a data e a hora aparecem em repouso; o resto nasce quando ela é
+              preenchida. Um formulário de agendamento inteiro sempre aberto num
+              campo opcional é peso cobrado de quem não vai usá-lo.
+
+              Vazio não cria nada, e esse caso é real: quem migra uma ficha
+              antiga quase nunca sabe a data. */}
+          <div style={{ border: '1px solid #DCE6EA', borderRadius: 10, background: '#F7FAFB', padding: '14px 14px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, flexWrap: 'wrap' }}>
+              <CalendarPlus size={14} color="#1E6E8C" />
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#16232B' }}>
+                {ehPaciente ? 'Quando foi a consulta?' : 'Quando será a consulta?'}
+              </span>
+              <span style={{ fontSize: 11.5, color: '#6B818C' }}>(opcional)</span>
+            </div>
+
+            <input
+              type="datetime-local"
+              value={consulta.quando}
+              onChange={(e) => {
+                setC('quando', e.target.value)
+                // Quem marcou UM interesse quase sempre vai marcar a consulta
+                // dele. É sugestão, não trava — a lista continua aberta.
+                if (e.target.value && !consulta.procedimento && form.procedimentos.length === 1) {
+                  setC('procedimento', form.procedimentos[0])
+                }
+                setError('')
+              }}
+              style={inputStyle}
+              onFocus={(e) => (e.target.style.borderColor = '#1E6E8C')}
+              onBlur={(e) => (e.target.style.borderColor = '#DCE6EA')}
+            />
+
+            {!consulta.quando ? (
+              <div style={{ fontSize: 11.5, color: '#6B818C', marginTop: 6, lineHeight: 1.5 }}>
+                Sem data, nenhuma consulta é criada — a pessoa entra só no cadastro.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 5 }}>
+                    Procedimento *
+                  </label>
+                  <select
+                    value={consulta.procedimento}
+                    onChange={(e) => { setC('procedimento', e.target.value); setError('') }}
+                    style={{ ...inputStyle, cursor: 'pointer' }}
+                  >
+                    <option value="">{catalogo.length ? 'Escolha o procedimento...' : 'Carregando...'}</option>
+                    {catalogo.map((nome) => (
+                      <option key={nome} value={nome}>{nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ flex: 2, minWidth: 0 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 5 }}>
+                      Profissional
+                    </label>
+                    <select value={consulta.profissional_id} onChange={(e) => setC('profissional_id', e.target.value)}
+                      style={{ ...inputStyle, cursor: 'pointer' }}>
+                      <option value="">Sem profissional definido</option>
+                      {profissionais.map((p) => (
+                        <option key={p.id} value={p.id}>{`${p.nome} ${p.sobrenome}`.trim()}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 5 }}>
+                      Duração
+                    </label>
+                    <select value={consulta.duracao} onChange={(e) => setC('duracao', e.target.value)}
+                      style={{ ...inputStyle, cursor: 'pointer' }}>
+                      {DURACOES.map((d) => (
+                        <option key={d} value={d}>{d} min</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11.5, color: '#6B818C', lineHeight: 1.5 }}>
+                  {ehPaciente
+                    ? 'Entra no histórico como realizada — e é a data que a lista de Pacientes passa a mostrar em "Última Consulta".'
+                    : 'Entra na agenda como marcada, e o funil acompanha sozinho.'}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Data de nascimento */}

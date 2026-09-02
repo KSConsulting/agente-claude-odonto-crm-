@@ -240,7 +240,7 @@ src/
     ├── Profissionais.tsx       dentistas: nome, cor e jornada
     ├── Leads.tsx               invólucro: <PessoasPage mode="leads" />
     ├── Clientes.tsx            invólucro: <PessoasPage mode="clientes" />
-    ├── LeadDetail.tsx          ficha do lead + consultas + anotações
+    ├── LeadDetail.tsx          ficha EDITÁVEL + consultas + anotações
     ├── Procedimentos.tsx       o catálogo da clínica
     ├── SecretariaIA.tsx        o Agente de IA: modelo, prompt (só leitura), liga/desliga
     ├── TokenApi.tsx            chaves de acesso e o contrato da API
@@ -259,10 +259,13 @@ inline daqui, e somariam peso a um bundle que já está grande.
 
 ### Telefone: um lugar só
 
-Toda pessoa criada pelo sistema passa por
+Todo telefone que o sistema escreve passa por
 [`CampoTelefone`](src/components/CampoTelefone.tsx) — modal da agenda, novo
-contato e novo paciente. O componente existe para que a regra de país e de
-contagem de dígitos não se repita (nem divirja) em três telas.
+contato, novo paciente e a ficha do lead. O componente existe para que a regra
+de país e de contagem de dígitos não se repita (nem divirja) em quatro telas.
+
+> `rotulo=""` some com o rótulo, para quem já tem um do lado de fora — é o caso
+> da ficha, onde os campos são alinhados numa coluna comum.
 
 Os países atendidos ficam em [`src/lib/telefones.ts`](src/lib/telefones.ts),
 numa lista curta e deliberada: cobrir "todos" com regra escrita à mão é promessa
@@ -665,7 +668,7 @@ de data — e as datas são a resposta.
 > valendo. **Escolher qualquer período nela desliga o modo** — é o caminho de
 > volta, sem precisar de um segundo botão para isso.
 
-### Procedimento é vocabulário fechado, nas quatro portas
+### Procedimento é vocabulário fechado, nas cinco portas
 
 "Qual o procedimento mais procurado?" não tinha resposta. A mesma coisa entrava
 como `Lentes de Contato`, `lente de contato`, `lentes` e `lente pro dente` —
@@ -681,6 +684,11 @@ Eram quatro portas de texto livre, e todas foram fechadas:
 | `agenda_marcar` (Letícia e API) | Recusa com `procedimento_desconhecido` |
 
 E o banco confere por baixo, nas duas tabelas (migração `0022`).
+
+> **A quinta veio depois, e já nasceu fechada.** A ficha do lead
+> ([`LeadDetail.tsx`](src/pages/LeadDetail.tsx)) passou a **editar** os
+> procedimentos — antes era só leitura —, com as mesmas caixas do cadastro.
+> Porta nova de vocabulário nasce com a lista, nunca com um campo de texto.
 
 **`enum` não é um pedido, é uma trava.** "Use o nome exato" no prompt é
 instrução, e instrução às vezes é atendida. `enum` no schema faz os dois
@@ -769,6 +777,70 @@ O dado é `consultas.interesse`, **congelado no ato de marcar** — e não o
 `procedimento_interesse` do CRM, que é da pessoa e guarda um valor só. Quem veio
 por lentes em março e por canal em agosto tem o último; olhar a consulta de
 março mostraria "canal", que é falso.
+
+### O cadastro pergunta quando, e a ficha aceita conserto
+
+Duas telas mudaram pelo mesmo motivo: **o dado existia na cabeça de quem
+digitava e não tinha onde entrar.**
+
+#### O cadastro cria a consulta
+
+"Novo Paciente" gravava `consulta_realizada` sem dizer **quando**. A coluna
+"Última Consulta" ficava em *"Cadastrado à mão"* para sempre, o histórico da
+pessoa nascia vazio, e a data da última visita — que é o dado inteiro de uma
+ficha migrada — não tinha campo.
+
+Agora o cadastro cria a consulta junto. Quatro decisões:
+
+| Decisão | Por quê |
+|---|---|
+| **Quem decide `realizada` ou `agendada` é o Tipo**, lá em cima | Um segundo par de botões faria a mesma pergunta ("já veio, ou ainda vem?") que o Tipo já faz — com essas palavras: *"Ainda não realizou consulta"* / *"Consulta já realizada"*. Duas respostas para uma pergunta só é contradição esperando ser digitada |
+| **Só a data e a hora ficam à vista**; procedimento, agenda e duração nascem quando ela é preenchida | Um formulário de agendamento inteiro sempre aberto num campo **opcional** é peso cobrado de quem não vai usá-lo |
+| **Vazio não cria nada** | E esse caso é o mais comum de todos: quem migra uma ficha antiga quase nunca sabe a data. O cadastro sem consulta continua existindo, e a coluna continua dizendo "Cadastrado à mão" |
+| **Realizada no futuro é recusada** | Não quer dizer nada — e é o engano fácil de quem está cadastrando um paciente e quer marcar o **retorno** dele. A recusa diz onde ir: a Agenda |
+
+> ⚠️ **A consulta é inserida DEPOIS da pessoa, e as duas não estão na mesma
+> transação.** Quando a segunda falha (tipicamente `23P01`, o horário ocupado),
+> a pessoa **já está no banco** — então o erro diz isso com o nome dela, e o
+> modal guarda o que criou. Sem isso, tentar de novo bateria no WhatsApp
+> duplicado, mandando procurar defeito no número de quem acabou de entrar.
+
+> **E o lead é relido depois da consulta agendada.** Quem move o funil é o
+> trigger `consultas_sincroniza_lead`, no banco — a linha que o `insert`
+> devolveu é anterior a ele. Sem reler, a lista mostraria `iniciou_conversa`
+> para alguém que acabou de ficar com consulta marcada. (Conferido no banco:
+> `realizada` inserida direto **não** mexe no funil — aquele ramo do trigger só
+> roda em `UPDATE` —, e é por isso que o Tipo continua sendo quem grava o
+> status.)
+
+#### A ficha do lead virou editável
+
+Nome, WhatsApp e procedimentos eram **só leitura** ali. Um nome que a Letícia
+entendeu errado, ou um número digitado torto, só tinham conserto pela IDE.
+
+| Decisão | Por quê |
+|---|---|
+| **Um "Salvar" para a ficha inteira** | Seis campos, seis botões seria um cartão de botões. O assunto é um só — "os dados desta pessoa". Status e Anotações continuam com o seu, porque são outras perguntas |
+| **O botão só acende quando há o que salvar**, e diz "Nada mudou por aqui" quando não há | Botão apagado sem motivo escrito parece botão quebrado |
+| **A pendência é comparada com o que está GRAVADO** | Não com um sinalizador de "mexeu". Mexer e voltar ao valor original deixa de contar, e o salvar zera tudo sozinho — não há um `setSujo(false)` para alguém esquecer num `onChange` novo |
+| **O WhatsApp usa o mesmo `CampoTelefone` do cadastro** | A regra de país e de contagem de dígitos mora num lugar só |
+| **O resumo continua só leitura** | Quem escreve é a Letícia, por `atualizar_ficha`. Editá-lo aqui seria apagar à mão o que ela reescreve na mensagem seguinte |
+
+> ⚠️ **Campo não tocado não entra no `update`.** O `CampoTelefone` manda `''`
+> tanto para "apagou" quanto para "está no meio de digitar" — os dois são
+> inválidos para ele. Sem um `whatsappTocado`, sair da ficha com o número pela
+> metade **zeraria o WhatsApp da pessoa**, que é a chave por onde a Letícia a
+> encontra.
+
+> **O que a tela mostra depois de salvar é a linha que o banco devolveu**
+> (`.select().single()`), e não o que foi enviado. A trigger
+> `crm_procedimentos_validos` **normaliza a grafia e reordena o array**, e
+> `procedimento_interesse` é calculada na leitura — espelhar isso à mão daria
+> uma tela que discorda do banco até o F5.
+
+**As duas recusas do banco têm frase própria:** `23505` (o WhatsApp já é de
+outra pessoa, e o aviso leva até ela) e `23514` (procedimento que saiu do
+catálogo). Conferidas no banco, em 01/09/2026.
 
 ### A página da Secretária: a ordem é a de quem chega
 

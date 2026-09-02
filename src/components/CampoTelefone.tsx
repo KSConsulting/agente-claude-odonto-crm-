@@ -19,6 +19,7 @@ interface Props {
   /** Valor canônico atual ('' quando vazio). */
   valor: string
   onChange: (canonico: string, valido: boolean) => void
+  /** Rótulo acima do campo. **Vazio some com ele** — para quem já tem um. */
   rotulo?: string
   obrigatorio?: boolean
   /**
@@ -79,12 +80,14 @@ export default function CampoTelefone({
 
   return (
     <div>
-      <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>
-        {rotulo}{marcador && ' '}
-        {marcador && (obrigatorio
-          ? '*'
-          : <span style={{ color: '#6B818C', fontWeight: 400 }}>(opcional)</span>)}
-      </label>
+      {rotulo !== '' && (
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: '#16232B', display: 'block', marginBottom: 6 }}>
+          {rotulo}{marcador && ' '}
+          {marcador && (obrigatorio
+            ? '*'
+            : <span style={{ color: '#6B818C', fontWeight: 400 }}>(opcional)</span>)}
+        </label>
+      )}
 
       <div style={{ display: 'flex', gap: 8 }}>
         <select
