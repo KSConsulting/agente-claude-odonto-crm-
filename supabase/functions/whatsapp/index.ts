@@ -690,8 +690,7 @@ async function montarHistorico(leadId: string): Promise<MensagemLLM[]> {
   linhas.reverse()
 
   const saida: MensagemLLM[] = []
-  linhas.forEach((l, i) => {
-    const ultima = i === linhas.length - 1
+  linhas.forEach((l) => {
     const rotulo = l.tipo === 'audio'
       ? (l.conteudo ?? '[áudio]')
       : l.tipo === 'imagem'

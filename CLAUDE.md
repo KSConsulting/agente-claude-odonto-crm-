@@ -221,7 +221,7 @@ src/
 │   ├── ModalPortal.tsx         leva o modal para o <body> (ver Convenções)
 │   ├── ListaConversas.tsx      coluna esquerda de /conversas
 │   ├── JanelaConversa.tsx      coluna direita: balões, cabeçalho e resposta
-│   ├── PainelLead.tsx          coluna extra: ficha da pessoa, com abrir/esconder
+│   ├── PainelLead.tsx          coluna extra: ficha da pessoa (sem o resumo — ver abaixo)
 │   ├── AvisoBaixaConsulta.tsx  "compareceu ou faltou?" — nas 3 telas
 │   ├── FiltroPeriodo.tsx       a lista de períodos + o botão "Personalizado"
 │   ├── ConexaoWhatsApp.tsx     seção "Conexão do WhatsApp", em Secretária de IA
@@ -985,6 +985,20 @@ e era justamente ali que a linha não existia.
 > descartar o pedido. Descartando, o clique sumia sem rastro sempre que caía no
 > meio segundo da verificação automática — o sintoma exato de botão morto, uma
 > vez a cada tantas.
+
+### O resumo da conversa não aparece em Conversas
+
+`resumo_conversa` existe para quem precisa entender o caso **sem abrir a
+conversa**. Na tela Conversas ela está aberta, inteira, dois centímetros à
+esquerda — ali o resumo era um parágrafo dizendo pior o que já estava do lado,
+e empurrava a linha do tempo e as consultas para fora da tela.
+
+O lugar dele é a ficha ([`LeadDetail.tsx`](src/pages/LeadDetail.tsx)), que é
+onde a recepção chega sem ter lido nada.
+
+> A regra vale para o painel inteiro: **ele mostra o que a conversa não mostra**
+> — telefone, procedimento de interesse, quando a pessoa chegou, as consultas.
+> O que dá para ler rolando a conversa não precisa ser repetido ao lado dela.
 
 ### O aviso de queda é do sistema, e demora um minuto
 

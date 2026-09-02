@@ -201,15 +201,16 @@ export default function PainelLead({ leadId, onFechar }: Props) {
             </div>
           </div>
 
-          {/* Resumo da conversa */}
-          <div style={bloco}>
-            <div style={rotulo}>Resumo da conversa</div>
-            <div style={valor}>
-              {lead.resumo_conversa?.trim() || (
-                <span style={{ color: '#6B818C' }}>A {nomeAgente} ainda não resumiu esta conversa.</span>
-              )}
-            </div>
-          </div>
+          {/* O RESUMO DA CONVERSA NÃO ENTRA AQUI, E É DE PROPÓSITO.
+
+              Ele existe para quem precisa entender o caso SEM abrir a conversa
+              — e nesta tela a conversa está aberta, do lado esquerdo, inteira.
+              Aqui ele era um parágrafo repetindo em pior qualidade o que está
+              dois centímetros ao lado, e empurrava a linha do tempo e as
+              consultas para fora da tela.
+
+              O lugar dele é a ficha do lead (`LeadDetail.tsx`), que é onde a
+              recepção chega sem ter lido nada. */}
 
           {/* Linha do tempo */}
           <div style={bloco}>
