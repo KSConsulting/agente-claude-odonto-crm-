@@ -53,16 +53,19 @@ E peça também o que vem junto: **regenerar, publicar e atualizar a
 documentação**. É a regra 1 do [`CLAUDE.md`](../CLAUDE.md) — mudança sem
 documentação não está pronta.
 
-### O campo de texto da tela é para testar, não para escrever
+### A tela mostra o prompt; ela não edita
 
-A página **Secretária de IA** tem um campo de prompt. Ele grava no banco e vale
-na mensagem seguinte, sem publicar nada — é ótimo para experimentar uma frase
-durante um teste.
+A página **Secretária de IA** tem um bloco "Ver o prompt". Ele **só lê** — busca
+o texto que está publicado na Edge Function e diz qual dos dois está no ar.
 
-Mas **o que está lá não vai para o Git**. O prompt oficial é o arquivo. Gostou do
-ajuste? Leve ele para o `prompt.md` pela IA, e use o botão *"voltar ao prompt
-oficial"* para limpar a versão do banco. Senão, um dia alguém publica o arquivo e
-a mudança some sem ninguém entender por quê.
+Editar por ali existiu e foi removido em 01/09/2026, de propósito: o que se
+escrevia na tela gravava no banco e **não ia para o Git**. No dia em que alguém
+precisasse entender por que a Letícia mudou de comportamento, não haveria
+histórico nenhum — e o `prompt.md` continuaria descrevendo uma agente que não
+existe mais.
+
+O caminho é sempre o mesmo: mude o arquivo pela IA da IDE, `npm run
+agente:deploy`, e teste no WhatsApp com o modo teste ligado.
 
 ---
 
@@ -103,7 +106,7 @@ nenhum.
 
 | O que | Se mexer |
 |---|---|
-| Os cinco `{{MARCADORES}}` | Apagou? O sistema não substitui, e o modelo lê `{{PROCEDIMENTOS}}` como se fosse o catálogo. Ela inventa procedimento |
+| Os seis `{{MARCADORES}}` | Apagou? O sistema não substitui, e o modelo lê `{{PROCEDIMENTOS}}` como se fosse o catálogo. Ela inventa procedimento. São `{{NOME_AGENTE}}`, `{{INFORMACOES_CLINICA}}`, `{{PROCEDIMENTOS}}`, `{{PROFISSIONAIS}}`, `{{DATA_HOJE}}` e `{{FICHA_DO_PACIENTE}}` |
 | **`# HOJE` e `# QUEM ESTÁ FALANDO COM VOCÊ` no fim do arquivo** | Subiu? O cache de prompt reaproveita o começo igual entre as chamadas. Dado volátil no topo joga fora o desconto do texto inteiro — de todas as conversas |
 | `# SUAS FERRAMENTAS` | As oito existem no código de qualquer jeito. Apagar do prompt não desliga: faz ela usar errado, ou não usar |
 | Os nomes das ferramentas e dos campos | `marcar_consulta`, `interesse`, `nome_completo` — são a chamada de verdade. Nome trocado é ferramenta que não roda |
@@ -208,9 +211,11 @@ só parou quando a ordem foi colada no dado.
 ## 5. Depois de editar
 
 ```bash
-npm run prompt          # o .md vira _shared/prompt-oficial.ts
-npm run agente:deploy   # regera e publica a função
+npm run agente:deploy   # regera o prompt E publica a função
 ```
+
+> Um comando só: o `agente:deploy` já roda o `npm run prompt` antes. Rodar os
+> dois não faz mal — só é redundante.
 
 Não pulou nenhum passo? Então:
 

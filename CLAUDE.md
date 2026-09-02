@@ -23,6 +23,18 @@ desempenho do próprio agente.
 **Idioma:** todo o produto é em **português do Brasil** — interface, nomes de
 colunas, identificadores de status e comentários. Mantenha assim.
 
+**Distribuição:** o repositório é **privado**, e o acesso é liberado pelo autor
+conta a conta — quem recebe pode instalar, rodar e modificar para a sua
+clínica, não redistribuir. O clone exige credencial: sem um token do GitHub ou
+`gh auth login`, o `git clone` falha.
+
+> **A instalação tem um dono: [`INSTALACAO.md`](INSTALACAO.md).** Ela já esteve
+> espalhada em três documentos, que discordavam — um dizia 24 migrações, o
+> outro "os dois arquivos", e nenhum mencionava as chaves da Letícia. O
+> `README.md`, o `DATABASE.md` e o `agente-ia/README.md` agora **apontam** para
+> ele. Mexeu em algo que muda a instalação? **É lá que se atualiza**, e só
+> lá.
+
 ---
 
 ## Comandos
@@ -43,8 +55,16 @@ npm run agente:secrets  # sobe as chaves de agente-ia/.env.agente.local
 npm run agente:deploy   # regera o prompt e publica a função whatsapp
 ```
 
+> **Os dois últimos passam por [`agente-ia/publicar.mjs`](agente-ia/publicar.mjs)**,
+> que lê o `SUPABASE_PROJECT_REF` e o `SUPABASE_ACCESS_TOKEN` de
+> `.supabase-token.local` e chama o CLI. O ref já esteve escrito dentro do
+> `package.json` — que é versionado: quem clonasse o repositório mandava
+> publicar **no projeto de outra pessoa**, e o erro que voltava era de
+> permissão, sem dizer a causa. Nada de projeto de ninguém fica em arquivo
+> versionado.
+
 > `agente:deploy` usa `--no-verify-jwt` de propósito: quem chama o webhook é a
-> Evolution, que não tem sessão do Supabase. A autenticação é o
+> ponte de WhatsApp, que não tem sessão do Supabase. A autenticação é o
 > `WEBHOOK_SEGREDO`, conferido dentro da função. Publicar no padrão derruba o
 > webhook com um 401 que nem chega no nosso código — mesmo motivo da `agenda/`.
 
@@ -1566,7 +1586,8 @@ commit.
 | Rota, página, componente novo | `CLAUDE.md` (Estrutura / Rotas) |
 | Dependência, script do `package.json` | `CLAUDE.md` (Stack / Comandos) |
 | Correção de algo listado em Débito técnico | Remova o item de `CLAUDE.md` |
-| Variável de ambiente | `CLAUDE.md` + `DATABASE.md` (seção 1.3) |
+| Variável de ambiente | `CLAUDE.md` + [`INSTALACAO.md`](INSTALACAO.md) (parte 2) + o molde `.example` correspondente |
+| Qualquer passo da instalação (conta, chave, migração, deploy, painel) | [`INSTALACAO.md`](INSTALACAO.md) — **e só ele**. Os outros três documentos apontam para lá |
 | Prompt do Agente de IA | [`agente-ia/prompt.md`](agente-ia/prompt.md) — e confira se a seção 8 do README da pasta ainda descreve ele, e se o [`GUIA-DO-PROMPT.md`](agente-ia/GUIA-DO-PROMPT.md) ainda classifica certo a seção mexida |
 | Ferramentas, modelo ou etapas do Agente de IA | [`agente-ia/README.md`](agente-ia/README.md) (a seção correspondente **e** a tabela de estado) |
 
@@ -1594,7 +1615,8 @@ Problemas reais que já existiam e ainda não foram tratados. Não são regress�
 ### ESLint acusa 7 erros
 
 - **4x — `ErrorMsg` declarado dentro do render** em
-  [`Configuracoes.tsx:192`](src/pages/Configuracoes.tsx#L192). Não é só estilo:
+  [`Configuracoes.tsx`](src/pages/Configuracoes.tsx), linhas **387, 426, 463 e
+  539**. Não é só estilo:
   componentes criados durante o render são recriados a cada renderização e
   **perdem o estado**. É um bug esperando acontecer. A correção é mover a
   declaração para fora do componente.
@@ -1606,11 +1628,18 @@ Problemas reais que já existiam e ainda não foram tratados. Não são regress�
 > com só os campos que aquela tela lê. **Compare com o número, não com
 > "limpo".**
 
-### Bundle de 2.2 MB (812 KB gzip)
+### Bundle de 2.3 MB (836 KB gzip)
 
 Acima do recomendado. `jspdf`, `html2canvas` e `recharts` são carregados sempre,
 mas só usados em telas específicas. Resolve-se com `import()` dinâmico e code
 splitting.
+
+> **Medido em 02/09/2026**, no `dist/assets/index-*.js`. O número sobe sozinho
+> a cada tela nova — confira antes de citar:
+>
+> ```bash
+> npm run build && gzip -c dist/assets/index-*.js | wc -c
+> ```
 
 ### Duplicação das cores de status
 
@@ -1677,14 +1706,13 @@ mortas: as colunas `*_chatwoot` de `crm_clinica_dados` e a tabela
 |---|:---:|
 | `crm_clinica` | **lê e grava** — cria o lead, avança o status e preenche a ficha |
 | `mensagens_whatsapp` | **lê e grava** — a memória da conversa, e a fonte da futura tela Conversas |
-| `consultas` | **grava só pelas funções SQL** `agenda_marcar` / `agenda_remarcar` / `agenda_cancelar`. Lê direto, só as do próprio lead |
+| `consultas` | **grava só pelas funções SQL** `agenda_marcar` / `agenda_remarcar` / `agenda_cancelar`. **Lê** direto — a consulta futura e o histórico, sempre só as do próprio lead |
 | bucket `midias-whatsapp` | **grava** — o áudio e a foto que o paciente mandou. Privado |
 | `informacoes_clinica_agente` | **só lê** — dados da clínica em frases prontas |
 | `procedimentos_clinica_agente` | **só lê** — procedimentos ativos |
 | `profissionais_clinica_agente` | **só lê** — dentistas ativos e a jornada de cada um |
 | `servicos_clinica` | **só lê** — a `descricao_longa` de **um** procedimento, pela ferramenta `detalhes_do_procedimento`. E `agenda_marcar` lê `exige_avaliacao` e `duracao_minutos` para decidir o agendamento |
-| `consultas` | **só lê** para a memória — a consulta futura e o histórico do paciente. Escrita é sempre por função SQL |
-| `configuracoes_agente` | **só lê** — modelo, prompt e a regra do modo teste |
+| `configuracoes_agente` | **só lê** — modelo, prompt, o nome dela e a regra do modo teste |
 | `configuracoes_clinica` | **só lê** — só o `fuso_horario` |
 
 Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.

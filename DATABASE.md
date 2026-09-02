@@ -13,20 +13,21 @@ Documentação completa do schema. Serve para quem baixar este sistema e precisa
 
 ---
 
-## 1. Setup rápido
+## 1. As migrações, uma a uma
 
-Para colocar um projeto novo no ar, na ordem:
+> ### 📘 Instalando? O passo a passo é o [`INSTALACAO.md`](INSTALACAO.md)
+>
+> Esta seção **não é um guia de instalação** — é a referência do que cada
+> migração faz. Criar o projeto, preencher as chaves, criar o primeiro usuário
+> e subir a aplicação estão todos lá, num caminho só.
+>
+> Ela ficou aqui porque é documentação **do banco**: quem vai mexer numa tabela
+> precisa saber em qual arquivo ela nasceu, e por quê.
 
-### 1.1. Criar o projeto Supabase
+### 1.1. Rodar as migrações
 
-Crie um projeto novo em [supabase.com](https://supabase.com). Anote o **project
-ref** — o identificador que aparece na URL do painel, no formato
-`abcdefghijklmnopqrst` (20 letras).
-
-### 1.2. Rodar as migrações
-
-Abra o **SQL Editor** no painel do Supabase e execute os dois arquivos, **nesta
-ordem**:
+Abra o **SQL Editor** no painel do Supabase e execute os **vinte e quatro
+arquivos, nesta ordem** — cada um depende do anterior:
 
 1. `supabase/migrations/0001_schema_inicial.sql` — 6 tabelas, 1 view, 9 índices,
    13 políticas de RLS, 2 buckets de Storage, 2 funções, 2 triggers, a
@@ -49,6 +50,11 @@ ordem**:
    `informacoes_clinica_agente`, de coluna única, que o Agente de IA lê.
 7. `supabase/migrations/0007_horario_na_view.sql` — a linha `Atendimento:` na
    view, montada de `horario_comercial` por `horario_atendimento_texto()`.
+
+   > ⚠️ **Essa função não sobrevive à instalação.** A migração `0009` a
+   > substitui por `jornada_texto()` e roda `drop function` nela. Num banco já
+   > migrado, procurar `horario_atendimento_texto()` não acha nada — e está
+   > certo. Ver [4.15](#415-jornada_textoprofissional).
 8. `supabase/migrations/0008_procedimentos_view.sql` — a view
    `procedimentos_clinica_agente`, de coluna única, com os procedimentos ativos.
 9. `supabase/migrations/0009_profissionais_view.sql` — a view
@@ -142,39 +148,21 @@ A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
 Confira o resultado com as consultas da [seção 10](#10-consultas-úteis-para-verificação).
 
-### 1.3. Configurar as variáveis de ambiente
+### 1.2. E depois das migrações
 
-Crie um arquivo `.env` na raiz do projeto:
+O resto da instalação — as chaves, o primeiro usuário, as Edge Functions e o
+webhook — está no [`INSTALACAO.md`](INSTALACAO.md).
 
-```env
-VITE_SUPABASE_URL=https://SEU_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_anon_key_aqui
-```
+Duas coisas deste banco que valem saber antes de mexer nele:
 
-Ambos estão em **Settings → API Keys** no painel do Supabase.
+- **A `service_role key` nunca entra no `.env`.** Aquele arquivo vira JavaScript
+  no navegador. Ela ignora todo o RLS, e o Supabase já a entrega às Edge
+  Functions sozinho — ver [seção 6](#6-segurança-rls).
+- **O perfil em `public.usuarios` nasce por trigger** (`on_auth_user_created`)
+  quando o usuário é criado no Auth. Não crie a linha à mão.
 
-> A `anon key` é pública por natureza — ela vai embutida no bundle do frontend e
-> é protegida pelo RLS. A `service_role key` **nunca** entra no `.env` deste
-> projeto: ela ignora todo o RLS e só deve viver no backend da automação.
-
-O `.env` já está no `.gitignore`. Não o comite.
-
-### 1.4. Criar o primeiro usuário
-
-Sem isso, a tela de login não deixa ninguém entrar.
-
-No painel: **Authentication → Users → Add user**. Informe e-mail e senha e
-marque *Auto Confirm User* (senão o Supabase exige confirmação por e-mail).
-
-O perfil em `public.usuarios` é criado **automaticamente** pelo trigger
-`on_auth_user_created`. Não crie a linha na mão.
-
-### 1.5. Subir a aplicação
-
-```bash
-npm install
-npm run dev
-```
+Confira o resultado com as consultas da
+[seção 10](#10-consultas-úteis-para-verificação).
 
 ---
 
@@ -1566,7 +1554,12 @@ RLS está **ativo nas 12 tabelas**. São 13 políticas:
 | `configuracoes_agente` | `configuracoes_agente_all` | ALL | `authenticated` — acesso total |
 | `usuarios` | `usuarios_update_own` | UPDATE | **só o próprio** (`auth.uid() = id`) |
 
-Mais 8 políticas em `storage.objects` (seção 7).
+Mais **10** políticas em `storage.objects` (seção 7) — leitura, escrita e
+remoção nos três buckets. Total do banco: **23**.
+
+> As duas de `DELETE` (`avatars_own_delete` e `logos_team_delete`) chegaram na
+> migração `0020`. Antes dela dava para trocar a foto e a logo, e não dava para
+> tirar.
 
 > **As duas Edge Functions usam a `service_role key`, que ignora o RLS** — são
 > servidor, não sessão de usuário. O que limita cada uma não é o RLS:
@@ -1910,8 +1903,9 @@ necessário para ler valores antigos de colunas fora da PK.
 ```sql
 select schemaname, tablename from pg_publication_tables
 where pubname = 'supabase_realtime';
--- esperado: public | crm_clinica_dados
---           public | consultas
+-- esperado: public | consultas
+--           public | crm_clinica_dados
+--           public | mensagens_whatsapp
 ```
 
 Se essa consulta voltar vazia, o Realtime está morto — e nada na interface vai
@@ -1990,9 +1984,19 @@ select relname from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
 
--- Políticas (esperado: 21 — 13 em public + 8 em storage)
+-- Políticas (esperado: 23 — 13 em public + 10 em storage)
+--
+-- ⚠️ ESTE É O ÚNICO LUGAR DA DOCUMENTAÇÃO ONDE ESTE NÚMERO É ESCRITO.
+--    Ele já esteve em cinco documentos, com três valores diferentes, e
+--    nenhum era o certo: a `0020` acrescentou duas políticas de DELETE e
+--    ninguém atualizou as cópias. Mexeu nas políticas? Mude AQUI, e só aqui.
 select schemaname, count(*) from pg_policies
 where schemaname in ('public','storage') group by schemaname;
+
+-- Realtime (esperado: as 3 tabelas — assinar a VIEW nunca dispara)
+select tablename from pg_publication_tables
+where pubname = 'supabase_realtime' order by 1;
+-- esperado: consultas, crm_clinica_dados, mensagens_whatsapp
 
 -- Divergência entre o horário anunciado e o que a agenda oferece (armadilha 16)
 select 'clínica' as quem, public.jornada_texto(null) as jornada

@@ -14,6 +14,7 @@ de desempenho do próprio agente.
 - [O que o sistema faz](#o-que-o-sistema-faz)
 - [Tecnologias](#tecnologias)
 - [Instalação passo a passo](#instalação-passo-a-passo)
+- [Deploy na Vercel](#deploy-na-vercel)
 - [Como o banco está organizado](#como-o-banco-está-organizado)
 - [Segurança](#segurança)
 - [Integração com o Agente de IA](#integração-com-o-agente-de-ia)
@@ -126,256 +127,100 @@ CSV**.
 | Kanban | dnd-kit |
 | PDF | jsPDF + jsPDF-AutoTable |
 | Ícones | Lucide |
+| Força de senha | zxcvbn |
+| Servidor | Edge Functions do Supabase (Deno) — `whatsapp/` e `agenda/` |
 
-Não há backend próprio: o front conversa direto com o Supabase, e a segurança
-fica a cargo do **Row Level Security** do PostgreSQL.
+**A tela não tem servidor próprio:** o front conversa direto com o Supabase, e
+a segurança fica a cargo do **Row Level Security** do PostgreSQL. O que roda no
+servidor são as duas Edge Functions — a Secretária de IA e a API da agenda —,
+e nenhuma delas fica entre a tela e o banco.
 
 ---
 
 ## Instalação passo a passo
 
+> ### 📘 O passo a passo completo é o [`INSTALACAO.md`](INSTALACAO.md)
+>
+> Do zero até a Letícia atendendo no WhatsApp, com o que **você** faz e o que a
+> **IA da sua IDE** faz, separados. Esta seção é só o resumo — se as duas
+> discordarem, vale o `INSTALACAO.md`.
+
+**Leva cerca de uma hora**, e metade dela é criar conta em site.
+
+| | Etapa | O que é |
+|:-:|---|---|
+| 👤 | **Contas** | Supabase, OpenAI e **uma** ponte de WhatsApp (Evolution ou uazapi) |
+| 👤 | **Três arquivos** | Colar as chaves em `.env`, `.supabase-token.local` e `agente-ia/.env.agente.local` |
+| 🤖 | **A IDE** | Ela aplica as 24 migrações e publica as duas funções. Você cola uma frase |
+| 👤 | **Quatro cliques** | 1º usuário · política de senha · **apontar o webhook** · Vercel |
+| 👤 | **Encerrar** | Testar, e **revogar os dois tokens** da instalação |
+
+**Dá para parar antes da Letícia.** O sistema de gestão — agenda, CRM,
+pacientes, faturamento — funciona inteiro sem ela, e a equipe atende à mão pela
+tela Conversas.
+
 ### Pré-requisitos
 
-- **Node.js 20 ou superior** — verifique com `node -v`
+- **Node.js 20.19+ ou 22.12+** — verifique com `node -v`. É a exigência do
+  Vite 8; um Node 20.0–20.18, ou qualquer 21, falha no `npm install`
 - Uma conta gratuita no [Supabase](https://supabase.com)
-- Git
+- Git, e uma **IDE com IA** (Claude Code, Codex, Cursor) — é ela quem monta o
+  banco
 
-### 1. Clonar e instalar
+### 🔒 O repositório é privado
+
+`git clone` sozinho **não funciona**: o GitHub pede credencial e o clone falha.
+**Peça acesso ao autor** informando o seu usuário do GitHub, e depois autentique
+o clone — com um Personal Access Token entregue à sua IA, ou `gh auth login` /
+chave SSH se estiver fazendo à mão.
 
 ```bash
-git clone https://github.com/afonsopereiralopes/odonto-clinica.git
-cd odonto-clinica
+git clone https://github.com/afonsopereiralopes/agente-odonto-crm.git
+cd agente-odonto-crm
 npm install
 ```
-
-Agora crie os **três arquivos de chaves**. Eles não vêm no clone de propósito —
-estão no `.gitignore`, que é o que impede a sua chave de ir junto num `push`.
-O que vem é o molde de cada um, e você copia:
-
-```bash
-cp .env.example                        .env
-cp agente-ia/.env.agente.example       agente-ia/.env.agente.local
-cp .supabase-token.example             .supabase-token.local
-```
-
-Eles não são a mesma coisa, e um deles é descartável:
-
-| Arquivo | Precisa? | Vida útil |
-|---|---|---|
-| **`.env`** | **Sim** — sem ele o sistema não funciona | Permanente |
-| `agente-ia/.env.agente.local` | Só para ligar a Letícia no WhatsApp | Permanente, mas parado: sobe para os secrets do Supabase e fica de registro |
-| `.supabase-token.local` | Só para publicar pela linha de comando | ⛔ **Descartável.** Sai de cena quando o sistema estiver no ar |
-
-Cada molde tem, dentro dele, o comentário dizendo onde achar cada valor. Você
-preenche cada um no passo em que ele for usado — não precisa ter tudo agora.
-
-> **Por que existe um arquivo para o token da conta.** Porque o `supabase login`
-> é interativo: abre o navegador e espera alguém colar um código. Se você está
-> instalando com a ajuda de uma IA na IDE, ela não consegue fazer esse passo — e
-> com o token no arquivo ela aplica as migrações e publica as funções sozinha.
-> Terminada a instalação, o token é **revogado e o arquivo apagado**. O passo a
-> passo está dentro do próprio `.supabase-token.example`.
-
-### 2. Criar o projeto no Supabase
-
-Acesse [supabase.com](https://supabase.com) → **New Project**.
-
-- Escolha uma região próxima dos seus usuários (no Brasil, `South America (São Paulo)`)
-- Guarde a senha do banco num gerenciador de senhas — ela só aparece uma vez
-
-Aguarde alguns minutos até o projeto ficar pronto.
-
-### 3. Criar as tabelas
-
-No painel do Supabase, abra o **SQL Editor** → **New query**.
-
-São **vinte e quatro arquivos, nesta ordem** — cada um depende do anterior:
-
-1. [`supabase/migrations/0001_schema_inicial.sql`](supabase/migrations/0001_schema_inicial.sql)
-2. [`supabase/migrations/0002_agenda_profissionais.sql`](supabase/migrations/0002_agenda_profissionais.sql)
-3. [`supabase/migrations/0003_whatsapp_unico.sql`](supabase/migrations/0003_whatsapp_unico.sql)
-4. [`supabase/migrations/0004_api_agente.sql`](supabase/migrations/0004_api_agente.sql)
-5. [`supabase/migrations/0005_catalogo_procedimentos.sql`](supabase/migrations/0005_catalogo_procedimentos.sql)
-6. [`supabase/migrations/0006_informacoes_clinica.sql`](supabase/migrations/0006_informacoes_clinica.sql)
-7. [`supabase/migrations/0007_horario_na_view.sql`](supabase/migrations/0007_horario_na_view.sql)
-8. [`supabase/migrations/0008_procedimentos_view.sql`](supabase/migrations/0008_procedimentos_view.sql)
-9. [`supabase/migrations/0009_profissionais_view.sql`](supabase/migrations/0009_profissionais_view.sql)
-10. [`supabase/migrations/0010_agente_conversas.sql`](supabase/migrations/0010_agente_conversas.sql)
-11. [`supabase/migrations/0011_procedimentos_detalhados.sql`](supabase/migrations/0011_procedimentos_detalhados.sql)
-12. [`supabase/migrations/0012_procedimentos_texto_enxuto.sql`](supabase/migrations/0012_procedimentos_texto_enxuto.sql)
-13. [`supabase/migrations/0013_conversas_lista.sql`](supabase/migrations/0013_conversas_lista.sql)
-14. [`supabase/migrations/0014_conversas_agendamento.sql`](supabase/migrations/0014_conversas_agendamento.sql)
-15. [`supabase/migrations/0015_baixa_da_consulta.sql`](supabase/migrations/0015_baixa_da_consulta.sql)
-16. [`supabase/migrations/0016_ultima_consulta.sql`](supabase/migrations/0016_ultima_consulta.sql)
-17. [`supabase/migrations/0017_provedor_whatsapp.sql`](supabase/migrations/0017_provedor_whatsapp.sql)
-18. [`supabase/migrations/0018_avaliacao_e_precos.sql`](supabase/migrations/0018_avaliacao_e_precos.sql)
-19. [`supabase/migrations/0019_nome_do_agente.sql`](supabase/migrations/0019_nome_do_agente.sql)
-20. [`supabase/migrations/0020_apagar_foto_e_logo.sql`](supabase/migrations/0020_apagar_foto_e_logo.sql)
-21. [`supabase/migrations/0021_nome_do_paciente.sql`](supabase/migrations/0021_nome_do_paciente.sql)
-22. [`supabase/migrations/0022_procedimentos_padronizados.sql`](supabase/migrations/0022_procedimentos_padronizados.sql)
-23. [`supabase/migrations/0023_marcar_so_do_catalogo.sql`](supabase/migrations/0023_marcar_so_do_catalogo.sql)
-24. [`supabase/migrations/0024_dashboard_no_banco.sql`](supabase/migrations/0024_dashboard_no_banco.sql)
-
-Copie **todo** o conteúdo de cada um, cole e clique em **Run**.
-
-Ao final você terá:
-
-```
-12 tabelas + 5 views     estrutura de dados
-23 índices               desempenho e integridade (um deles impede
-                         duas pessoas com o mesmo WhatsApp)
-21 políticas de RLS      controle de acesso (13 no banco + 8 no Storage)
-3 buckets de Storage     perfil, logotipo e as mídias do WhatsApp
-25 funções + 10 triggers automações internas, as regras da agenda e as
-                         contagens do Dashboard
-1 restrição de exclusão  impede duas consultas no mesmo horário
-3 tabelas no Realtime    atualização automática da tela
-```
-
-E já deixa cadastrados o horário comercial padrão e os **20 procedimentos** da
-clínica — todos editáveis depois pela tela de Configurações. Profissionais não
-vêm de exemplo: cadastre os seus na tela **Profissionais**, e a agenda de cada
-um nasce junto. Tokens também começam vazios: crie o primeiro em
-no **menu do usuário → Token e API**, senão a API responde 401 para quem chamar.
-
-### 4. Preencher o `.env`
-
-Abra o `.env` que você copiou no passo 1 e preencha as duas linhas:
-
-```env
-VITE_SUPABASE_URL=https://SEU_PROJECT_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_chave_anon_aqui
-```
-
-Os dois valores estão em **Settings → API Keys**, no painel do Supabase:
-
-- `VITE_SUPABASE_URL` → o campo **Project URL**
-- `VITE_SUPABASE_ANON_KEY` → a chave **anon / public**
-
-> ⚠️ Use a chave **anon**, nunca a **service_role**. A diferença está explicada
-> em [Segurança](#segurança).
-
-### 5. Criar o primeiro usuário
-
-Sem isso a tela de login não deixa ninguém entrar — não existe cadastro público,
-por ser um sistema interno.
-
-No painel: **Authentication → Users → Add user**.
-
-- Preencha e-mail e senha
-- **Marque a opção `Auto Confirm User`** — sem ela o Supabase exige confirmação
-  por e-mail e o login falha
-
-O perfil na tabela `usuarios` é criado automaticamente por um trigger. Não crie
-essa linha manualmente.
-
-### 6. Rodar
-
-```bash
-npm run dev
-```
-
-Acesse o endereço mostrado no terminal (normalmente `http://localhost:5173`) e
-entre com o usuário que você acabou de criar.
 
 ### Comandos disponíveis
 
 ```bash
-npm run dev       # servidor de desenvolvimento
-npm run build     # build de produção (roda o TypeScript antes)
-npm run preview   # pré-visualiza o build
-npm run lint      # análise estática
+npm run dev             # servidor de desenvolvimento
+npm run build           # build de produção (roda o TypeScript antes)
+npm run preview         # pré-visualiza o build
+npm run lint            # análise estática
+
+npm run prompt          # agente-ia/prompt.md → a Edge Function
+npm run agente:secrets  # sobe as chaves para os secrets do Supabase
+npm run agente:deploy   # regera o prompt e publica a função whatsapp
 ```
+
+Os dois últimos leem o seu projeto e o seu token de `.supabase-token.local`.
+Nada de projeto de ninguém fica escrito em arquivo versionado.
 
 ---
 
 ## Deploy na Vercel
 
-O sistema é uma SPA estática que fala com o Supabase pelo navegador — não há
-servidor próprio, então a Vercel serve o `dist/` e pronto. A detecção automática
-já acerta o framework (Vite), o comando (`npm run build`) e a pasta (`dist`).
+O sistema é uma SPA estática que fala com o Supabase pelo navegador — a Vercel
+serve o `dist/` e pronto. A detecção automática já acerta o framework (Vite), o
+comando (`npm run build`) e a pasta (`dist`).
 
-**Duas coisas precisam ser feitas à mão, e sem elas o site sobe quebrado:**
+**Duas coisas precisam ser feitas à mão**, e as duas estão detalhadas na
+[parte 4 do `INSTALACAO.md`](INSTALACAO.md):
 
-### 1. As variáveis de ambiente, no painel da Vercel
+1. **As duas variáveis de ambiente**, em Settings → Environment Variables. Sem
+   elas o build **não falha** — o Vite embute `undefined`, o site sobe, e a tela
+   fica em branco no primeiro acesso ao banco
+2. **A política de senha no Supabase Auth**, que não vem em migração: um projeto
+   novo nasce aceitando senha de seis caracteres
 
-O `.env` está no `.gitignore` — e deve continuar assim. Em
-**Settings → Environment Variables**, cadastre as duas, para todos os ambientes:
+O `vercel.json` já está no repositório, com uma coisa só: o rewrite de `/(.*)`
+para `/index.html`. **Não é enfeite** — as rotas são client-side, e sem ele
+entrar direto em `/agenda` ou dar F5 numa ficha devolve 404 da Vercel. Navegar
+pelo menu continuaria funcionando, então o defeito só apareceria quando alguém
+compartilhasse um link.
 
-```
-VITE_SUPABASE_URL=https://SEU_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_anon_key
-```
-
-> ⚠️ **Sem elas o build não falha** — o Vite não reclama de variável ausente.
-> Ele embute `undefined`, o site sobe, e a tela fica em branco no primeiro
-> acesso ao Supabase. O sintoma não aponta para a causa.
-
-Variável do Vite só entra no bundle durante o build: **mudou a variável,
-precisa reimplantar.**
-
-### 2. O `vercel.json` — já está no repositório
-
-```json
-{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
-```
-
-As rotas são client-side (`BrowserRouter`). Sem esse rewrite, entrar direto em
-`/agenda` ou dar F5 em `/leads/algum-id` devolve **404 da Vercel**: não existe
-arquivo nesses caminhos. Navegar pela barra lateral funcionaria, o que faz o
-problema aparecer só quando alguém compartilha um link — ou seja, na frente de
-outra pessoa.
-
-O rewrite não atrapalha os assets: a Vercel serve o arquivo real quando ele
-existe, e só cai no `index.html` quando não existe.
-
-### Ligue a política de senha no Supabase Auth
-
-**Isto não vem em migração.** As regras de senha ficam na configuração do
-projeto, não no banco — então um projeto novo nasce aceitando senha de **seis**
-caracteres, sem exigência nenhuma, por mais que a tela de Configurações mostre
-a lista de requisitos.
-
-No painel: **Authentication → Sign In / Providers → Password**
-
-| Campo | Valor |
-|---|---|
-| Minimum password length | `10` |
-| Password Requirements | Lowercase, uppercase letters, digits and symbols |
-
-A lista que aparece em Configurações → Perfil espelha exatamente isso. Se as
-duas divergirem, a pessoa preenche todos os itens verdes e mesmo assim leva uma
-recusa do servidor — sem saber de qual regra.
-
-> **Opcional, e vale a pena:** ligar também o **Prevent use of leaked
-> passwords** (HaveIBeenPwned). É o único item que barra `Senha@2026` — que
-> atende a todos os requisitos acima e está em qualquer lista de senhas
-> vazadas.
-
-### O que **não** precisa
-
-**Configurar Redirect URLs no Supabase Auth.** O login é
-`signInWithPassword`, sem OAuth e sem link mágico — nada volta por redirect.
-
-### Depois de subir, confira
-
-1. Entrar com um usuário e chegar no Dashboard
-2. Abrir `/agenda` **digitando na barra de endereço** — é o teste do rewrite
-3. Dar F5 dentro de uma ficha de paciente
-4. Menu do usuário → Token e API: a URL dos cURLs tem que apontar para o seu
-   projeto do Supabase, e não para `undefined`
-5. **Revogue o token de instalação e apague o arquivo** — nesta ordem:
-
-   ```bash
-   # 1º  https://supabase.com/dashboard/account/tokens  →  Revoke
-   # 2º
-   rm .supabase-token.local
-   ```
-
-   Ele dá acesso total à sua **conta** do Supabase, não só a este projeto, e a
-   instalação acabou. Apagar antes de revogar não revoga nada: o token continua
-   vivo e você jogou fora a cópia que dizia qual era. Precisou publicar de novo
-   depois? Gere outro — leva quinze segundos.
+> **O que NÃO precisa:** configurar Redirect URLs no Supabase Auth. O login é
+> `signInWithPassword`, sem OAuth e sem link mágico — nada volta por redirect.
 
 > A Edge Function da API **não** vai para a Vercel — ela roda no Supabase e
 > continua onde está. O deploy aqui é só do sistema que a equipe usa.
@@ -510,8 +355,9 @@ continua no histórico do Git. É preciso revogar a credencial e gerar outra.
 
 ### Controle de acesso
 
-O RLS está ativo nas 12 tabelas, com 13 políticas (mais 8 no Storage). O modelo
-atual é:
+O RLS está ativo nas 12 tabelas, com 13 políticas (mais 10 no Storage — a
+conta atualizada vive na [seção 10 do `DATABASE.md`](DATABASE.md), que é onde
+está a consulta que a confere). O modelo atual é:
 
 - Quem **não** está autenticado não enxerga absolutamente nada
 - Quem está autenticado é considerado parte da equipe e enxerga tudo
@@ -531,8 +377,15 @@ proteção de interface, não substitui as políticas do Supabase.
 ## Integração com o Agente de IA
 
 O agente é a **Letícia**, e ela mora dentro deste repositório: a Edge Function
-`supabase/functions/whatsapp/`. Quem entrega as mensagens é a **Evolution API**
-(WhatsApp não oficial); quem pensa é a OpenAI.
+`supabase/functions/whatsapp/`.
+
+Quem entrega as mensagens é a ponte de WhatsApp escolhida pela clínica —
+**Evolution API v2** ou **uazapi v2**, no seletor de Secretária de IA. Uma por
+vez; a coluna `provedor_whatsapp` decide, e trocar vale na mensagem seguinte.
+
+Quem pensa é o modelo escolhido na mesma tela: seis da **OpenAI** ou dois da
+**Anthropic**. A chave da OpenAI é necessária de qualquer jeito — é ela que
+transcreve os áudios e descreve as fotos, mesmo com um Claude atendendo.
 
 **📘 Tudo sobre ela está em [`agente-ia/`](agente-ia/)** — comece pelo
 [`agente-ia/README.md`](agente-ia/README.md).
@@ -645,22 +498,32 @@ O fluxo completo está na seção 8 do [`DATABASE.md`](DATABASE.md).
 ## Estrutura do projeto
 
 ```
-odonto-clinica/
-├── src/
+agente-odonto-crm/
+├── src/                          A TELA (React, roda no navegador)
 │   ├── components/       Sidebar, Layout, rota protegida, pessoas, calendário,
 │   │                     modais e as colunas da tela Conversas
 │   ├── pages/            Login, Dashboard, CRM, Conversas, Agenda, Profissionais,
 │   │                     Procedimentos, Leads, Clientes, Ficha, Secretária de IA,
 │   │                     Token e API, Configurações
 │   ├── lib/              Supabase, regra Lead × Paciente, cores, agenda,
-│   │                     telefones e tokens da API
+│   │                     período, telefones, conversas, conexão do WhatsApp
+│   │                     e tokens da API
 │   ├── types/            tipos espelhando o schema do banco
 │   └── index.css         fonte, Tailwind e animações
-├── supabase/
+├── supabase/                     O SERVIDOR
 │   ├── migrations/       o SQL que cria o banco inteiro (rode em ordem)
-│   └── functions/agenda/ a API que o Agente de IA consome
+│   └── functions/
+│       ├── whatsapp/     a Secretária de IA: recebe a mensagem e responde
+│       ├── agenda/       a API da agenda, para integração externa
+│       └── _shared/      peças comuns às duas: modelos de IA, as duas pontes
+│                         de WhatsApp, o prompt montado e a conversão de fuso
+├── agente-ia/                    O CONTEÚDO DA SECRETÁRIA
+│   ├── prompt.md         o prompt dela — quem ela é e como se comporta
+│   ├── GUIA-DO-PROMPT.md como escrever o prompt de outra clínica
+│   └── README.md         tudo sobre ela: decisões, ferramentas, custos
 ├── public/               favicon
 ├── DATABASE.md           documentação completa do banco
+├── API_AGENTE.md         o contrato dos sete endpoints da agenda
 ├── CLAUDE.md             convenções e orientações de desenvolvimento
 └── .env                  suas credenciais (NÃO versionado)
 ```
@@ -702,37 +565,51 @@ select tgname from pg_trigger where tgname = 'on_auth_user_created';
 <details>
 <summary><strong>As telas abrem vazias, mesmo com dados no banco</strong></summary>
 
-Provável falha nas políticas de RLS. Verifique se as 16 políticas foram criadas:
+Provável falha nas políticas de RLS. Confira quantas existem — o número
+esperado está na [seção 10 do `DATABASE.md`](DATABASE.md):
 
 ```sql
-select tablename, policyname from pg_policies
-where schemaname in ('public', 'storage');
+select schemaname, count(*) from pg_policies
+where schemaname in ('public', 'storage') group by schemaname;
 ```
 </details>
 
 <details>
 <summary><strong>O Kanban não atualiza sozinho</strong></summary>
 
-A tabela não está publicada no Realtime:
+A tabela não está publicada no Realtime. São **três**, e cada uma sustenta uma
+tela diferente:
 
 ```sql
 select tablename from pg_publication_tables
 where pubname = 'supabase_realtime';
--- deve retornar: crm_clinica_dados
+-- esperado: consultas, crm_clinica_dados, mensagens_whatsapp
 ```
 
-Se voltar vazio, rode:
+Faltando alguma, rode só a que faltou:
 
 ```sql
 alter publication supabase_realtime add table public.crm_clinica_dados;
+alter publication supabase_realtime add table public.consultas;
+alter publication supabase_realtime add table public.mensagens_whatsapp;
 ```
+
+> ⚠️ **É sempre a TABELA, nunca a view.** `crm_clinica` é view, e assinar view
+> não dá erro — apenas nunca dispara. Detalhes na seção 8.6 do
+> [`DATABASE.md`](DATABASE.md).
 </details>
 
 <details>
-<summary><strong>A automação não grava nada, mas também não dá erro</strong></summary>
+<summary><strong>Uma integração externa não grava nada, mas também não dá erro</strong></summary>
 
-Ela está usando a chave `anon`. Troque pela `service_role`, que ignora o RLS.
-Veja [Integração com o Agente de IA](#integração-com-o-agente-de-ia).
+Ela está usando a chave `anon` sem sessão. O RLS libera apenas `authenticated`,
+então a escrita é descartada em silêncio: `200 OK`, zero linhas.
+
+> **Isto não vale para a Secretária de IA.** As Edge Functions deste
+> repositório recebem a `service_role key` do próprio Supabase, sem
+> configuração. Vale para qualquer automação de fora — e para essas, o caminho
+> recomendado é a [API da agenda](API_AGENTE.md) com token próprio, não a
+> `service_role`.
 </details>
 
 <details>
@@ -780,19 +657,18 @@ antigas continuam íntegras.
 <details>
 <summary><strong>A Agenda não mostra o que o Agente de IA marcou</strong></summary>
 
-Duas causas possíveis.
-
-A automação ainda está gravando `data_agendamento` na ficha do lead em vez de
-criar a linha em `consultas` — veja
-[Integração com o Agente de IA](#integração-com-o-agente-de-ia).
-
-Ou a tabela não está publicada no Realtime, e a tela só atualiza ao recarregar:
+A tabela não está publicada no Realtime, e a tela só atualiza ao recarregar:
 
 ```sql
 select tablename from pg_publication_tables
 where pubname = 'supabase_realtime';
--- deve retornar: crm_clinica_dados e consultas
+-- esperado: consultas, crm_clinica_dados, mensagens_whatsapp
 ```
+
+Se `consultas` estiver lá e a consulta mesmo assim não aparecer, veja o log da
+função `whatsapp` no painel do Supabase: marcar passa por `agenda_marcar`, e
+uma recusa dela (horário ocupado, procedimento fora do catálogo) volta como
+resposta ao paciente, não como erro.
 </details>
 
 ---
@@ -801,13 +677,25 @@ where pubname = 'supabase_realtime';
 
 | Arquivo | Conteúdo |
 |---|---|
+| [`INSTALACAO.md`](INSTALACAO.md) | **O passo a passo da instalação**, do zero até a Letícia atendendo — separando o que você faz do que a IA da IDE faz |
 | [`DATABASE.md`](DATABASE.md) | Referência completa do banco: todas as colunas, RLS, Storage, Realtime, armadilhas e consultas de verificação |
 | [`API_AGENTE.md`](API_AGENTE.md) | Contrato da API da agenda para integração externa: os sete endpoints, com cURL pronto, e o desenho dos tokens de acesso |
 | [`CLAUDE.md`](CLAUDE.md) | Convenções de código, design system, rotas e débito técnico conhecido |
+| [`agente-ia/README.md`](agente-ia/README.md) | **A Secretária de IA por inteiro**: como funciona, as oito ferramentas, a memória, os custos e o que cada teste real quebrou |
+| [`agente-ia/GUIA-DO-PROMPT.md`](agente-ia/GUIA-DO-PROMPT.md) | **Levando o sistema para outra clínica**: o que no prompt é conteúdo seu e o que é contrato com o código |
 | [`supabase/migrations/`](supabase/migrations/) | O SQL que recria o banco do zero |
 
 ---
 
 ## Licença
 
-Projeto privado. Todos os direitos reservados.
+**Projeto privado.** O repositório não é público: o acesso é concedido pelo
+autor, conta a conta, a quem pedir.
+
+Quem recebe acesso pode instalar o sistema, rodá-lo para a sua clínica ou a de
+um cliente, e modificá-lo à vontade — inclusive acrescentar funcionalidades. O
+que não está autorizado é redistribuir o código para terceiros: quem quiser
+usar, pede o próprio acesso.
+
+> Não há licença aberta formal (MIT, Apache) declarada aqui. Se um dia isso
+> mudar, é este bloco que muda.

@@ -4,28 +4,29 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 
 **Esta pasta é o ponto de partida de tudo que diz respeito a ela.**
 
-> ### ⚠️ ESTADO: EM CONSTRUÇÃO — 5 de 6 etapas · **a Letícia já atende**
+> ### ✅ ESTADO: NO AR — as seis etapas entregues
 >
-> **A tabela de etapas, logo abaixo, é a única fonte confiável do que já
-> existe.** O que está em etapa não concluída **não existe no repositório nem
-> no banco** — não procure o arquivo, não escreva código contra a tabela.
+> **A Letícia atende.** Ela recebe pelo WhatsApp, responde, consulta a agenda,
+> marca, remarca e cancela; escuta áudio, lê a descrição de foto e grava a
+> ficha do paciente.
 >
-> **O agente está no ar e respondendo** — ligado, em modo teste, só para os
-> números cadastrados. Ligar, desligar e trocar o modelo já são pela tela:
-> **menu do usuário → Secretária de IA**. O prompt aparece lá, mas **só para
-> ler** — quem edita é a IA da IDE, no [`prompt.md`](prompt.md).
+> Ligar, desligar, trocar o modelo e escolher a ponte de WhatsApp são pela
+> tela: **menu do usuário → Secretária de IA**. O prompt aparece lá, mas **só
+> para ler** — quem edita é a IA da IDE, no [`prompt.md`](prompt.md).
 >
-> A tela **Conversas** existe em `/conversas`: a equipe lê o que a Letícia
+> A tela **Conversas**, em `/conversas`, é o outro lado: a equipe lê o que ela
 > respondeu, assume a conversa quando precisa e responde pelo mesmo WhatsApp.
-
-> Falta a **etapa 6** — a revisão final de ponta a ponta. E o agendamento
-> nunca foi exercitado numa conversa de verdade.
 >
-> Conforme cada etapa for entregue, marque-a e reescreva a seção correspondente
-> no tempo presente. Quando as seis estiverem prontas, apague este aviso: o
-> documento passa a descrever o sistema, não o plano.
+> **Este documento descreve o sistema, não um plano.** O que estiver escrito
+> aqui existe — se você não achar o arquivo, é o documento que está errado.
 
-**Última revisão:** 30 de agosto de 2026
+> ⚠️ **O modo teste continua ligado** por decisão da clínica: ela só responde
+> os números cadastrados na tela. Enquanto estiver assim, paciente de verdade
+> **não recebe resposta automática** — a equipe atende pela tela Conversas.
+> Quem desliga o modo teste é a clínica, e é o ato que coloca a Letícia na
+> frente do público.
+
+**Última revisão:** 2 de setembro de 2026
 **Documentos relacionados:** [`CLAUDE.md`](../CLAUDE.md) · [`DATABASE.md`](../DATABASE.md) · [`API_AGENTE.md`](../API_AGENTE.md)
 
 ---
@@ -50,15 +51,36 @@ agente-ia/
 O código do agente **não pode** morar aqui — o Supabase e o Vite exigem
 caminhos próprios. Esta é a lista completa, para ninguém procurar:
 
+**No servidor**
+
 | Onde | O que é |
 |---|---|
-| `supabase/functions/whatsapp/` | O cérebro: recebe a mensagem e responde. E as rotas da conexão (`/conexao`, `/conexao/conectar`, `/conexao/desconectar`), a de apagar uma pessoa (`/apagar-pessoa`) e a `/chaves-ia`, que diz quais fornecedores de IA têm chave — **sim ou não, nunca a chave** |
-| `supabase/functions/_shared/` | Peças compartilhadas: modelos de IA, as **duas pontes de WhatsApp**, montagem do prompt, conversão de fuso (`tempo.ts`) |
-| `supabase/migrations/0010_agente_conversas.sql` | As tabelas e colunas do agente |
+| `supabase/functions/whatsapp/` | O cérebro. Recebe o webhook e responde — e mais 7 rotas atrás da sessão: `/enviar` (o atendente responde), `/prompt-oficial` (o texto que a tela mostra), `/foto` (foto de perfil), `/conexao`, `/conexao/conectar`, `/conexao/desconectar`, `/apagar-pessoa` e `/chaves-ia`, que diz quais fornecedores de IA têm chave — **sim ou não, nunca a chave** |
+| `supabase/functions/_shared/` | As 10 peças compartilhadas: `llm.ts` (modelos, transcrição e descrição de foto), `evolution.ts` + `uazapi.ts` + `whatsapp.ts` + `pontes.ts` (as **duas pontes** e a porta entre elas), `ferramentas.ts` (as oito), `prompt.ts` + `prompt-oficial.ts`, `db.ts` e `tempo.ts` (conversão de fuso) |
+
+**No banco**
+
+| Onde | O que é |
+|---|---|
+| `0010_agente_conversas.sql` | `mensagens_whatsapp`, `configuracoes_agente`, o bucket de mídia e as 3 colunas de "assumir conversa" |
+| `0013` + `0014` | A view `conversas_lista`, que sustenta a coluna da esquerda |
+| `0017_provedor_whatsapp.sql` | Qual ponte está ativa |
+| `0019_nome_do_agente.sql` | O nome dela vira dado |
+
+**Na tela**
+
+| Onde | O que é |
+|---|---|
 | `src/pages/Conversas.tsx` | A tela estilo WhatsApp |
-| `src/components/ListaConversas.tsx`<br>`src/components/JanelaConversa.tsx` | As duas colunas dessa tela |
-| `src/pages/SecretariaIA.tsx` | A página do menu do usuário: modelo e prompt |
+| `src/components/ListaConversas.tsx`<br>`src/components/JanelaConversa.tsx`<br>`src/components/PainelLead.tsx` | As três colunas dessa tela |
+| `src/pages/SecretariaIA.tsx` | A página do menu do usuário: estado, nome, modelo, prompt, conexão, modo teste e o interruptor |
+| `src/components/ConexaoWhatsApp.tsx` | A seção "Conexão do WhatsApp" dessa página |
+| `src/components/AvisoWhatsAppCaiu.tsx` | A faixa vermelha no topo do sistema, quando a ponte cai |
+| `src/components/ApagarPessoa.tsx` | A zona de perigo por busca |
 | `src/lib/conversas.ts` | Ler, enviar, assumir e devolver conversa |
+| `src/lib/whatsappConexao.ts` | A ponte está de pé? Quem está conectado? (com polling) |
+| `src/lib/modelosIA.ts` | O catálogo dos 8 modelos e quais têm chave no servidor |
+| `src/lib/agente.ts` | Como ela se chama **na tela** — o `useAgente()` |
 
 > **Regra:** conteúdo (prompt, exemplos, chaves, documentação) fica **nesta
 > pasta**. Código fica onde a ferramenta manda, e é sempre listado aqui.
@@ -481,7 +503,10 @@ Por isso o modo teste **nasce ligado**, e o agente **nasce desligado**:
 A regra mora numa função só, `agente_deve_responder(whatsapp)`. A Edge Function
 pergunta, não decide — assim ela não pode divergir da tela.
 
-Número já cadastrado para os testes: **`5511987654321`**.
+> ⚠️ **O número de teste não fica escrito aqui.** Ele é de uma pessoa de
+> verdade, e este repositório vai para outras clínicas. Quem está cadastrado se
+> vê na tela — **Secretária de IA → Modo de teste** —, que é o único lugar onde
+> ele precisa aparecer.
 
 ### Bucket `midias-whatsapp` — privado
 
@@ -1332,12 +1357,17 @@ Evolution manda mensagem por aquele WhatsApp.
 Quatro linhas cinzas acima do estado, e cada uma responde uma pergunta que só
 aparece quando algo quebra:
 
-| Campo | Responde |
-|---|---|
-| **Servidor** `sua-evolution.exemplo.…` | Em qual painel entrar. Foi a pergunta de 01/09 |
-| **Instância** `clinica-principal` | Qual das instâncias do servidor é a nossa |
-| **Chave** `····949B` | Se a chave configurada é a que se pensa que é — útil depois de um `agente:secrets` |
-| **WhatsApp** `+55 (11) 98765-4321` | **Qual número está atendendo.** Inteiro, e não os últimos dígitos |
+| Campo | Exemplo | Responde |
+|---|---|---|
+| **Servidor** | `sua-evolution.exemplo.com` | Em qual painel entrar. Foi a pergunta de 01/09 |
+| **Instância** | `clinica-principal` | Qual das instâncias do servidor é a nossa |
+| **Chave** | `····949B` | Se a chave configurada é a que se pensa que é — útil depois de um `agente:secrets` |
+| **WhatsApp** | `+55 (11) 98765-4321` | **Qual número está atendendo.** Inteiro, e não os últimos dígitos |
+
+> Os valores acima são **exemplos**. Os de verdade só existem na tela e nas
+> secrets da função — escrever a instância e o número da clínica aqui seria
+> publicar a identificação de uma instalação num repositório que vai para
+> outras.
 
 Os três primeiros saem de `identificacao()` da ponte ativa, e vêm das **secrets
 da função** — nunca do banco. O quarto é de outra natureza: sai do
@@ -1381,7 +1411,7 @@ de teste.
 **A contagem é a parte importante.** A tela mostra o que vai destruir antes de
 liberar o botão:
 
-> **Afonso** — +55 (11) 98765-4321
+> **Maria Silva** — +55 (11) 98765-4321
 > 68 mensagens · 3 consultas (1 já realizada)
 
 Botão irreversível que só pergunta "tem certeza?" vira clique automático na
@@ -1483,29 +1513,38 @@ clínica anuncia, `profissional_horarios` é quem manda na disponibilidade.
 
 ## 10.5. Como publicar (o que funcionou)
 
-Precisa de um **Personal Access Token** do Supabase
-(https://supabase.com/dashboard/account/tokens), exportado como
-`SUPABASE_ACCESS_TOKEN`. Ele dá acesso total à conta — **revogue depois de usar.**
+> **Instalando do zero?** O caminho inteiro é o
+> [`INSTALACAO.md`](../INSTALACAO.md) — este bloco é o mesmo procedimento com o
+> **porquê** de cada decisão, para quem já tem o sistema de pé e vai republicar.
+
+Preencha as **duas** linhas de `.supabase-token.local` — o Personal Access
+Token da conta e o `SUPABASE_PROJECT_REF` do seu projeto. O molde
+[`.supabase-token.example`](../.supabase-token.example) explica onde achar cada
+um, e como revogar o token no fim. Depois:
 
 ```bash
 npm run agente:secrets   # sobe as chaves de agente-ia/.env.agente.local
 npm run agente:deploy    # regera o prompt e publica a função
 ```
 
-> **Deploy com 401 `Unauthorized` quer dizer token, não código.** O CLI usa a
-> sessão do `supabase login`, que expira; o token do arquivo não entra sozinho.
-> Exporte antes:
->
-> ```bash
-> export SUPABASE_ACCESS_TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .supabase-token.local | cut -d= -f2-)
-> ```
->
-> Esse arquivo é **da instalação, e descartável** — o molde
-> [`.supabase-token.example`](../.supabase-token.example) explica como criar o
-> token, e como revogar e apagar quando o sistema estiver no ar.
+> **Os dois passam por [`publicar.mjs`](publicar.mjs), e é ele que injeta o
+> token.** Antes o `SUPABASE_ACCESS_TOKEN` precisava ser exportado à mão, e
+> esquecer disso devolvia um **401 `Unauthorized` que parecia erro de código** —
+> o CLI usa a sessão do `supabase login`, que expira, e o token do arquivo não
+> entrava sozinho. Hoje entra sempre.
 
-Depois, apontar o webhook da Evolution para a função, com o segredo no
-cabeçalho (`POST {EVOLUTION_API_URL}/webhook/set/{instancia}`):
+### Apontar o webhook — o passo que ninguém adivinha
+
+**A ponte não descobre a nossa função sozinha.** Sem este passo o resultado é o
+pior possível de diagnosticar: sessão pareada, card **verde escrito
+"Conectado"**, e silêncio absoluto. Foi exatamente o que aconteceu na estreia da
+uazapi.
+
+Só o webhook da **ponte ativa** deve apontar para cá — a outra, se continuar
+apontada, tem o formato descartado com motivo no log.
+
+**Evolution** — o segredo vai no cabeçalho
+(`POST {EVOLUTION_API_URL}/webhook/set/{instancia}`):
 
 ```json
 { "webhook": {
@@ -1516,6 +1555,30 @@ cabeçalho (`POST {EVOLUTION_API_URL}/webhook/set/{instancia}`):
     "events": ["MESSAGES_UPSERT"] } }
 ```
 
+**uazapi** — ela **não aceita cabeçalho customizado**, então o segredo viaja na
+query (`POST {UAZAPI_API_URL}/webhook`, com o token da instância no cabeçalho
+`token`):
+
+```json
+{ "enabled": true,
+  "url": "https://SEU_REF.supabase.co/functions/v1/whatsapp?segredo=O_MESMO_DO_SECRET",
+  "events": ["messages"],
+  "excludeMessages": ["wasSentByApi", "isGroupYes"],
+  "addUrlEvents": false, "addUrlTypesMessages": false }
+```
+
+> Este corpo foi **lido de uma instância configurada e funcionando**
+> (`GET /webhook`, 02/09/2026), não copiado de documentação. O `excludeMessages`
+> é cinto e suspensório: o `lerWebhook()` de
+> [`uazapi.ts`](../supabase/functions/_shared/uazapi.ts) já descarta a própria
+> mensagem e as de grupo — e precisa continuar descartando, porque quem
+> configurou o painel pode ter tirado.
+
+> ⚠️ **Confira pela tela, não pelo painel da ponte.** O card "Conexão do
+> WhatsApp", em Secretária de IA, pergunta à ponte onde o webhook aponta e
+> avisa quando não é para cá. Ele mostra o **veredito**, nunca a URL — ela
+> carrega o segredo dentro.
+
 ### Três coisas descobertas do jeito difícil
 
 1. **`WEBHOOK_SEGREDO` vazio derruba tudo em silêncio.** A função rejeita todo
@@ -1523,8 +1586,8 @@ cabeçalho (`POST {EVOLUTION_API_URL}/webhook/set/{instancia}`):
    Confira com `supabase secrets list`: o hash
    `e3b0c442…7852b855` é o SHA-256 da string vazia.
 2. **O `_shared/` funciona.** O `--no-remote` do runtime bloqueia módulo
-   **remoto**; import relativo local sobe normalmente — os 7 arquivos vão
-   juntos no deploy.
+   **remoto**; import relativo local sobe normalmente — os **10** arquivos de
+   `_shared/` vão juntos no deploy, sem precisar listar nenhum.
 3. **A Management API do Supabase exige `User-Agent`.** Sem um de verdade, o
    Cloudflare devolve `error code: 1010` antes de chegar na API.
 
@@ -1539,7 +1602,11 @@ curl -i -X POST https://SEU_REF.supabase.co/functions/v1/whatsapp -d '{}'
 
 ## 11. Chaves e secrets
 
-As seis chaves ficam em `.env.agente.local`, nesta pasta. Ele **não vem no
+> **Instalando do zero?** Onde achar cada chave, e quais são realmente
+> obrigatórias, está na [parte 1 do `INSTALACAO.md`](../INSTALACAO.md). Esta
+> seção é a referência de o que cada uma faz.
+
+As **nove** chaves ficam em `.env.agente.local`, nesta pasta. Ele **não vem no
 clone** — está no `.gitignore`. O que vem é o molde
 [`.env.agente.example`](.env.agente.example), com o comentário de onde achar
 cada chave:
@@ -1554,14 +1621,24 @@ O `agente:secrets` **sobe** as chaves para os secrets do Supabase, e é de lá q
 a Edge Function lê. O arquivo local continua sendo o seu único registro do que
 foi configurado — os secrets do Supabase não podem ser lidos de volta.
 
-| Chave | Para quê |
-|---|---|
-| `ANTHROPIC_API_KEY` | Claude. **Vazia hoje** — e por isso o seletor mostra os dois Claude desligados, em vez de deixar escolher e falhar |
-| `OPENAI_API_KEY` | GPT **e** a transcrição dos áudios — usada mesmo quando o modelo escolhido é o Claude |
-| `EVOLUTION_API_URL` | Endereço do servidor da Evolution |
-| `EVOLUTION_API_KEY` | Autenticação da Evolution |
-| `EVOLUTION_INSTANCIA` | Nome da instância do número da clínica |
-| `WEBHOOK_SEGREDO` | Impede que alguém que descubra o endereço faça o agente responder de graça |
+| Chave | Obrigatória? | Para quê |
+|---|:-:|---|
+| `OPENAI_API_KEY` | **sim** | GPT, a transcrição dos áudios **e** a descrição das fotos. Necessária mesmo com um Claude atendendo — sem ela a agente trava no primeiro áudio |
+| `ANTHROPIC_API_KEY` | não | Claude. **Vazia hoje** — e por isso o seletor mostra os dois Claude desligados, em vez de deixar escolher e falhar |
+| `WEBHOOK_SEGREDO` | **sim** | Impede que alguém que descubra o endereço faça o agente responder de graça. Você inventa o valor |
+
+**E as chaves da ponte de WhatsApp — de UMA delas, não das duas.** Qual está
+valendo é a coluna `provedor_whatsapp` (migração `0017`), trocada no seletor da
+tela; a presença da chave não decide nada.
+
+| Chave | Ponte | Para quê |
+|---|---|---|
+| `EVOLUTION_API_URL` | Evolution | Endereço do servidor onde ela roda, sem barra no fim |
+| `EVOLUTION_API_KEY` | Evolution | A autenticação da sua instalação |
+| `EVOLUTION_INSTANCIA` | Evolution | O nome da instância do número da clínica |
+| `UAZAPI_API_URL` | uazapi | O host — `https://api.uazapi.com`, ou o seu |
+| `UAZAPI_TOKEN` | uazapi | O token **da instância**. É o do dia a dia: enviar, presença, status e mídia |
+| `UAZAPI_ADMIN_TOKEN` | uazapi | O token **da conta**, que cria e apaga instâncias. ⚠️ Este sistema nunca cria instância — deixe vazio a menos que algo realmente precise |
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` **não** precisam ser configuradas —
 o Supabase já as entrega às Edge Functions, como acontece hoje na `agenda/`.
