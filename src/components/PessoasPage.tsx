@@ -322,7 +322,11 @@ function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
         // alguém cadastrar de novo e bater no WhatsApp duplicado, procurando
         // defeito no número de quem acabou de entrar.
         const nome = form.nome.trim()
-        setError(errConsulta.code === '23P01'
+        setError(errConsulta.code === 'JOR01'
+          // JOR01 = a trava de jornada do banco (migração 0025). Ver o
+          // comentário gêmeo em NovoAgendamentoModal: é sinal de aba antiga.
+          ? `${nome} foi cadastrado, mas a consulta não: ${errConsulta.message} Recarregue a página (Ctrl+F5) e marque pela Agenda.`
+          : errConsulta.code === '23P01'
           // 23P01 = a restrição `consultas_sem_sobreposicao`.
           ? `${nome} foi cadastrado, mas a consulta não: esse profissional já tem consulta nesse horário. Marque pela Agenda.`
           : `${nome} foi cadastrado, mas a consulta não foi salva. Marque pela Agenda.`)

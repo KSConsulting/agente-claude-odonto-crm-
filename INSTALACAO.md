@@ -257,7 +257,7 @@ Instale este sistema seguindo o INSTALACAO.md.
 Os três arquivos de chave já estão preenchidos. Faça a parte 3:
 
 1. Leia o CLAUDE.md e o DATABASE.md antes de tocar no banco.
-2. Aplique as 24 migrações de supabase/migrations/, na ordem
+2. Aplique as 25 migrações de supabase/migrations/, na ordem
    numérica, usando o SUPABASE_ACCESS_TOKEN e o SUPABASE_PROJECT_REF
    que estão em .supabase-token.local.
 3. Confira o resultado com as consultas da seção 10 do DATABASE.md
@@ -274,7 +274,7 @@ No fim, me diga o que deu certo e o que ainda falta eu fazer à mão.
 
 | Passo | O que é | Como saber que deu certo |
 |---|---|---|
-| **As 24 migrações** | Criam tabelas, índices, regras de segurança, as funções da agenda e o catálogo de 20 procedimentos | 12 tabelas + 5 views, 23 índices, 23 políticas, 25 funções, 10 triggers |
+| **As 25 migrações** | Criam tabelas, índices, regras de segurança, as funções da agenda e o catálogo de 20 procedimentos | 12 tabelas + 5 views, 23 índices, 23 políticas, 27 funções, 11 triggers |
 | **Os secrets** | Sobem as chaves do arquivo para o servidor | `npm run agente:secrets` termina sem erro |
 | **As duas funções** | `whatsapp` (a Letícia) e `agenda` (a API) | Publicadas no painel do Supabase |
 
@@ -287,7 +287,7 @@ No fim, me diga o que deu certo e o que ainda falta eu fazer à mão.
 
 > **Se a IA travar nas migrações**, dá para fazer à mão: no painel do Supabase,
 > **SQL Editor → New query**, e cole o conteúdo de cada arquivo de
-> `supabase/migrations/` na ordem, do `0001` ao `0024`, clicando em **Run** a
+> `supabase/migrations/` na ordem, do `0001` ao `0025`, clicando em **Run** a
 > cada um. A ordem importa — cada um depende do anterior.
 
 ### Já dá para entrar

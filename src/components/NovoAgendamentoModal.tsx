@@ -227,7 +227,13 @@ export default function NovoAgendamentoModal({
       // que a tela não viu — tipicamente o Agente de IA marcou neste horário
       // enquanto o modal estava aberto. Repetir dá o mesmo erro; a saída é
       // escolher outro horário.
-      setErro(error.code === '23P01'
+      // JOR01 = a trava de jornada do banco (migração 0025). Chegar aqui
+      // significa que ESTA TELA não barrou antes — na prática, uma aba aberta
+      // desde antes da correção, rodando o JavaScript antigo. Por isso a frase
+      // manda recarregar: sem isso, a pessoa tenta de novo e leva o mesmo erro.
+      setErro(error.code === 'JOR01'
+        ? `${error.message} Recarregue a página (Ctrl+F5) e escolha outro horário.`
+        : error.code === '23P01'
         ? 'Esse horário acabou de ser ocupado nessa agenda. Escolha outro.'
         : 'Erro ao salvar o agendamento. Tente novamente.')
       return

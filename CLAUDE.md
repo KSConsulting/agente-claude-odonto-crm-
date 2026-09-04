@@ -21,7 +21,7 @@ Nesse caso:
    de cada vez.
 3. **Respeite a divisão de quem age.** As partes 1, 2, 4, 5 e 6 são dela: criar
    contas, colar chaves, clicar em painéis de terceiros, configurar pela tela.
-   A parte 3 é sua: aplicar as 24 migrações e publicar as duas Edge Functions.
+   A parte 3 é sua: aplicar as 25 migrações e publicar as duas Edge Functions.
    Não tente fazer a parte dela, e não deixe a parte 3 para ela.
 4. **Não pule a parte 5**, mesmo que o sistema já esteja funcionando. O banco
    nasce com o catálogo de procedimentos da clínica de origem, e desde a
@@ -144,7 +144,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **vinte e quatro arquivos, nesta ordem**:
+A migração é aplicada em **vinte e cinco arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -172,7 +172,10 @@ preencher o `nome_lead` vazio com o nome dado ao marcar) e
 e o interesse do lead vira lista) e `0023_marcar_so_do_catalogo.sql` (o
 `agenda_marcar` recusa o que não está no catálogo) e
 `0024_dashboard_no_banco.sql` (as cinco funções que fazem o Dashboard contar no
-banco em vez de trazer todo mundo).
+banco em vez de trazer todo mundo) e `0025_jornada_no_banco.sql` (a jornada vira
+regra do banco: a função `dentro_da_jornada()`, o conserto do defeito da
+meia-noite nas três funções que a copiavam, e o trigger que recusa agendar fora
+dela).
 
 > ⚠️ **A `0021` recria a `agenda_marcar` inteira**, porque `create or replace`
 > exige o corpo todo. O arquivo foi **gerado a partir do
@@ -361,6 +364,7 @@ Eram três portas escrevendo em `consultas`, e as três discordavam:
 | **Agenda → Novo Agendamento** | Aviso âmbar — *"dá para marcar assim mesmo, como encaixe"* — com o botão azul do lado | Recusa, e o botão tranca |
 | **Ficha do paciente → Nova Consulta** | **Nada.** Não importava uma linha de `lib/agenda` nem carregava `profissional_horarios` | Recusa, e o botão tranca |
 | **Contatos/Pacientes → Novo Paciente** | **Nada.** Data no futuro virava consulta `agendada` em qualquer dia | Recusa, e o botão tranca |
+| **O banco, por baixo das três** | **Nada.** `insert` direto em domingo passava | Trigger `consultas_jornada` recusa com `JOR01` |
 
 O encaixe fora da jornada foi para fora do produto: a saída é **ligar aquele dia
 na jornada em Profissionais**, e a própria mensagem de recusa diz isso. A ideia
@@ -381,12 +385,21 @@ quase nunca era o caso real, e o caso real era clicar sem perceber.
 > odontológica em feriado existe — a decisão está na migração `0002`, seção 4.
 > A jornada é a regra permanente, e é outra coisa.
 
-> ⚠️ **A trava é da interface; o banco não tem nenhuma.** `consultas` só tem a
-> restrição de sobreposição — testado em 03/09/2026: `insert` direto em domingo
-> às 10h e às 3h da madrugada passam os dois. Quem confere jornada são as
-> funções `agenda_*` (as duas portas dos agentes) e agora as três telas. Não há
-> quarto caminho hoje; **tela nova que grave em `consultas` precisa chamar
-> `motivoForaDaJornada()`**, porque nada abaixo dela vai pegar o erro.
+> ⚠️ **E a trava de verdade mora no BANCO — a da tela é só o aviso antecipado.**
+> A primeira versão desta correção parou na interface, e ela **falhou em 17
+> minutos**: publicada às 22:26 de 03/09/2026, uma consulta entrou num domingo
+> às 22:43 porque a aba do navegador estava aberta desde antes e continuava
+> rodando o JavaScript velho. Garantia que mora na tela é garantia que uma aba
+> antiga ignora — o mesmo argumento da `consultas_sem_sobreposicao`.
+>
+> Hoje quem recusa é o trigger `consultas_jornada` (migração `0025`), sobre a
+> função SQL `dentro_da_jornada()`. As telas continuam conferindo **antes**,
+> porque descobrir a recusa só no clique é descobrir tarde — e as três traduzem
+> o `JOR01` que o banco devolve, mandando recarregar a página.
+>
+> **Restaram duas implementações da regra, e elas têm de concordar:**
+> `dentro_da_jornada()` no SQL e `motivoForaDaJornada()` no TypeScript. Mudou
+> uma, mude a outra.
 
 #### E a grade passou a mostrar o dia fechado
 

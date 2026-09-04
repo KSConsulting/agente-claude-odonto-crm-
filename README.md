@@ -176,7 +176,7 @@ e nenhuma delas fica entre a tela e o banco.
 |:-:|---|---|
 | 👤 | **Contas** | Supabase, OpenAI e **uma** ponte de WhatsApp (Evolution ou uazapi) |
 | 👤 | **Três arquivos** | Colar as chaves em `.env`, `.supabase-token.local` e `agente-ia/.env.agente.local` |
-| 🤖 | **A IDE** | Ela aplica as 24 migrações e publica as duas funções. Você cola uma frase |
+| 🤖 | **A IDE** | Ela aplica as 25 migrações e publica as duas funções. Você cola uma frase |
 | 👤 | **Quatro cliques** | 1º usuário · política de senha · **apontar o webhook** · Vercel |
 | 👤 | **Encerrar** | Testar, e **revogar os dois tokens** da instalação |
 

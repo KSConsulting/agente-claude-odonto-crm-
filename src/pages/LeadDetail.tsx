@@ -159,7 +159,11 @@ function NewConsultaModal({ leadId, profissionais, horarios, onClose, onSaved }:
       // barrou uma consulta em cima de outra na agenda desse profissional.
       // 23514 = a trigger `consultas_procedimento_valido`: procedimento que
       // saiu do catálogo entre abrir o modal e salvar.
-      setError(err.code === '23P01'
+      // JOR01 = a trava de jornada do banco (migração 0025). Ver o comentário
+      // gêmeo em NovoAgendamentoModal: chegar aqui é sinal de aba antiga.
+      setError(err.code === 'JOR01'
+        ? `${err.message} Recarregue a página (Ctrl+F5).`
+        : err.code === '23P01'
         ? 'Esse profissional já tem consulta nesse horário. Escolha outro horário ou outra agenda.'
         : err.code === '23514'
         ? 'Esse procedimento não está mais no catálogo da clínica.'

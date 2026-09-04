@@ -26,7 +26,7 @@ Documentação completa do schema. Serve para quem baixar este sistema e precisa
 
 ### 1.1. Rodar as migrações
 
-Abra o **SQL Editor** no painel do Supabase e execute os **vinte e quatro
+Abra o **SQL Editor** no painel do Supabase e execute os **vinte e cinco
 arquivos, nesta ordem** — cada um depende do anterior:
 
 1. `supabase/migrations/0001_schema_inicial.sql` — 6 tabelas, 1 view, 9 índices,
@@ -143,6 +143,21 @@ arquivos, nesta ordem** — cada um depende do anterior:
     > A tela fazia `select * from crm_clinica` e contava no navegador. Com
     > `max_rows = 1000`, a partir do lead 1001 as contas não ficariam
     > incompletas — ficariam **erradas**, sem erro e sem aviso.
+
+25. `supabase/migrations/0025_jornada_no_banco.sql` — a jornada vira **regra do
+    banco**. A função `dentro_da_jornada(profissional, inicio, duracao)`, o
+    trigger `consultas_jornada` que recusa agendar fora dela (`JOR01`), e a
+    reescrita de `agenda_profissionais_livres`, `agenda_marcar` e
+    `agenda_remarcar` para chamarem a função em vez de repetirem a regra.
+    Detalhes em 4.20.
+
+    > **Ela conserta um defeito silencioso.** As três cópias comparavam o fim
+    > da consulta como *hora do dia*: numa jornada das 08:00 às 18:00, uma
+    > consulta às 23:30 com 60 minutos termina às `00:30`, que é menor que
+    > `18:00` — e passava. Conferido no banco em 03/09/2026:
+    > `agenda_marcar(..., '2026-09-10 23:30-03', ...)` devolvia `ok = true`.
+    > A conta agora é em segundos desde a meia-noite, somados, e nunca
+    > reconvertidos para hora do dia.
 
 A ordem importa: cada arquivo depende do anterior. Rodar fora de ordem falha.
 
@@ -845,7 +860,8 @@ modelagem de `horario_comercial`, porque cada dentista tem horário diferente.
 **Usada em:** `Profissionais.tsx` (edição), `Agenda.tsx` (sombreado fora do
 expediente) e as **três telas que criam consulta** — `NovoAgendamentoModal.tsx`,
 `LeadDetail.tsx` e `PessoasPage.tsx` —, todas por `motivoForaDaJornada()` em
-`src/lib/agenda.ts`. Do lado do servidor, pelas funções `agenda_*` (4.11).
+`src/lib/agenda.ts`. Do lado do servidor, por `dentro_da_jornada()` (4.20), que
+é quem as funções `agenda_*` (4.11) e o trigger `consultas_jornada` consultam.
 
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
@@ -1420,6 +1436,65 @@ comparar instantes independe de fuso. Só o balde precisa.
 
 ---
 
+### 4.20. `dentro_da_jornada()` e o trigger `consultas_jornada` (migração `0025`)
+
+```sql
+select public.dentro_da_jornada(p_profissional uuid,
+                                p_inicio timestamptz,
+                                p_duracao integer) -> boolean
+```
+
+**"Este intervalo cabe inteiro na jornada deste profissional?"** — a regra
+existe **uma vez** no banco, e é consultada por `agenda_profissionais_livres`,
+`agenda_marcar`, `agenda_remarcar` e pelo trigger. Antes ela estava copiada nas
+três primeiras, e as três carregavam o mesmo defeito.
+
+| Situação | Devolve |
+|---|---|
+| Sem linha em `profissional_horarios` para aquele dia | `false` |
+| Linha existe mas `ativo = false` | `false` — é assim que a clínica desliga um dia |
+| O intervalo **inteiro** cabe entre `hora_inicio` e `hora_fim` | `true` |
+| Começa dentro mas termina depois do fechamento | `false` |
+
+> ⚠️ **O fuso decide que dia é.** A jornada é `time` sem fuso e a consulta é
+> `timestamptz`; a conversão usa `configuracoes_clinica.fuso_horario`. Sem ela,
+> a sessão do PostgREST (que roda em UTC) jogaria a manhã inteira da clínica
+> para fora do expediente.
+
+> ⚠️ **O defeito que a `0025` matou — a consulta que vira o dia.** As cópias
+> comparavam o fim como hora do dia: `((inicio + duracao) at time zone
+> fuso)::time <= hora_fim`. Numa jornada 08:00–18:00, uma consulta às 23:30 com
+> 60 minutos termina às `00:30` — e `00:30 <= 18:00` é verdadeiro, assim como
+> `23:30 >= 08:00`. A função **aceitava**. Hoje a conta é em segundos desde a
+> meia-noite, somados, e `84600 + 3600` não é menor que `64800`.
+
+> ⚠️ **Ela espelha `motivoForaDaJornada()`, em `src/lib/agenda.ts`.** São as
+> duas únicas implementações da regra. **Mudou uma, mude a outra** — a de lá
+> devolve a frase pronta da recusa para a tela avisar antes do clique; esta
+> decide.
+
+**O trigger `consultas_jornada`** (`before insert or update of data_consulta,
+duracao_minutos, profissional_id, status`) é a garantia:
+
+| Decisão | Por quê |
+|---|---|
+| Só `status = 'agendada'` | `realizada` e `faltou` são **registro de histórico** — um paciente antigo pode ter sido atendido num sábado que a clínica não abre mais. Barrar tornaria o passado impossível de lançar. Dar baixa também não esbarra aqui |
+| Só com `profissional_id` | Sem profissional não há jornada a conferir; a consulta cai na faixa "Sem profissional definido" da Agenda |
+| `update of` com quatro colunas | Mexer nas **observações** de uma consulta antiga que já está fora da jornada continua funcionando. Sem isso, uma linha herdada viraria uma linha que ninguém mais consegue editar |
+| Bloqueio (férias, feriado) **não** entra | Ele impede a agenda de *oferecer*, mas a equipe encaixa por cima conscientemente — decisão da `0002`, seção 4 |
+| SQLSTATE próprio, `JOR01` | `23514` já é da trigger de procedimento, e a ficha do lead traduz aquele código como "esse procedimento não está mais no catálogo" — a recusa da jornada apareceria com a frase de outro erro |
+
+A mensagem vem pronta: *"Débora Lima não atende neste dia e horário."* As três
+telas que criam consulta traduzem o `JOR01` e mandam recarregar a página —
+chegar até o banco significa que a tela não barrou antes, e o motivo típico é
+uma aba aberta desde antes da última publicação.
+
+> **O trigger não valida o que já está gravado.** Em 03/09/2026 havia uma
+> consulta fora da jornada (domingo 12:00), criada por uma aba antiga. A
+> consulta da seção 6 da migração lista as que existirem.
+
+---
+
 ## 5. Status do funil
 
 `crm_clinica_dados.status` aceita exatamente estes 9 valores, garantidos por
@@ -1969,14 +2044,19 @@ Lista do que quebra este banco de formas não óbvias:
     os endpoints fora do ar de uma vez. O runtime roda com `--no-remote`.
 20. **Esquecer `set search_path = public` numa função `security definer`** →
     brecha de escalada de privilégio.
-21. **Contar com o banco para recusar consulta fora da jornada** → ele não
-    recusa. `consultas` tem a restrição de sobreposição e mais nada sobre
-    horário: conferido em 03/09/2026, `insert` direto em domingo às 10h e às
-    3h da madrugada passam os dois. Quem confere jornada são as funções
-    `agenda_*` (4.11), do lado dos agentes, e `motivoForaDaJornada()`
-    (`src/lib/agenda.ts`) do lado das telas. **Tela nova que grave em
-    `consultas` precisa chamar essa função** — nada abaixo dela vai pegar o
-    erro, e foi assim que uma consulta entrou num domingo.
+21. **Confiar só na tela para recusar consulta fora da jornada** → uma aba
+    aberta desde antes da correção continua gravando. Aconteceu: a interface
+    foi publicada às 22:26 de 03/09/2026 e, às 22:43, uma consulta entrou num
+    domingo — o navegador ainda rodava o JavaScript velho, e nada no servidor
+    sabia. Desde a `0025` quem recusa é o trigger `consultas_jornada` (4.20),
+    com `JOR01`. **Tela nova que grave em `consultas` continua devendo chamar
+    `motivoForaDaJornada()`** — não pela garantia, que agora é do banco, mas
+    para avisar ANTES do clique em vez de deixar a pessoa levar um erro.
+22. **Reescrever a regra de jornada em SQL sem mexer no TypeScript** (ou o
+    contrário) → `dentro_da_jornada()` (4.20) e `motivoForaDaJornada()`
+    (`src/lib/agenda.ts`) são as duas únicas implementações que sobraram, e
+    elas têm de concordar. Divergindo, a recepção recusa o que a Letícia já
+    prometeu ao paciente — ou marca o que ela recusa.
 
 ---
 
