@@ -279,10 +279,13 @@ export default function Agenda() {
     [consultas, visiveis],
   )
 
-  /* Uma única agenda visível → dá para sombrear o fora-de-expediente dela. */
+  /* A jornada das agendas visíveis, para a grade sombrear o que está fora
+     dela. Vale com uma agenda filtrada ou com todas — antes valia só com uma,
+     e no padrão da tela (todas visíveis) domingo não se distinguia de uma
+     quarta. Sem nenhuma agenda real visível não há jornada a desenhar. */
   const idsVisiveisReais = [...visiveis].filter((v) => v !== SEM_PROFISSIONAL)
-  const jornadaDestaque = idsVisiveisReais.length === 1
-    ? horarios.filter((h) => h.profissional_id === idsVisiveisReais[0])
+  const jornadaVisivel = idsVisiveisReais.length > 0
+    ? horarios.filter((h) => idsVisiveisReais.includes(h.profissional_id))
     : undefined
 
   const limites = useMemo(() => {
@@ -437,7 +440,7 @@ export default function Agenda() {
               consultas={consultasVisiveis}
               profissionaisPorId={profissionaisPorId}
               limites={limites}
-              jornadaDestaque={jornadaDestaque}
+              jornadaVisivel={jornadaVisivel}
               onClickConsulta={setDetalhe}
               onClickHorarioVazio={(quando) => setModalNovo({ quando })}
             />

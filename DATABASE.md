@@ -843,7 +843,9 @@ Jornada de trabalho — **uma linha por dia da semana, por profissional**. Mesma
 modelagem de `horario_comercial`, porque cada dentista tem horário diferente.
 
 **Usada em:** `Profissionais.tsx` (edição), `Agenda.tsx` (sombreado fora do
-expediente), `NovoAgendamentoModal.tsx` (aviso de encaixe)
+expediente) e as **três telas que criam consulta** — `NovoAgendamentoModal.tsx`,
+`LeadDetail.tsx` e `PessoasPage.tsx` —, todas por `motivoForaDaJornada()` em
+`src/lib/agenda.ts`. Do lado do servidor, pelas funções `agenda_*` (4.11).
 
 | Coluna | Tipo | Nulo | Default | Observação |
 |---|---|:---:|---|---|
@@ -1967,6 +1969,14 @@ Lista do que quebra este banco de formas não óbvias:
     os endpoints fora do ar de uma vez. O runtime roda com `--no-remote`.
 20. **Esquecer `set search_path = public` numa função `security definer`** →
     brecha de escalada de privilégio.
+21. **Contar com o banco para recusar consulta fora da jornada** → ele não
+    recusa. `consultas` tem a restrição de sobreposição e mais nada sobre
+    horário: conferido em 03/09/2026, `insert` direto em domingo às 10h e às
+    3h da madrugada passam os dois. Quem confere jornada são as funções
+    `agenda_*` (4.11), do lado dos agentes, e `motivoForaDaJornada()`
+    (`src/lib/agenda.ts`) do lado das telas. **Tela nova que grave em
+    `consultas` precisa chamar essa função** — nada abaixo dela vai pegar o
+    erro, e foi assim que uma consulta entrou num domingo.
 
 ---
 

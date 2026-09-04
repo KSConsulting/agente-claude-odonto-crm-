@@ -19,6 +19,19 @@ import type { Consulta, ProfissionalBloqueio, ProfissionalHorario } from '../typ
 export const NOMES_DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 export const NOMES_DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+/**
+ * `"aos domingos"`, `"às segundas"` … — o complemento das frases de recusa
+ * ("Débora Lima não atende aos domingos").
+ *
+ * Vem escrito por extenso, com artigo e tudo, porque o artigo muda com o dia
+ * (aos domingos, às segundas). Montá-lo na hora seria enfiar uma regra de
+ * gramática dentro de uma regra de agenda.
+ */
+export const DIAS_POR_EXTENSO = [
+  'aos domingos', 'às segundas', 'às terças', 'às quartas',
+  'às quintas', 'às sextas', 'aos sábados',
+]
+
 /** Faixa exibida na visão semanal quando não há jornada cadastrada. */
 export const GRADE_PADRAO = { horaInicio: 7, horaFim: 20 }
 
@@ -161,20 +174,51 @@ export function haConflito(
 ────────────────────────────────────────────── */
 
 /**
- * O horário cabe inteiro dentro da jornada do profissional naquele dia?
- * Uma consulta que começa às 17h40 e dura 40 minutos NÃO cabe num expediente
- * que fecha às 18h — por isso a checagem é sobre o intervalo, não sobre o
- * instante inicial.
+ * Por que NÃO dá para AGENDAR neste horário nesta agenda — ou `null` quando dá.
+ *
+ * ⚠️ Esta é a única fonte da regra na interface. As três telas que criam
+ * consulta — a Agenda, a ficha do paciente e o cadastro de Novo Paciente —
+ * chamam esta função e mostram a frase que ela devolve. Antes cada uma tinha a
+ * sua versão: a Agenda avisava e deixava salvar, a ficha não sabia que jornada
+ * existia e o cadastro tampouco. Foi por elas que entrou consulta num domingo,
+ * num dia em que ninguém atende.
+ *
+ * O horário precisa caber INTEIRO: uma consulta que começa às 17h40 e dura 40
+ * minutos não cabe num expediente que fecha às 18h, ainda que o começo esteja
+ * dentro. Por isso a checagem é sobre o intervalo, e não sobre o instante.
+ *
+ * `horarios` já vem filtrado pelo profissional — quem chama sabe qual agenda
+ * está em jogo, e passar a lista inteira faria a jornada de um valer para o
+ * outro.
+ *
+ * ⚠️ Espelha o `fora_expediente` de `agenda_marcar` (migração `0004`). Mudou
+ * uma, mude a outra: se divergirem, a recepção recusa o que a Letícia já
+ * prometeu ao paciente — ou marca o que ela recusa.
+ *
+ * Devolve a FRASE pronta, e não um código, porque é isso que as três telas
+ * precisam mostrar. Quem quer só o sim/não compara com `null`.
  */
-export function dentroDoExpediente(
+export function motivoForaDaJornada(
   horarios: ProfissionalHorario[],
   inicio: Date,
   duracaoMinutos: number,
-): boolean {
-  const doDia = horarios.find((h) => h.dia_semana === inicio.getDay() && h.ativo)
-  if (!doDia) return false
+  nomeProfissional: string,
+): string | null {
+  const dia = inicio.getDay()
+  const doDia = horarios.find((h) => h.dia_semana === dia && h.ativo)
+  if (!doDia) return `${nomeProfissional} não atende ${DIAS_POR_EXTENSO[dia]}.`
+
+  const abre = horaParaMinutos(doDia.hora_inicio)
+  const fecha = horaParaMinutos(doDia.hora_fim)
   const ini = minutosDoDia(inicio)
-  return ini >= horaParaMinutos(doDia.hora_inicio) && ini + duracaoMinutos <= horaParaMinutos(doDia.hora_fim)
+  if (ini >= abre && ini + duracaoMinutos <= fecha) return null
+
+  // O fim é lido de uma Date, e não da soma crua: 23h30 mais uma hora precisa
+  // sair como 00:30, e não como o "24:30" que a soma em minutos daria.
+  const fim = minutosDoDia(somarMinutos(inicio, duracaoMinutos))
+  return `${nomeProfissional} atende ${DIAS_POR_EXTENSO[dia]} das ${minutosParaHora(abre)} `
+    + `às ${minutosParaHora(fecha)}, e essa consulta iria das ${minutosParaHora(ini)} `
+    + `às ${minutosParaHora(fim)}.`
 }
 
 /**

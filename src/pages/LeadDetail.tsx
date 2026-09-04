@@ -7,9 +7,10 @@ import { formatarParaExibicao } from '../lib/telefones'
 import { useCatalogoProcedimentos } from '../lib/procedimentos'
 import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
 import { STATUS_CONSULTA, ROTULO_CONSULTA } from '../lib/statusLead'
+import { motivoForaDaJornada } from '../lib/agenda'
 import CampoTelefone from '../components/CampoTelefone'
 import ApagarEstaPessoa from '../components/ApagarEstaPessoa'
-import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional } from '../types'
+import type { LeadClinica, LeadStatus, Consulta, ConsultaStatus, Profissional, ProfissionalHorario } from '../types'
 
 /* ──────────────────────────────────────────────
    Constants
@@ -105,7 +106,7 @@ interface NewConsultaForm {
 
 const DURACOES = [15, 30, 45, 60, 90, 120]
 
-function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId: string; profissionais: Profissional[]; onClose: () => void; onSaved: (c: Consulta) => void }) {
+function NewConsultaModal({ leadId, profissionais, horarios, onClose, onSaved }: { leadId: string; profissionais: Profissional[]; horarios: ProfissionalHorario[]; onClose: () => void; onSaved: (c: Consulta) => void }) {
   const [form, setForm] = useState<NewConsultaForm>({ procedimento: '', data_consulta: '', profissional_id: '', duracao_minutos: '60', status: 'agendada', valor_pago: '', observacoes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -113,9 +114,33 @@ function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId:
 
   const set = (field: keyof NewConsultaForm, value: string) => setForm((f) => ({ ...f, [field]: value }))
 
+  /* A JORNADA BARRA QUEM ESTÁ SENDO MARCADO — E SÓ ELE.
+
+     Esta tela ficou de fora quando a jornada virou regra, do mesmo jeito que
+     ficou de fora quando o procedimento virou lista fechada: ela não importava
+     nada de `lib/agenda` e gravava direto em `consultas`. Domingo, feriado, 3h
+     da manhã — tudo passava, em silêncio.
+
+     Mas aqui, diferente da Agenda, existe o seletor de status. Uma consulta
+     `realizada` é REGISTRO DE HISTÓRICO, não agendamento: um paciente antigo
+     pode ter sido atendido num sábado que a clínica não abre mais, e barrar
+     isso tornaria o passado impossível de lançar. Por isso a recusa só vale
+     para `agendada` — que é o único status que significa "marcar". */
+  const profissionalEscolhido = profissionais.find((p) => p.id === form.profissional_id) ?? null
+  const inicioConsulta = form.data_consulta ? new Date(form.data_consulta) : null
+  const foraDaJornada = form.status === 'agendada' && inicioConsulta && !isNaN(inicioConsulta.getTime()) && profissionalEscolhido
+    ? motivoForaDaJornada(
+        horarios.filter((h) => h.profissional_id === form.profissional_id),
+        inicioConsulta,
+        Number(form.duracao_minutos),
+        `${profissionalEscolhido.nome} ${profissionalEscolhido.sobrenome}`.trim(),
+      )
+    : null
+
   const handleSave = async () => {
     if (!form.procedimento) { setError('Escolha o procedimento.'); return }
     if (!form.data_consulta) { setError('Escolha a data da consulta.'); return }
+    if (foraDaJornada) { setError(foraDaJornada); return }
     setSaving(true); setError('')
     const { data, error: err } = await supabase.from('consultas').insert({
       lead_id: leadId,
@@ -223,11 +248,19 @@ function NewConsultaModal({ leadId, profissionais, onClose, onSaved }: { leadId:
           </div>
         </div>
 
+        {/* Aparece enquanto a pessoa mexe na data, e não só depois do clique:
+            descobrir a recusa ao salvar é descobrir tarde demais. */}
+        {foraDaJornada && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, color: '#DC2626', marginTop: 12, lineHeight: 1.5 }}>
+            {foraDaJornada} Escolha outro horário, outro profissional, ou ajuste a jornada em <strong>Profissionais</strong>.
+          </div>
+        )}
+
         {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#DC2626', marginTop: 12 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancelar</button>
-          <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: saving ? '#4C90A8' : '#1E6E8C', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <button onClick={handleSave} disabled={saving || !!foraDaJornada} style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: foraDaJornada ? '#DCE6EA' : saving ? '#4C90A8' : '#1E6E8C', cursor: saving || foraDaJornada ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: foraDaJornada ? '#6B818C' : '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {saving ? 'Salvando...' : 'Salvar Consulta'}
           </button>
         </div>
@@ -246,6 +279,7 @@ export default function LeadDetail() {
   const [lead, setLead] = useState<LeadClinica | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [profissionais, setProfissionais] = useState<Profissional[]>([])
+  const [horarios, setHorarios] = useState<ProfissionalHorario[]>([])
   const [loading, setLoading] = useState(true)
 
   const [selectedStatus, setSelectedStatus] = useState<LeadStatus>('iniciou_conversa')
@@ -291,7 +325,9 @@ export default function LeadDetail() {
       supabase.from('crm_clinica').select('*').eq('id', id).single(),
       supabase.from('consultas').select('*').eq('lead_id', id).order('data_consulta', { ascending: false }),
       supabase.from('profissionais').select('*').order('nome'),
-    ]).then(([{ data: leadData }, { data: consultasData }, { data: profissionaisData }]) => {
+      // A jornada vem junto: é ela que decide se dá para marcar a consulta.
+      supabase.from('profissional_horarios').select('*'),
+    ]).then(([{ data: leadData }, { data: consultasData }, { data: profissionaisData }, { data: horariosData }]) => {
       if (leadData) {
         setLead(leadData)
         setSelectedStatus(leadData.status)
@@ -305,6 +341,7 @@ export default function LeadDetail() {
       }
       setConsultas(consultasData ?? [])
       setProfissionais((profissionaisData ?? []) as Profissional[])
+      setHorarios((horariosData ?? []) as ProfissionalHorario[])
       setLoading(false)
     })
   }, [id])
@@ -755,6 +792,7 @@ export default function LeadDetail() {
         <NewConsultaModal
           leadId={lead.id}
           profissionais={profissionais}
+          horarios={horarios}
           onClose={() => setShowModal(false)}
           onSaved={(c) => setConsultas((prev) => [c, ...prev])}
         />

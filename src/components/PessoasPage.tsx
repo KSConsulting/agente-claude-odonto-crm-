@@ -8,6 +8,7 @@ import { isPaciente } from '../lib/pessoas'
 import { buscarPorWhatsapp, ERRO_DUPLICADO, type PessoaResumo } from '../lib/contatos'
 import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
 import { useCatalogoProcedimentos } from '../lib/procedimentos'
+import { motivoForaDaJornada } from '../lib/agenda'
 import CampoTelefone from './CampoTelefone'
 import AvisoBaixaConsulta from './AvisoBaixaConsulta'
 import FiltroPeriodo from './FiltroPeriodo'
@@ -15,7 +16,7 @@ import {
   getPeriodRange, inRange,
   type DateRange, type PeriodKey,
 } from '../lib/periodo'
-import type { LeadClinica, LeadStatus, Profissional } from '../types'
+import type { LeadClinica, LeadStatus, Profissional, ProfissionalHorario } from '../types'
 
 /* ──────────────────────────────────────────────
    Implementação compartilhada entre /leads e /clientes.
@@ -178,14 +179,22 @@ function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
   })
   const [agora, setAgora] = useState(() => Date.now())
   const [profissionais, setProfissionais] = useState<Profissional[]>([])
+  const [horarios, setHorarios] = useState<ProfissionalHorario[]>([])
   /* A pessoa que JÁ foi criada, quando só a consulta falhou. Sem guardar isto,
      tentar de novo bateria no WhatsApp duplicado — e o erro apontaria para o
      lugar errado, culpando o número de quem acabou de ser cadastrado. */
   const [jaCriado, setJaCriado] = useState<LeadClinica | null>(null)
 
   useEffect(() => {
-    void supabase.from('profissionais').select('*').eq('ativo', true).order('nome')
-      .then(({ data }) => setProfissionais((data ?? []) as Profissional[]))
+    // A jornada vem junto com os profissionais: uma consulta no futuro é um
+    // agendamento, e agendamento fora da jornada deixou de ser possível.
+    void Promise.all([
+      supabase.from('profissionais').select('*').eq('ativo', true).order('nome'),
+      supabase.from('profissional_horarios').select('*'),
+    ]).then(([{ data: profs }, { data: hors }]) => {
+      setProfissionais((profs ?? []) as Profissional[])
+      setHorarios((hors ?? []) as ProfissionalHorario[])
+    })
   }, [])
 
   /* A DATA DECIDE — E É A ÚNICA COISA QUE DECIDE.
@@ -208,6 +217,20 @@ function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
      do modal e relido a cada mexida no campo de data — que é o único momento em
      que a resposta pode ter mudado para quem está olhando. */
   const jaAconteceu = instante !== null && instante.getTime() <= agora
+
+  /* A MESMA REGRA DA AGENDA, PELA MESMA FUNÇÃO — e só para o que está sendo
+     MARCADO. No passado a consulta é histórico (`realizada`), e a jornada de
+     hoje não tem o que dizer sobre um atendimento que já aconteceu; no futuro
+     ela é agendamento, e vale a recusa. É a mesma divisão da ficha do lead. */
+  const profissionalDaConsulta = profissionais.find((p) => p.id === consulta.profissional_id) ?? null
+  const foraDaJornada = !jaAconteceu && instante && profissionalDaConsulta
+    ? motivoForaDaJornada(
+        horarios.filter((h) => h.profissional_id === consulta.profissional_id),
+        instante,
+        Number(consulta.duracao),
+        `${profissionalDaConsulta.nome} ${profissionalDaConsulta.sobrenome}`.trim(),
+      )
+    : null
 
   const set = <C extends keyof NewLeadForm>(field: C, value: NewLeadForm[C]) =>
     setForm((f) => ({ ...f, [field]: value }))
@@ -234,6 +257,7 @@ function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
     // próprias — e `procedimento` é `not null` no banco.
     if (consulta.quando && !instante) { setError('A data da consulta não é válida.'); return }
     if (instante && !consulta.procedimento) { setError('Escolha o procedimento da consulta.'); return }
+    if (foraDaJornada) { setError(foraDaJornada); return }
 
     setSaving(true); setError('')
 
@@ -529,6 +553,12 @@ function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
                     ? <>Está no passado: entra no histórico como <strong>realizada</strong>, e a pessoa vira <strong>Paciente</strong>.</>
                     : <>Está no futuro: entra na agenda como <strong>marcada</strong>, e a pessoa fica em Contatos com a etiqueta "Consulta Agendada".</>}
                 </div>
+
+                {foraDaJornada && (
+                  <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '9px 12px', fontSize: 11.5, color: '#DC2626', lineHeight: 1.5 }}>
+                    {foraDaJornada} Escolha outro horário, outro profissional, ou ajuste a jornada em <strong>Profissionais</strong>.
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -562,8 +592,8 @@ function NewLeadModal({ titulo, onClose, onSaved }: NewLeadModalProps) {
           <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Cancelar
           </button>
-          <button onClick={handleSave} disabled={saving || !!duplicado}
-            style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: duplicado ? '#DCE6EA' : saving ? '#4C90A8' : '#1E6E8C', cursor: (saving || duplicado) ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: duplicado ? '#6B818C' : '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <button onClick={handleSave} disabled={saving || !!duplicado || !!foraDaJornada}
+            style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: (duplicado || foraDaJornada) ? '#DCE6EA' : saving ? '#4C90A8' : '#1E6E8C', cursor: (saving || duplicado || foraDaJornada) ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: (duplicado || foraDaJornada) ? '#6B818C' : '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {/* O botão diz o que vai SAIR, não o que a página se chama: quem
                 abriu "Novo Paciente" e não deu data leva um Contato, e precisa
                 saber disso antes de clicar. */}

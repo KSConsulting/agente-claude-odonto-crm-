@@ -257,7 +257,7 @@ src/
 │   ├── supabase.ts             cliente Supabase (lê as env vars)
 │   ├── pessoas.ts              regra que separa Lead de Paciente
 │   ├── cores.ts                paleta das agendas (cor do profissional)
-│   ├── agenda.ts               lógica pura: datas, conflito, layout dos blocos
+│   ├── agenda.ts               lógica pura: datas, conflito, jornada, layout dos blocos
 │   ├── periodo.ts              o recorte de datas dos filtros (3 telas, 1 regra)
 │   ├── procedimentos.ts        o "a partir de" na tela, e o catálogo dos campos
 │   ├── telefones.ts            países atendidos, dígitos e formato canônico
@@ -340,12 +340,65 @@ existe só na tela, via `formatarParaExibicao()`.
 
 ### A lógica da agenda
 
-A lógica de datas, conflito e posicionamento fica em
+A lógica de datas, conflito, jornada e posicionamento fica em
 [`src/lib/agenda.ts`](src/lib/agenda.ts), fora de qualquer componente. Isso é
 proposital: a API do Agente de IA vai precisar responder "que horários estão
 livres?" com estas mesmas regras, só que em SQL. **Mudou uma regra aqui, a outra
 implementação precisa acompanhar** — se divergirem, o agente oferece horário que
 a recepção vê como ocupado.
+
+### Agendar fora da jornada não existe — em nenhuma das três portas
+
+`motivoForaDaJornada()`, em [`src/lib/agenda.ts`](src/lib/agenda.ts), devolve a
+**frase pronta** da recusa, ou `null` quando dá para marcar. É a única fonte
+desta regra na interface, e ela espelha o `fora_expediente` de `agenda_marcar`
+(migração `0004`) — **mudou uma, mude a outra**.
+
+Eram três portas escrevendo em `consultas`, e as três discordavam:
+
+| Porta | Como estava | Agora |
+|---|---|---|
+| **Agenda → Novo Agendamento** | Aviso âmbar — *"dá para marcar assim mesmo, como encaixe"* — com o botão azul do lado | Recusa, e o botão tranca |
+| **Ficha do paciente → Nova Consulta** | **Nada.** Não importava uma linha de `lib/agenda` nem carregava `profissional_horarios` | Recusa, e o botão tranca |
+| **Contatos/Pacientes → Novo Paciente** | **Nada.** Data no futuro virava consulta `agendada` em qualquer dia | Recusa, e o botão tranca |
+
+O encaixe fora da jornada foi para fora do produto: a saída é **ligar aquele dia
+na jornada em Profissionais**, e a própria mensagem de recusa diz isso. A ideia
+de uma caixinha "marcar assim mesmo" foi considerada e descartada — o encaixe
+quase nunca era o caso real, e o caso real era clicar sem perceber.
+
+> ⚠️ **A recusa vale para quem está sendo MARCADO, e só.** A ficha do lead tem
+> seletor de status, e uma consulta `realizada` é **registro de histórico**: um
+> paciente antigo pode ter sido atendido num sábado que a clínica não abre mais.
+> Barrar isso tornaria o passado impossível de lançar — que é justamente o uso
+> que o `CLAUDE.md` manda dar àquele modal. Por isso a trava só olha `agendada`.
+>
+> Pelo mesmo motivo o cadastro de Novo Paciente só barra data **no futuro**: no
+> passado a consulta nasce `realizada`, e é histórico.
+
+> ⚠️ **Bloqueio continua sendo aviso, e não recusa.** Férias e feriado são a
+> exceção que a própria equipe criou sabendo o que fazia, e emergência
+> odontológica em feriado existe — a decisão está na migração `0002`, seção 4.
+> A jornada é a regra permanente, e é outra coisa.
+
+> ⚠️ **A trava é da interface; o banco não tem nenhuma.** `consultas` só tem a
+> restrição de sobreposição — testado em 03/09/2026: `insert` direto em domingo
+> às 10h e às 3h da madrugada passam os dois. Quem confere jornada são as
+> funções `agenda_*` (as duas portas dos agentes) e agora as três telas. Não há
+> quarto caminho hoje; **tela nova que grave em `consultas` precisa chamar
+> `motivoForaDaJornada()`**, porque nada abaixo dela vai pegar o erro.
+
+#### E a grade passou a mostrar o dia fechado
+
+O sombreado de "fora do expediente" da visão semanal só era desenhado quando
+havia **uma agenda filtrada**. Com todas à vista — que é como a tela abre —
+domingo era desenhado igual a uma quarta-feira: nada dizia que a clínica está
+fechada, e o clique numa coluna vazia abria o modal como em qualquer outro dia.
+
+Agora vale para qualquer número de agendas, e com várias é a **união** delas:
+abre com a primeira e fecha com a última. O que está fora da jornada de todo
+mundo está fora da clínica; sombrear a interseção esconderia horário em que
+alguém atende.
 
 ### Leads e Clientes são a mesma implementação
 
@@ -1022,7 +1075,7 @@ Clareamento.
 | **A caixa mora no modal de Editar** | É decisão que se toma pensando, uma vez — não coisa para clicar de passagem numa grade de vinte cards, onde é fácil errar o vizinho. O card **mostra** o resultado ("Passa pela avaliação" / "Agenda direto · a partir de R$ 250"), porque senão descobrir quais passam exigiria abrir vinte modais |
 | **Uma porta só, garantida por índice** | `servicos_clinica_avaliacao_unica` é parcial (`where e_avaliacao`). Duas portas seriam duas respostas para a mesma pergunta |
 | **A trava mora na função SQL** | `agenda_marcar` recusa, e devolve o nome da porta. Prompt é pedido, não trava — a Letícia já ignorou regra escrita com o dado na frente dela. E como as duas portas dos agentes descem para a mesma função, a API externa herda a regra de graça |
-| **A recepção passa por fora** | `NovoAgendamentoModal` grava direto em `consultas`. A regra existe para impedir um **agente** de decidir clínica, não para impedir a clínica de marcar o que quiser |
+| **A recepção passa por fora** | `NovoAgendamentoModal` grava direto em `consultas`. A regra existe para impedir um **agente** de decidir clínica, não para impedir a clínica de marcar o que quiser. Vale para **esta** regra: a da jornada a recepção não fura mais (ver "Agendar fora da jornada não existe") |
 
 **O preço tem três estados, e o do meio é o que vale.** Vazio, ela não fala
 valor; `0`, ela diz **"é gratuita"**; acima de zero, "a partir de R$ X". Zero

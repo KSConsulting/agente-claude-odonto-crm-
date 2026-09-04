@@ -3,7 +3,7 @@ import { X, Search, UserPlus, AlertTriangle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCatalogoProcedimentos } from '../lib/procedimentos'
 import {
-  bloqueioNoPeriodo, dentroDoExpediente, haConflito, paraDatetimeLocal, somarMinutos,
+  bloqueioNoPeriodo, haConflito, motivoForaDaJornada, paraDatetimeLocal, somarMinutos,
 } from '../lib/agenda'
 import { buscarPorWhatsapp, ERRO_DUPLICADO } from '../lib/contatos'
 import { apenasDigitos, formatarParaExibicao } from '../lib/telefones'
@@ -137,9 +137,30 @@ export default function NovoAgendamentoModal({
     [consultas, profissionalId, inicio, duracao],
   )
 
-  const foraDoExpediente = useMemo(
-    () => (inicio && profissionalId ? !dentroDoExpediente(horariosDoProfissional, inicio, duracao) : false),
-    [horariosDoProfissional, inicio, duracao, profissionalId],
+  /* O NOME, e não o objeto do profissional: `ativos` é um filtro refeito a
+     cada render, e uma dependência que muda de identidade toda vez faz o
+     compilador do React desistir da memoização (`preserve-manual-memoization`).
+     `profissionais` é prop e `profissionalId` é estado — os dois são estáveis. */
+  const nomeDaAgenda = useMemo(() => {
+    const p = profissionais.find((x) => x.id === profissionalId)
+    return p ? `${p.nome} ${p.sobrenome}`.trim() || 'Esse profissional' : null
+  }, [profissionais, profissionalId])
+
+  /* FORA DA JORNADA NÃO É AVISO, É RECUSA.
+
+     Era um aviso âmbar — "dá para marcar assim mesmo, como encaixe" — e o
+     botão continuava azul do lado dele. O encaixe quase nunca era o caso; o
+     caso era alguém clicar numa coluna de domingo que a grade desenhava igual
+     a uma quarta-feira. Agendar para um dia em que o dentista não atende
+     deixou de ser possível, e a saída é ajustar a jornada em Profissionais.
+
+     Sem profissional escolhido não há jornada a conferir — acontece só quando
+     a clínica não tem nenhum ativo, e aí o modal já avisa isso mais acima. */
+  const foraDaJornada = useMemo(
+    () => (inicio && !isNaN(inicio.getTime()) && nomeDaAgenda
+      ? motivoForaDaJornada(horariosDoProfissional, inicio, duracao, nomeDaAgenda)
+      : null),
+    [horariosDoProfissional, inicio, duracao, nomeDaAgenda],
   )
 
   const bloqueio = useMemo(
@@ -149,6 +170,9 @@ export default function NovoAgendamentoModal({
 
   const handleSalvar = async () => {
     if (!inicio || isNaN(inicio.getTime())) { setErro('Escolha a data e o horário.'); return }
+    // O botão já está trancado; esta linha é a trava de verdade, para o caso de
+    // o horário virar inválido entre o último render e o clique.
+    if (foraDaJornada) { setErro(foraDaJornada); return }
     if (!procedimento.trim()) { setErro('Escolha o procedimento.'); return }
     if (!paciente && !(modoNovo && novoNome.trim())) { setErro('Escolha o paciente ou cadastre um novo.'); return }
     if (!paciente && !novoWhatsappValido) { setErro('Informe um WhatsApp válido, com o código do país.'); return }
@@ -217,6 +241,8 @@ export default function NovoAgendamentoModal({
   }
 
   const termoLimpo = limparTermo(busca)
+  /** As duas recusas do modal: horário ocupado e dia/hora fora da jornada. */
+  const impedido = !!conflito || !!foraDaJornada
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, overflowY: 'auto' }}
@@ -291,14 +317,18 @@ export default function NovoAgendamentoModal({
               {new Date(conflito.data_consulta).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Escolha outro horário.
             </Aviso>
           )}
-          {!conflito && bloqueio && (
-            <Aviso tipo="atencao">
-              Há um bloqueio nesse período{bloqueio.motivo ? ` (${bloqueio.motivo})` : ''}. Dá para marcar assim mesmo, como encaixe.
+          {!conflito && foraDaJornada && (
+            <Aviso tipo="erro">
+              {foraDaJornada} Escolha outro horário, outra agenda, ou ajuste a jornada em <strong>Profissionais</strong>.
             </Aviso>
           )}
-          {!conflito && !bloqueio && foraDoExpediente && (
+          {/* O bloqueio continua sendo aviso, e não recusa: férias e feriado são
+              a exceção que a própria equipe criou sabendo o que fazia, e
+              emergência odontológica em feriado existe. A jornada é a regra
+              permanente — é outra coisa. */}
+          {!conflito && !foraDaJornada && bloqueio && (
             <Aviso tipo="atencao">
-              Fora da jornada cadastrada desse profissional. Dá para marcar assim mesmo, como encaixe.
+              Há um bloqueio nesse período{bloqueio.motivo ? ` (${bloqueio.motivo})` : ''}. Dá para marcar assim mesmo, como encaixe.
             </Aviso>
           )}
 
@@ -450,8 +480,8 @@ export default function NovoAgendamentoModal({
             style={{ flex: 1, padding: '10px', borderRadius: 9, border: '1px solid #DCE6EA', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#6B818C', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Cancelar
           </button>
-          <button onClick={handleSalvar} disabled={salvando || !!conflito}
-            style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: conflito ? '#DCE6EA' : salvando ? '#4C90A8' : '#1E6E8C', color: conflito ? '#6B818C' : '#fff', cursor: conflito ? 'not-allowed' : salvando ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <button onClick={handleSalvar} disabled={salvando || impedido}
+            style={{ flex: 2, padding: '10px', borderRadius: 9, border: 'none', background: impedido ? '#DCE6EA' : salvando ? '#4C90A8' : '#1E6E8C', color: impedido ? '#6B818C' : '#fff', cursor: impedido || salvando ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {salvando ? 'Salvando...' : 'Agendar'}
           </button>
         </div>

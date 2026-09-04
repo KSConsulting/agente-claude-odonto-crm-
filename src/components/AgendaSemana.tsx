@@ -23,14 +23,14 @@ interface Props {
   consultas: ConsultaAgenda[]
   profissionaisPorId: Map<string, Profissional>
   limites: { horaInicio: number; horaFim: number }
-  /** Jornada a sombrear como "fora do expediente". Só quando há 1 agenda visível. */
-  jornadaDestaque?: ProfissionalHorario[]
+  /** Jornada das agendas visíveis — o que fica fora dela é sombreado. */
+  jornadaVisivel?: ProfissionalHorario[]
   onClickConsulta: (c: ConsultaAgenda) => void
   onClickHorarioVazio: (quando: Date) => void
 }
 
 export default function AgendaSemana({
-  dias, consultas, profissionaisPorId, limites, jornadaDestaque, onClickConsulta, onClickHorarioVazio,
+  dias, consultas, profissionaisPorId, limites, jornadaVisivel, onClickConsulta, onClickHorarioVazio,
 }: Props) {
   const corpoRef = useRef<HTMLDivElement>(null)
   const hoje = new Date()
@@ -59,14 +59,24 @@ export default function AgendaSemana({
     onClickHorarioVazio(quando)
   }
 
-  /** Faixas sombreadas fora da jornada — só com uma agenda visível. */
+  /* FAIXAS SOMBREADAS FORA DA JORNADA — DE QUALQUER NÚMERO DE AGENDAS.
+
+     Isto só era desenhado quando havia UMA agenda filtrada. Com as duas à
+     vista, que é como a tela abre, domingo era desenhado igual a uma
+     quarta-feira: nada na grade dizia que a clínica está fechada, e o clique
+     numa coluna vazia abria o modal como em qualquer outro dia. Foi por aí
+     que entrou uma consulta num domingo.
+
+     Com várias agendas, a faixa é a UNIÃO delas — abre com a primeira e fecha
+     com a última. O que está fora da jornada de todo mundo está fora da
+     clínica; sombrear a interseção esconderia horário em que alguém atende. */
   const sombrasDoDia = (dia: Date) => {
-    if (!jornadaDestaque) return null
-    const doDia = jornadaDestaque.find((h) => h.dia_semana === dia.getDay() && h.ativo)
+    if (!jornadaVisivel) return null
+    const doDia = jornadaVisivel.filter((h) => h.dia_semana === dia.getDay() && h.ativo)
     const estilo: React.CSSProperties = { position: 'absolute', left: 0, right: 0, background: '#F7FAFB', pointerEvents: 'none' }
-    if (!doDia) return <div style={{ ...estilo, top: 0, height: alturaGrade }} />
-    const ini = horaParaMinutos(doDia.hora_inicio)
-    const fim = horaParaMinutos(doDia.hora_fim)
+    if (doDia.length === 0) return <div style={{ ...estilo, top: 0, height: alturaGrade }} />
+    const ini = Math.min(...doDia.map((h) => horaParaMinutos(h.hora_inicio)))
+    const fim = Math.max(...doDia.map((h) => horaParaMinutos(h.hora_fim)))
     return (
       <>
         {ini > minutoInicial && <div style={{ ...estilo, top: 0, height: (ini - minutoInicial) * pxPorMinuto }} />}
