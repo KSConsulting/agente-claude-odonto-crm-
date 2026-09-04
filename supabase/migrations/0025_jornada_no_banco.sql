@@ -471,10 +471,13 @@ begin
   select trim(nome || ' ' || sobrenome) into v_nome
     from public.profissionais where id = new.profissional_id;
 
-  raise exception '% nao atende neste dia e horario.',
+  -- A frase sai daqui PRONTA PARA A TELA: as tres telas que criam consulta
+  -- mostram o `message` deste erro como ele vem. Por isso ela e escrita em
+  -- portugues de verdade, com acento -- quem le e a recepcao, nao um log.
+  raise exception '% não atende neste dia e horário.',
         coalesce(nullif(v_nome, ''), 'Esse profissional')
     using errcode = 'JOR01',
-          hint = 'Escolha outro horario, outra agenda, ou ajuste a jornada em Profissionais.';
+          hint = 'Escolha outro horário, outra agenda, ou ajuste a jornada em Profissionais.';
 end;
 $$;
 
