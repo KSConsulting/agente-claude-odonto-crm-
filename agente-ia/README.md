@@ -985,8 +985,9 @@ que a clínica faz — *qual o mais procurado?* — passa a não ter resposta, s
 nada avise.
 
 Hoje o catálogo entra **dentro do JSON Schema** das ferramentas, como `enum`.
-Os dois fornecedores restringem a saída à lista: o modelo **não consegue**
-escrever outra coisa.
+Isso muda o comportamento de verdade — mas **não é uma trava**, e este documento
+já disse que era. Ver "O `enum` orienta, e quem garante é a fronteira", logo
+abaixo da tabela.
 
 `ferramentasCom(procedimentos)`, em
 [`ferramentas.ts`](../supabase/functions/_shared/ferramentas.ts), injeta a lista
@@ -1020,9 +1021,43 @@ ninguém descobriria.
 > pelos dois fornecedores, e o resultado seria ela parar de responder. Grafia
 > solta é ruim; secretária muda é pior.
 
-> **O `enum` impede; a trigger garante.** As migrações `0022` e `0023` conferem
-> no banco, para as outras portas (a recepção, a API externa, um `insert` à mão)
-> não escaparem pela grafia. Uma trava só nunca é uma trava.
+> **O `enum` orienta; a trigger garante.** As migrações `0022` e `0023`
+> conferem no banco, para as outras portas (a recepção, a API externa, um
+> `insert` à mão) não escaparem pela grafia. Uma trava só nunca é uma trava.
+
+#### O `enum` orienta, e quem garante é a fronteira
+
+As ferramentas vão para a OpenAI **sem `strict: true`**
+([`llm.ts`](../supabase/functions/_shared/llm.ts)). Sem ele o `enum` guia a
+geração e não a restringe — a tabela acima mostra o quanto ele guia, e ela
+continua valendo. O que não vale é a palavra "não consegue".
+
+**Em 04/09/2026 o `gpt-4.1-mini` respondeu um array de dois num campo declarado
+`string`**, porque o paciente pediu duas coisas ("limpeza e clareamento"). O
+código fazia `String(args.interesse ?? '')`, e `String(['A','B'])` é `'A,B'`:
+
+```
+23514  interesse fora do catalogo: Clareamento Dental,Limpeza e Profilaxia.
+```
+
+O `catch` de `executar()` traduziu isso para *"Não consegui acessar a agenda
+agora"* — a frase de **servidor fora do ar** — e o paciente leu
+*"parece que agora não consigo acessar a agenda"*. Ele pediu para tentar de
+novo, o modelo omitiu o campo, e passou: consulta marcada **com o interesse
+vazio**.
+
+Três lições, e a do meio é a que se repete neste documento:
+
+| | |
+|---|---|
+| **`String()` num argumento do modelo é proibido** | Ele aceita qualquer coisa e devolve algo que *parece* um nome. `String(42)` é `'42'`, que também não está no catálogo. Hoje quem desembrulha é `umNomeSo()` |
+| **Recusa de negócio vestida de falha técnica manda procurar defeito no lugar errado** | É o mesmo do mapa `FRASES` da API, e o mesmo do defeito nº 1 logo abaixo. A diferença: aqui o valor impossível foi **fabricado pelo nosso código** |
+| **Ligar `strict` não é trocar um sinalizador** | Ele exige **toda** propriedade em `required` (as opcionais como tipo anulável), e `marcar_consulta` tem `dentista` e `interesse` fora. É tarefa própria |
+
+> ⚠️ **E a assimetria continua:** `procedimentos_interesse` da ficha é lista;
+> `consultas.interesse` é um só. `umNomeSo()` fica com o primeiro — o erro
+> sumiu, a segunda escolha ainda não cabe na consulta. Está no **Débito
+> técnico** do [`CLAUDE.md`](../CLAUDE.md).
 
 ### Três defeitos de um teste só, e o mais caro era invisível
 

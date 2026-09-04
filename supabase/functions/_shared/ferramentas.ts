@@ -346,6 +346,33 @@ function arrumarResumo(bruto: string): string {
     .join(' ')
 }
 
+/**
+ * Um campo do catálogo, sempre um nome só — mesmo quando vêm dois.
+ *
+ * O schema declara `type: 'string'` com o `enum` do catálogo, mas isso é
+ * **pedido, não trava**: as ferramentas vão para a OpenAI sem `strict: true`
+ * (ver `_shared/llm.ts`), então o modelo pode responder o que quiser. E
+ * responde: para "quero limpeza e clareamento", o `gpt-4.1-mini` mandou os
+ * dois num array.
+ *
+ * `String(['A', 'B'])` devolve `'A,B'` — um nome que não existe em catálogo
+ * nenhum. Em 04/09/2026 isso virou um `23514` da trigger
+ * `consultas_procedimento_valido` (migração `0022`), e o `catch` lá embaixo
+ * traduziu para *"não consegui acessar a agenda agora"* na frente do paciente,
+ * que é a frase de servidor fora do ar. Ele tentou de novo, o modelo desistiu
+ * do campo, e passou — **com o interesse vazio**.
+ *
+ * Coerção silenciosa que fabrica um valor impossível é pior que campo vazio:
+ * ela some com o dado e ainda manda procurar defeito no lugar errado.
+ *
+ * Fica o primeiro. A consulta guarda um interesse só; a lista inteira vai para
+ * a ficha por `atualizar_ficha`, que é `text[]` desde a `0022`.
+ */
+function umNomeSo(v: unknown): string {
+  const bruto = Array.isArray(v) ? v[0] : v
+  return typeof bruto === 'string' ? bruto.trim() : ''
+}
+
 /** Nome digitado pelo paciente → uuid do profissional. Nulo se não achar. */
 async function acharDentista(nome?: string): Promise<string | null> {
   if (!nome || !nome.trim()) return null
@@ -488,13 +515,13 @@ export async function executar(
         }[]>('agenda_marcar', {
           p_nome: String(args.nome_completo ?? ''),
           p_whatsapp: ctx.whatsapp,
-          p_procedimento: String(args.procedimento ?? ''),
+          p_procedimento: umNomeSo(args.procedimento),
           p_data_hora: quando.toISOString(),
           p_profissional_id: dentista,
           // O que a pessoa procura, para o dentista ver na agenda. Só faz
           // sentido quando o que está sendo marcado é a avaliação — e quando
           // ela esquece, a própria função busca na ficha.
-          p_interesse: String(args.interesse ?? '') || null,
+          p_interesse: umNomeSo(args.interesse) || null,
           // Nulo de propósito: a duração sai de `servicos_clinica`. A avaliação
           // ocupa 30 minutos, e chumbar 60 aqui desperdiçaria meia hora de
           // agenda em toda primeira consulta.
@@ -608,7 +635,7 @@ export async function executar(
       }
 
       case 'detalhes_do_procedimento': {
-        const pedido = String(args.procedimento ?? '').trim()
+        const pedido = umNomeSo(args.procedimento)
         if (!pedido) return { ok: false, mensagem: 'Preciso saber qual procedimento.' }
 
         // Busca pelo nome, sem exigir escrita exata — o modelo às vezes

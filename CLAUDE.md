@@ -1035,10 +1035,9 @@ e as duas contam uma lição diferente:
 > procure TODAS as telas que escrevem naquela coluna** — `grep` pelo nome da
 > coluna, não pela memória de onde ela é usada.
 
-**`enum` não é um pedido, é uma trava.** "Use o nome exato" no prompt é
-instrução, e instrução às vezes é atendida. `enum` no schema faz os dois
-fornecedores restringirem a saída à lista — o modelo **não consegue** escrever
-outra coisa. Medido em 01/09/2026 com o `gpt-4.1-mini`:
+**`enum` puxa muito mais que o prompt — mas não é trava.** "Use o nome exato"
+é instrução, e instrução às vezes é atendida; o `enum` no schema muda o
+comportamento de verdade. Medido em 01/09/2026 com o `gpt-4.1-mini`:
 
 | O paciente disse | Ela gravou |
 |---|---|
@@ -1051,6 +1050,35 @@ outra coisa. Medido em 01/09/2026 com o `gpt-4.1-mini`:
 
 Os dois últimos são o teste que importa: **traduzir é bom, forçar é pior que
 não gravar.**
+
+> ⚠️ **Este documento já disse que o modelo "não consegue" escrever fora da
+> lista, e isso era falso.** As ferramentas vão para a OpenAI **sem
+> `strict: true`** ([`llm.ts`](supabase/functions/_shared/llm.ts)) — sem ele o
+> `enum` orienta a geração, não a restringe. Em 04/09/2026 o `gpt-4.1-mini`
+> respondeu um **array de dois** num campo declarado `string`, porque o
+> paciente pediu duas coisas.
+>
+> Ligar `strict` não é trocar um sinalizador: ele exige **toda** propriedade em
+> `required` (as opcionais como tipo anulável), e `marcar_consulta` tem duas
+> que não são. É tarefa própria.
+>
+> **Enquanto isso, quem confere é a fronteira.** `umNomeSo()`, em
+> [`ferramentas.ts`](supabase/functions/_shared/ferramentas.ts), desembrulha a
+> lista antes de descer para o banco. Ver a armadilha logo abaixo.
+
+> ⚠️ **Nunca use `String()` num argumento que veio do modelo.** Ele aceita
+> qualquer coisa e devolve algo que *parece* um nome: `String(['A','B'])` é
+> `'A,B'`, e `String(42)` é `'42'`. Nenhum dos dois existe no catálogo, então
+> a trigger `consultas_procedimento_valido` recusa com `23514` — e o `catch`
+> da ferramenta traduz para *"não consegui acessar a agenda agora"*, que é a
+> frase de **servidor fora do ar**. Foi assim que o agendamento de 04/09/2026
+> falhou na frente do paciente e passou na segunda tentativa, com o `interesse`
+> vazio, porque o modelo desistiu do campo.
+>
+> É a mesma lição do mapa `FRASES` da API: **recusa de negócio disfarçada de
+> falha técnica manda procurar defeito no lugar errado.** A diferença é que
+> aqui o valor impossível foi **fabricado pelo nosso código**, não escrito pelo
+> modelo.
 
 > ⚠️ **A lista entra no schema a cada mensagem**, lida de `servicos_clinica`.
 > Fixa no código, ela envelheceria no dia em que a clínica cadastrasse mais um
@@ -1122,6 +1150,18 @@ O dado é `consultas.interesse`, **congelado no ato de marcar** — e não o
 `procedimento_interesse` do CRM, que é da pessoa e guarda um valor só. Quem veio
 por lentes em março e por canal em agosto tem o último; olhar a consulta de
 março mostraria "canal", que é falso.
+
+> ⚠️ **A `0022` deixou uma assimetria, e ela ainda está de pé.** Lá o interesse
+> **da pessoa** virou lista (`procedimentos_interesse` é `text[]`); o interesse
+> **da consulta** continuou um só — `consultas.interesse` é `text`, e
+> `agenda_marcar` recebe `p_interesse text`.
+>
+> Quem quer duas coisas é caso normal, e não cabe: a ficha guarda as duas, a
+> consulta guarda a primeira. O dentista abre a agenda e vê metade do que a
+> pessoa pediu. Fechar isso é uma migração própria (`consultas.interesse` para
+> `text[]`, mais `agenda_marcar`, a trigger da `0022`,
+> `procedimentoComInteresse()`, a API e estes documentos) — está em **Débito
+> técnico conhecido**.
 
 ### O cadastro pergunta quando, e a ficha aceita conserto
 
@@ -1710,6 +1750,30 @@ Ao mudar o banco, **prefira verificar contra o banco real** (consultas da seçã
 ## Débito técnico conhecido
 
 Problemas reais que já existiam e ainda não foram tratados. Não são regressões.
+
+### A consulta guarda um interesse só, e a ficha guarda a lista
+
+`consultas.interesse` é `text`; `crm_clinica.procedimentos_interesse` é
+`text[]` desde a `0022`. Quem procura duas coisas — "limpeza e clareamento" é
+pedido comum — tem as duas na ficha e **uma** na consulta.
+
+Desde 04/09/2026 isso não dá mais erro: `umNomeSo()` fica com a primeira. Mas o
+dentista continua vendo metade do pedido no bloco da agenda, e o gráfico
+"procurado x realizado" do Dashboard conta pelo interesse da **pessoa**, não
+pelo da consulta — então ele não erra por causa disto.
+
+O conserto é uma migração (`consultas.interesse` para `text[]`) mais
+`agenda_marcar`, a trigger `consultas_procedimento_valido`,
+`procedimentoComInteresse()`, o mapa da API e os documentos. **É tarefa
+própria** — o remendo na fronteira já tirou o erro da frente do paciente.
+
+### As ferramentas vão para a OpenAI sem `strict: true`
+
+Sem ele, o `enum` do catálogo **orienta** a geração e não a restringe — e o
+modelo já respondeu um array num campo declarado `string`. Ligar exige pôr
+**toda** propriedade em `required` (as opcionais como tipo anulável), e
+`marcar_consulta` tem duas que não são. Hoje quem segura é `umNomeSo()`, na
+fronteira. Ver "Procedimento é vocabulário fechado, em toda porta".
 
 ### ESLint acusa 7 erros
 
