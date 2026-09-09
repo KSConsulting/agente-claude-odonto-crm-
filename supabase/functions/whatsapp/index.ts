@@ -326,7 +326,18 @@ async function processar(
   )
   const ferramentas = ferramentasCom(catalogo.map((s) => s.nome))
 
-  let resposta = ''
+  // CADA VOLTA PODE TRAZER FALA, e não só a última.
+  //
+  // O modelo fala E chama ferramenta na MESMA volta — é o normal da OpenAI,
+  // e o `llm.ts` devolve os dois campos preenchidos juntos. Guardar só o
+  // texto da volta final descartava tudo que ela dissesse enquanto anotava.
+  //
+  // Aconteceu de verdade: ela explicou lentes de contato e disse que a
+  // avaliação era gratuita na mesma volta em que gravou a ficha, e o paciente
+  // recebeu só o fecho — "posso marcar essa avaliação", apontando para uma
+  // explicação que ele nunca leu. O `resumo_conversa` ficou relatando a fala
+  // perdida, e foi assim que o defeito apareceu.
+  const pedacos: string[] = []
   for (let volta = 0; volta < MAX_VOLTAS; volta++) {
     const r = await conversar({
       modelo: cfg[0]?.modelo ?? 'gpt-4.1-mini',
@@ -335,10 +346,9 @@ async function processar(
       ferramentas,
     })
 
-    if (!r.chamadas.length) {
-      resposta = r.texto
-      break
-    }
+    if (r.texto.trim()) pedacos.push(r.texto.trim())
+
+    if (!r.chamadas.length) break
 
     mensagens.push({ papel: 'assistant', conteudo: r.texto, chamadas: r.chamadas })
     for (const c of r.chamadas) {
@@ -350,6 +360,10 @@ async function processar(
       })
     }
   }
+
+  // `\n\n` é o mesmo separador que o divisor logo abaixo procura:
+  // cada trecho vira uma mensagem de WhatsApp, que é o que o prompt pede.
+  const resposta = pedacos.join('\n\n')
 
   if (!resposta.trim()) return
 
