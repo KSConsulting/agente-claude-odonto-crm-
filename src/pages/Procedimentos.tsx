@@ -21,7 +21,7 @@ import type { ServicoClinica } from '../types'
  * ── Por que card e não linha ─────────────────────────────────────────────
  * Vinte linhas iguais empilhadas viram uma parede: o olho não separa um
  * procedimento do outro, e a descrição — que é justamente o texto que a
- * Letícia fala — fica espremida numa faixa fina no meio da linha.
+ * Gabriela fala — fica espremida numa faixa fina no meio da linha.
  *
  * No card cada procedimento é um objeto com contorno próprio, a descrição
  * ganha três linhas de largura confortável, e liga/desliga, editar e excluir
@@ -192,7 +192,7 @@ export default function Procedimentos() {
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 9, padding: '10px 14px', fontSize: 13, color: '#DC2626', marginBottom: 16 }}>{toggleError}</div>
       )}
 
-      {/* Placar: quantos a Letícia realmente enxerga */}
+      {/* Placar: quantos a Gabriela realmente enxerga */}
       {items.length > 0 && (
         <div className="fade-in-2" style={{ fontSize: 12.5, color: '#6B818C', marginBottom: 12 }}>
           {ativos === items.length

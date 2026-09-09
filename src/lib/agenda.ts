@@ -192,7 +192,7 @@ export function haConflito(
  * outro.
  *
  * ⚠️ Espelha o `fora_expediente` de `agenda_marcar` (migração `0004`). Mudou
- * uma, mude a outra: se divergirem, a recepção recusa o que a Letícia já
+ * uma, mude a outra: se divergirem, a recepção recusa o que a Gabriela já
  * prometeu ao paciente — ou marca o que ela recusa.
  *
  * Devolve a FRASE pronta, e não um código, porque é isso que as três telas

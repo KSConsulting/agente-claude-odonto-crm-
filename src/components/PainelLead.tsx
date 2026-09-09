@@ -15,7 +15,7 @@ import AvisoBaixaConsulta from './AvisoBaixaConsulta'
  * O painel da direita: quem é a pessoa do outro lado da conversa.
  *
  * ⚠️ **O NOME PODE NÃO EXISTIR, E ISSO É O NORMAL NO COMEÇO.** Ninguém digita
- * esta ficha: ela se preenche sozinha conforme a Letícia descobre as coisas na
+ * esta ficha: ela se preenche sozinha conforme a Gabriela descobre as coisas na
  * conversa. Enquanto a pessoa não disser como se chama, o que existe é o
  * número — e o painel diz isso com todas as letras, em vez de mostrar um campo
  * vazio que parece defeito.

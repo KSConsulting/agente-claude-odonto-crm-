@@ -320,7 +320,7 @@ const MODELO_VISAO = 'gpt-4.1-mini'
  *
  * ⚠️ **A secretária repete isto.** A descrição não é uma anotação interna: ela
  * vira o `conteudo` da mensagem, entra no histórico e é lida como se fosse o
- * que a paciente disse. Um diagnóstico aqui sai pela boca da Letícia — que tem
+ * que a paciente disse. Um diagnóstico aqui sai pela boca da Gabriela — que tem
  * proibição inegociável de dar diagnóstico. Por isso a regra é repetida com
  * todas as letras, e por isso o descritor descreve **o visível**, nunca o que
  * aquilo significa.
@@ -363,7 +363,7 @@ Não cumprimente, não faça perguntas, não dê conselho. Escreva só a descri�
  *    sem uma linha do que a IA entendeu dali.
  *
  * Descrita, a foto vira texto — e texto é permanente, é igual em todo modelo,
- * e é lido tanto pela Letícia quanto por quem abre a conversa. É o mesmo
+ * e é lido tanto pela Gabriela quanto por quem abre a conversa. É o mesmo
  * caminho do áudio, e agora os dois têm uma forma só.
  *
  * `null` quando não deu: quem chama grava o aviso de falha, e o prompt manda

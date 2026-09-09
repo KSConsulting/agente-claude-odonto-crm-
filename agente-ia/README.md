@@ -1,4 +1,4 @@
-# Agente de IA — a Letícia
+# Agente de IA — a Gabriela
 
 A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 
@@ -6,7 +6,7 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 
 > ### ✅ ESTADO: NO AR — as seis etapas entregues
 >
-> **A Letícia atende.** Ela recebe pelo WhatsApp, responde, consulta a agenda,
+> **A Gabriela atende.** Ela recebe pelo WhatsApp, responde, consulta a agenda,
 > marca, remarca e cancela; escuta áudio, lê a descrição de foto e grava a
 > ficha do paciente.
 >
@@ -23,7 +23,7 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 > ⚠️ **O modo teste continua ligado** por decisão da clínica: ela só responde
 > os números cadastrados na tela. Enquanto estiver assim, paciente de verdade
 > **não recebe resposta automática** — a equipe atende pela tela Conversas.
-> Quem desliga o modo teste é a clínica, e é o ato que coloca a Letícia na
+> Quem desliga o modo teste é a clínica, e é o ato que coloca a Gabriela na
 > frente do público.
 
 **Última revisão:** 2 de setembro de 2026
@@ -38,7 +38,7 @@ A secretária que atende os pacientes pelo WhatsApp, 24 horas por dia.
 ```
 agente-ia/
 ├── README.md            📖 este documento
-├── prompt.md            ⭐ o prompt da Letícia — quem ela é e como se comporta
+├── prompt.md            ⭐ o prompt da Gabriela — quem ela é e como se comporta
 ├── GUIA-DO-PROMPT.md    🧭 como escrever o prompt de OUTRA clínica
 ├── gerar-prompt.mjs     ⚙️ `npm run prompt`: o .md vira `_shared/prompt-oficial.ts`
 ├── .env.agente.example  📋 o molde das chaves — este É versionado
@@ -98,7 +98,7 @@ está no ar:
 
 **A tela não edita o prompt** — decisão de produto, desde 01/09/2026, e a mesma
 do nome da agente. O que ela editava criava uma versão **que não ia para o Git**:
-no dia em que alguém precisasse entender por que a Letícia mudou de
+no dia em que alguém precisasse entender por que a Gabriela mudou de
 comportamento, não haveria histórico nenhum, e o `prompt.md` continuaria
 descrevendo uma agente que não existe mais.
 
@@ -126,7 +126,7 @@ A clínica já tem o sistema completo — funil de leads, agenda por dentista,
 faturamento, métricas. O que falta é alguém atendendo o WhatsApp fora do horário
 comercial, e sobrando tempo da recepção dentro dele.
 
-A Letícia é esse alguém. Ela conversa como uma pessoa, consulta os horários
+A Gabriela é esse alguém. Ela conversa como uma pessoa, consulta os horários
 reais dos dentistas, marca a consulta na agenda de verdade e vai preenchendo a
 ficha do lead conforme a conversa acontece. Quando a equipe quiser assumir, é um
 botão.
@@ -214,7 +214,7 @@ O agente para sozinho em dois lugares, e os dois são propositais:
 ### Por que a espera existe
 
 Paciente no WhatsApp escreve assim: *"oi"* … *"tudo bem?"* … *"queria saber do
-clareamento"*. Três mensagens em cinco segundos. Sem a espera, a Letícia
+clareamento"*. Três mensagens em cinco segundos. Sem a espera, a Gabriela
 responderia três vezes, atropelando a própria conversa. Com ela, responde uma
 vez, ao tudo junto — como uma pessoa faria.
 
@@ -274,7 +274,7 @@ pessoa escolheu, não quem vai sentar na cadeira:
 - duas pessoas dividem o mesmo número
 
 > **E o pior nem era o nome errado no CRM.** A ficha chegava preenchida, então a
-> Letícia lia "já sei o nome" — [`prompt.md`](prompt.md), Etapa 1 — e **nunca
+> Gabriela lia "já sei o nome" — [`prompt.md`](prompt.md), Etapa 1 — e **nunca
 > perguntava**. O palpite entrava calado e ninguém tinha chance de corrigir.
 > Descoberto num teste de 01/09, em que o nome dito na conversa foi ignorado em
 > favor do nome do perfil.
@@ -312,7 +312,7 @@ Nesta ordem, porque cada uma depende da anterior.
 
 ### Etapa 1 — Reescrever o prompt
 
-Só texto. Nenhum código, nenhuma mudança no sistema. O prompt da Letícia
+Só texto. Nenhum código, nenhuma mudança no sistema. O prompt da Gabriela
 adaptado: tom e fluxo mantidos, `sobreClinica` removida, `Agendar` dividida em
 quatro, e as regras que faltavam.
 
@@ -325,7 +325,7 @@ depende de chave nenhuma.
 ### Etapa 3 — O cérebro
 
 A função `whatsapp/`, ao lado da `agenda/` que já está no ar. No fim desta etapa
-já dá para conversar com a Letícia pelo WhatsApp de verdade.
+já dá para conversar com a Gabriela pelo WhatsApp de verdade.
 **Depende das chaves e da Evolution no ar.**
 
 ### Etapa 4 — Página Conversas ✅
@@ -335,14 +335,14 @@ Rota `/conversas`, duas colunas, tempo real, e o botão de assumir.
 Três decisões que ficaram de pé:
 
 -   **A caixa de resposta só abre com a conversa assumida.** Sem isso o
-    atendente escreveria junto com a Letícia, e o paciente receberia duas
+    atendente escreveria junto com a Gabriela, e o paciente receberia duas
     versões da mesma resposta, de duas pessoas que não sabem uma da outra.
--   **Três cores de balão** — paciente, Letícia e atendente. Dá para ver de
+-   **Três cores de balão** — paciente, Gabriela e atendente. Dá para ver de
     relance onde uma pessoa entrou no atendimento.
 -   **Assumir pausa uma conversa, não o agente.** Ela continua atendendo todo
     mundo; só naquele número fica calada. Quem desliga o agente inteiro é a aba
     de Configurações.
--   **Na tela ela é "Secretária IA · Letícia"; no WhatsApp, só "Letícia".** A
+-   **Na tela ela é "Secretária IA · Gabriela"; no WhatsApp, só "Gabriela".** A
     equipe precisa saber de relance que quem respondeu foi a IA; o paciente,
     não — o prompt proíbe que ela se declare IA. O nome de tela vive em
     [`src/lib/agente.ts`](../src/lib/agente.ts), o de conversa no
@@ -351,7 +351,7 @@ Três decisões que ficaram de pé:
     azul da marca, atendente em grafite. As duas cores cheias são as mais
     fortes da identidade — contraste grande sem inventar cor.
 -   **O painel da direita abre e fecha**, e a escolha fica gravada no navegador.
-    Ele mostra a ficha que a Letícia vai preenchendo: nome, interesse, resumo e
+    Ele mostra a ficha que a Gabriela vai preenchendo: nome, interesse, resumo e
     as consultas. **O nome só aparece depois que a pessoa disser como se chama**
     — até lá o painel explica isso, em vez de mostrar um campo vazio que parece
     defeito.
@@ -412,7 +412,7 @@ não depois.
 | `supabase/functions/_shared/ferramentas.ts` | 3 | As 8 ferramentas e o `executar()` que despacha |
 | `supabase/functions/_shared/db.ts` | 3 | PostgREST por `fetch` puro: ler, gravar e subir mídia |
 | `src/lib/conversas.ts` | 4 | Ler, enviar, assumir e devolver — fora dos componentes |
-| `agente-ia/prompt.md` | 1 | ⭐ O prompt da Letícia — identidade, tom, fluxo e regras |
+| `agente-ia/prompt.md` | 1 | ⭐ O prompt da Gabriela — identidade, tom, fluxo e regras |
 | `agente-ia/exemplos/` | 1 | ⬜ **vazia** — conversas de teste, quando existirem |
 | `agente-ia/README.md` | — | ✅ **já criado** — este documento |
 | `agente-ia/GUIA-DO-PROMPT.md` | — | Como escrever o prompt ao levar o sistema para outra clínica |
@@ -540,7 +540,7 @@ perderia justamente o sinal que ela existe para dar.
 
 ## 7. As ferramentas
 
-O que a Letícia consegue fazer no sistema. Oito coisas — nada além.
+O que a Gabriela consegue fazer no sistema. Oito coisas — nada além.
 
 | Ferramenta | Quando ela usa | Já existe? |
 |---|---|---|
@@ -582,7 +582,7 @@ marcar_consulta("Avaliação Odontológica", quinta 14h,
 
 **Por que na função e não no prompt.** Ela já ignorou regra escrita com o dado
 na frente dela — é o caso de 01/09, contado na seção 8. Prompt é pedido; função
-é trava. E como a Letícia e a API externa descem para a **mesma** função, a
+é trava. E como a Gabriela e a API externa descem para a **mesma** função, a
 regra não tem como divergir entre as duas portas.
 
 **A recusa carrega o nome, e o nome vem do banco.** Renomear a avaliação na tela
@@ -742,7 +742,7 @@ onde a tela avisa qual campo é cobrado em toda conversa e qual não é.
 ### O arquivo é exatamente o que o modelo recebe
 
 Nada dentro dele é comentário, instrução para humano ou anotação. Tudo o que
-estiver ali, a Letícia lê como ordem. Explicação sobre o prompt vem para este
+estiver ali, a Gabriela lê como ordem. Explicação sobre o prompt vem para este
 README — nunca para dentro do arquivo.
 
 ### Os seis marcadores
@@ -776,7 +776,7 @@ todas as conversas de uma vez. **Não mova as duas últimas seções para cima.*
 > cara.
 
 Efeito prático: **desligar um procedimento na página Procedimentos tira ele da boca da
-Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
+Gabriela na mensagem seguinte.** Sem deploy, sem editar prompt.
 
 > ⚠️ Mexeu num marcador (nome, quantidade, formato)? A montagem em
 > `supabase/functions/_shared/prompt.ts` precisa acompanhar. Marcador sem
@@ -785,7 +785,7 @@ Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
 
 ### Fica igual
 
-- A identidade da Letícia e o tom de voz — incluindo a regra de **não repetir o
+- A identidade da Gabriela e o tom de voz — incluindo a regra de **não repetir o
   nome do paciente**, que é o detalhe que mais separa agente bom de robô
 - O limite de **50 palavras** por resposta
 - Tentar agendar até **três vezes** antes de encerrar
@@ -821,7 +821,7 @@ Letícia na mensagem seguinte.** Sem deploy, sem editar prompt.
 Uma conversa de teste no WhatsApp derrubou duas coisas de uma vez, e as duas
 tinham **a mesma causa: o exemplo da seção Foto.**
 
-O paciente já tinha consulta marcada, mandou uma foto do sorriso, e a Letícia
+O paciente já tinha consulta marcada, mandou uma foto do sorriso, e a Gabriela
 ofereceu agendar uma avaliação. Trinta segundos depois, perguntada, ela recitou
 dia, hora, procedimento e dentista de cor. Ou seja: **o dado estava na ficha e
 ela sabia.** O que ela fez foi copiar o exemplo, quase palavra por palavra:
@@ -930,7 +930,7 @@ rascunho de template.
 
 ### A mídia da uazapi não vem no webhook, e o silêncio disso é caro
 
-Na estreia, um áudio e uma foto chegaram e a Letícia respondeu às duas **sem
+Na estreia, um áudio e uma foto chegaram e a Gabriela respondeu às duas **sem
 ter recebido nenhuma das duas**:
 
 | O paciente mandou | Ela respondeu |
@@ -1014,7 +1014,7 @@ ninguém descobriria.
 
 > ⚠️ **A lista é montada a cada mensagem**, lida de `servicos_clinica` (só os
 > ativos). Fixa no código, envelheceria no dia em que a clínica cadastrasse o
-> vigésimo primeiro — e o sintoma seria a Letícia não conseguir marcar algo que
+> vigésimo primeiro — e o sintoma seria a Gabriela não conseguir marcar algo que
 > está na tela dela.
 >
 > **Se a leitura falhar, o campo volta a texto livre.** `enum` vazio é recusado
@@ -1071,10 +1071,10 @@ sistema não tinha rede embaixo de nenhuma delas.
 | Quem | O quê |
 |---|---|
 | Paciente | *"Puts, vamos remarcar… remarca aí para amanhã mesmo, às 15 horas."* |
-| Letícia | *"Consegui achar sua avaliação marcada para amanhã meio-dia."* |
-| Letícia | *"O horário das 15h também está livre. Quer que eu mude?"* |
+| Gabriela | *"Consegui achar sua avaliação marcada para amanhã meio-dia."* |
+| Gabriela | *"O horário das 15h também está livre. Quer que eu mude?"* |
 | Paciente | *"aham"* |
-| Letícia | *"Não consegui acessar a agenda para remarcar agora."* |
+| Gabriela | *"Não consegui acessar a agenda para remarcar agora."* |
 
 `agenda_remarcar` foi chamada à mão com os mesmos argumentos e respondeu
 `ok: true` na primeira tentativa. A função SQL nunca teve problema.
@@ -1100,7 +1100,7 @@ ar".**
 
 #### 2. O nome dito, confirmado, e jogado fora
 
-A Letícia perguntou o nome completo *para registrar a avaliação*, o paciente
+A Gabriela perguntou o nome completo *para registrar a avaliação*, o paciente
 respondeu **"Rogério Cardoso Albuquerque"**, a consulta foi marcada — e o CRM
 continuou sem nome. Pior: mostrava **"cliente"**.
 
@@ -1236,13 +1236,13 @@ no instante e falhava depois:
 Hoje a foto passa por um **descritor** (`descreverImagem()`, em
 [`llm.ts`](../supabase/functions/_shared/llm.ts)) e o que segue é uma linha de
 texto — igual ao áudio. Texto é permanente, é igual em qualquer modelo, e é
-lido tanto pela Letícia quanto por quem abre a conversa.
+lido tanto pela Gabriela quanto por quem abre a conversa.
 
 | Decisão | Por quê |
 |---|---|
 | **Modelo fixo (`gpt-4.1-mini`)**, e não o do seletor | Descrever é pré-processamento, não conversa — a mesma razão do Whisper. Precisa funcionar com a clínica no Claude, e precisa dar a mesma descrição sempre: senão a mesma foto muda de sentido a cada troca de seletor, e ninguém entende por quê |
 | **A descrição vai para o `conteudo`** | É onde a transcrição do áudio já vivia. Uma coluna, dois tipos de mídia, e a tela Conversas mostra os dois sem saber que são diferentes |
-| **Ele descreve o visível, nunca o que significa** | A Letícia **repete o que estiver ali**. Um diagnóstico no descritor sai pela boca dela — e ela tem proibição inegociável de dar diagnóstico |
+| **Ele descreve o visível, nunca o que significa** | A Gabriela **repete o que estiver ali**. Um diagnóstico no descritor sai pela boca dela — e ela tem proibição inegociável de dar diagnóstico |
 | **`Sem relação com odontologia:` é marcador** | Contrato com o `prompt.md`, que tem uma resposta própria para esse caso |
 
 > ⚠️ **"Está saudável" também é diagnóstico — e tranquilizar, também.** A
@@ -1255,7 +1255,7 @@ lido tanto pela Letícia quanto por quem abre a conversa.
 > | *"gengivas aparentam sem alteração visível"* | Descreve o que **não** viu. Dizer que algo não está lá tranquiliza — e tranquilizar sobre uma foto é avaliar |
 >
 > As duas passariam por qualquer revisão descuidada: são observações corretas.
-> O problema é que **a Letícia repete o que estiver ali**, e na boca dela viram
+> O problema é que **a Gabriela repete o que estiver ali**, e na boca dela viram
 > laudo. Hoje a instrução veta por escrito *saudável, bom, normal, bonito,
 > feio, preocupante*, e proíbe a forma negativa com as palavras dela: *"sem
 > sinal de"*, *"sem alteração visível"*, *"aparenta normal"*, *"nada fora do
@@ -1464,7 +1464,7 @@ apagar a ficha antes destruiria a única forma de saber quais arquivos eram
 dela. E se a mídia falhar, a rota **para e não apaga nada** — meio-apagado com
 arquivo órfão é o pior dos dois mundos.
 
-Depois disso a Letícia não reconhece mais a pessoa: a ficha volta a ser "você
+Depois disso a Gabriela não reconhece mais a pessoa: a ficha volta a ser "você
 ainda não sabe nada sobre esta pessoa", e ela se apresenta de novo na próxima
 mensagem.
 
@@ -1520,12 +1520,12 @@ API oficial da Meta.
 
 ### Nenhum prompt nasce pronto
 
-As primeiras 20 ou 30 conversas reais vão mostrar onde a Letícia trava, responde
+As primeiras 20 ou 30 conversas reais vão mostrar onde a Gabriela trava, responde
 demais ou insiste na hora errada. Ajustar faz parte — e se faz no
 [`prompt.md`](prompt.md), pela IA da IDE, com `npm run agente:deploy` depois.
 A tela mostra o que está no ar; ela não edita.
 
-### A Letícia não pode dar diagnóstico
+### A Gabriela não pode dar diagnóstico
 
 Nem por foto, nem por descrição de sintoma. A regra vai dura no prompt e ela
 encaminha para a avaliação. Isso é limite profissional, não limitação técnica.
@@ -1539,7 +1539,7 @@ negar de forma enfática.
 ### O horário anunciado e a agenda real são coisas diferentes
 
 Se a clínica anuncia atendimento até as 18h mas nenhum dentista trabalha depois
-das 17h, a Letícia promete horário que a própria agenda recusa em seguida. Mesma
+das 17h, a Gabriela promete horário que a própria agenda recusa em seguida. Mesma
 armadilha já descrita no [`CLAUDE.md`](../CLAUDE.md): `horario_comercial` é o que a
 clínica anuncia, `profissional_horarios` é quem manda na disponibilidade.
 **Confira as duas grades antes de ligar o agente.**

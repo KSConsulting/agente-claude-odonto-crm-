@@ -298,7 +298,7 @@ export default function LeadDetail() {
 
   /* A FICHA EDITÁVEL.
 
-     Nome, WhatsApp e procedimentos eram só leitura aqui: um nome que a Letícia
+     Nome, WhatsApp e procedimentos eram só leitura aqui: um nome que a Gabriela
      entendeu errado, ou um número digitado torto, só tinham conserto no banco.
      Tudo isto entra no MESMO "Salvar Ficha" que já existia — um botão por
      assunto, e não um por campo. */
@@ -603,7 +603,7 @@ export default function LeadDetail() {
       <div className="fade-in-3">
         <SectionCard title="Visão Completa do Contato" icon={ClipboardList}>
 
-          {/* O RESUMO CONTINUA SÓ LEITURA: quem escreve é a Letícia, pela
+          {/* O RESUMO CONTINUA SÓ LEITURA: quem escreve é a Gabriela, pela
               ferramenta `atualizar_ficha`. Editá-lo aqui seria apagar na mão o
               que ela vai reescrever na próxima mensagem. */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
@@ -656,7 +656,7 @@ export default function LeadDetail() {
             </LinhaFicha>
 
             {/* Caixas, e não texto livre — a mesma trava do cadastro e da
-                Letícia. O banco confere de novo (trigger
+                Gabriela. O banco confere de novo (trigger
                 `crm_procedimentos_validos`, migração 0022). */}
             <LinhaFicha rotulo="Procedimentos de Interesse" topo>
               {catalogo.length === 0 ? (

@@ -1,5 +1,5 @@
 /**
- * O cérebro da Letícia — recebe do WhatsApp, pensa, responde.
+ * O cérebro da Gabriela — recebe do WhatsApp, pensa, responde.
  *
  * Documentação: agente-ia/README.md
  *
@@ -67,7 +67,7 @@ const MAX_VOLTAS = 6
  * Quantas mensagens da conversa vão para o modelo.
  *
  * **Cada balão conta uma linha**, e ela responde em 2 ou 3 — então 50 mensagens
- * são umas 16 trocas, não 50. O que passar disso a Letícia não enxerga mais: a
+ * são umas 16 trocas, não 50. O que passar disso a Gabriela não enxerga mais: a
  * memória longa dela é a ficha (`montarFicha`), não esta janela.
  */
 const HISTORICO = 50
@@ -205,7 +205,7 @@ async function processar(
 
   // ---- Mídia: baixar, guardar e virar texto -------------------------------
   //
-  // As duas mídias que a Letícia entende terminam no mesmo lugar: uma linha de
+  // As duas mídias que a Gabriela entende terminam no mesmo lugar: uma linha de
   // texto no `conteudo` da mensagem. O áudio pelo Whisper, a foto pelo
   // descritor. Nada de imagem viaja daqui para a frente.
   if (recebida.midia) {
@@ -306,7 +306,7 @@ async function processar(
   const fuso = clinica[0]?.fuso_horario || FUSO_PADRAO
 
   // A ficha sai do lead RECÉM-LIDO (`atual`), não do que chegou no começo da
-  // execução: nos 8 segundos de espera a Letícia pode ter gravado o nome.
+  // execução: nos 8 segundos de espera a Gabriela pode ter gravado o nome.
   const ficha = await montarFicha(lead.id, atual[0] ?? lead, fuso)
   const sistema = await montarPrompt(cfg[0]?.prompt, ficha, cfg[0]?.nome_agente)
   const mensagens = await montarHistorico(lead.id)
@@ -319,7 +319,7 @@ async function processar(
   // procedimento mais procurado?" ter resposta.
   //
   // Lido a cada mensagem, e de propósito: uma lista fixa envelheceria no dia em
-  // que a clínica cadastrasse mais um, e o sintoma seria a Letícia não
+  // que a clínica cadastrasse mais um, e o sintoma seria a Gabriela não
   // conseguir marcar algo que está na tela dela.
   const catalogo = await selecionar<{ nome: string }>(
     'servicos_clinica?select=nome&ativo=is.true&order=nome',
@@ -642,7 +642,7 @@ async function rotaEnviar(req: Request): Promise<Response> {
 /**
  * Chegou mensagem do PACIENTE depois desta?
  *
- * `autor=eq.paciente` importa: a resposta da própria Letícia também entra em
+ * `autor=eq.paciente` importa: a resposta da própria Gabriela também entra em
  * `mensagens_whatsapp`, e sem o filtro ela veria a si mesma como "mensagem mais
  * nova" e calaria a execução seguinte.
  */
@@ -676,7 +676,7 @@ async function criadaEm(mensagemId: string): Promise<string> {
  * o mesmo número.
  *
  * E o estrago não era só o nome errado no CRM: a ficha chegava preenchida, a
- * Letícia lia "já sei o nome" e **nunca perguntava** — então o palpite nunca
+ * Gabriela lia "já sei o nome" e **nunca perguntava** — então o palpite nunca
  * era corrigido por ninguém.
  *
  * O nome vem da conversa, pela ferramenta `atualizar_ficha`. Só de lá. Até ela
@@ -734,7 +734,7 @@ async function montarHistorico(leadId: string): Promise<MensagemLLM[]> {
     if (l.autor === 'paciente') {
       saida.push({ papel: 'user', conteudo: rotulo })
     } else {
-      // O que o atendente humano escreveu entra como fala da própria Letícia:
+      // O que o atendente humano escreveu entra como fala da própria Gabriela:
       // para o paciente foi a mesma pessoa, e ela precisa saber o que "disse".
       saida.push({ papel: 'assistant', conteudo: rotulo })
     }

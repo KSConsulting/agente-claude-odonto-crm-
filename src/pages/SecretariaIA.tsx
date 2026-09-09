@@ -21,7 +21,7 @@ import type { ConfiguracoesAgente, ModeloAgente } from '../types'
  * Aba "Agente de IA" de Configurações.
  *
  * É por aqui que a clínica liga, desliga, escolhe o modelo, controla o modo
- * teste e ajusta o prompt da Letícia — **sem deploy e sem ninguém programar**.
+ * teste e ajusta o prompt da Gabriela — **sem deploy e sem ninguém programar**.
  *
  * O LIGA/DESLIGA SALVA NA HORA, de propósito. Ele é o botão de pânico: se ela
  * falar alguma bobagem com um paciente, ninguém quer descobrir que esqueceu de

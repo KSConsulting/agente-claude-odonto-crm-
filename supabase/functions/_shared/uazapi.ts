@@ -68,7 +68,7 @@ async function chamar<T>(
  *
  * `ReactionMessage`, `PollUpdateMessage` e `error` ficam de fora **de
  * propósito**: um "❤️" numa mensagem antiga não é uma pergunta, e responder a
- * ele é a Letícia falando sozinha.
+ * ele é a Gabriela falando sozinha.
  */
 const TIPOS: Record<string, string> = {
   Conversation: 'texto',
@@ -82,7 +82,7 @@ const TIPOS: Record<string, string> = {
 /**
  * Só áudio e imagem são baixados — a mesma política da Evolution.
  *
- * Vídeo e documento ficam de fora porque a Letícia não faz nada com eles: o
+ * Vídeo e documento ficam de fora porque a Gabriela não faz nada com eles: o
  * modelo não assiste vídeo, e baixar um PDF de 8 MB para guardar sem ler é
  * custo de Storage sem retorno. O balão aparece na tela do jeito certo, e a
  * recepção abre no celular se precisar.
@@ -119,7 +119,7 @@ function lerWebhook(corpo: Record<string, unknown>): Recebimento {
   }
 
   // Mensagem que nós mesmos mandamos volta pelo webhook. Sem este corte, a
-  // Letícia responderia a si mesma, para sempre.
+  // Gabriela responderia a si mesma, para sempre.
   if (m.fromMe) return { tipo: 'ignorar', motivo: 'propria' }
 
   // Grupo não é atendimento. E não é hipótese remota: na instância de teste,
@@ -156,7 +156,7 @@ function lerWebhook(corpo: Record<string, unknown>): Recebimento {
  *
  * ⚠️ **O `fileURL` do webhook chega VAZIO**, e foi assim que o áudio e a foto
  * sumiram na estreia: sem referência, o `index.ts` não baixava nada, e a
- * Letícia respondia a uma foto que nunca viu. A `content.URL` que vem ao lado
+ * Gabriela respondia a uma foto que nunca viu. A `content.URL` que vem ao lado
  * não salva — é a CDN do WhatsApp, com o arquivo criptografado pela
  * `mediaKey`.
  *

@@ -1,4 +1,4 @@
-# Instalação — do zero até a Letícia atendendo
+# Instalação — do zero até a Gabriela atendendo
 
 Este é o **caminho completo**. O [`README.md`](README.md) conta o que o sistema
 faz; este arquivo conta como colocá-lo no ar.
@@ -35,7 +35,7 @@ sua máquina com `npm run dev`.
 
 > ⚠️ **A parte 5 não é opcional, e é a que mais se esquece.** O banco nasce com
 > o catálogo de procedimentos da clínica que originou este sistema — e é
-> exatamente essa lista que a Letícia oferece ao paciente. Instalar sem fazer a
+> exatamente essa lista que a Gabriela oferece ao paciente. Instalar sem fazer a
 > parte 5 deixa o sistema **funcionando e falando de outra clínica**.
 
 ---
@@ -128,7 +128,7 @@ Em [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/accoun
 
 > ⚠️ **Ela é obrigatória mesmo se você escolher um modelo Claude na tela.** É a
 > OpenAI que transcreve os áudios e descreve as fotos — e o paciente brasileiro
-> manda áudio na primeira mensagem. Sem ela, a Letícia trava logo no começo.
+> manda áudio na primeira mensagem. Sem ela, a Gabriela trava logo no começo.
 
 A da Anthropic (`console.anthropic.com` → API Keys) é **opcional**: ela libera
 os dois modelos Claude no seletor. Sem ela, eles aparecem desligados, com o
@@ -177,7 +177,7 @@ Não é de site nenhum: **você inventa**. Uma frase longa e aleatória serve.
 > **Para que serve:** a função que recebe as mensagens fica num endereço
 > público, e quem chama é a ponte de WhatsApp — que não tem login no Supabase.
 > Então a tranca é este segredo, conferido dentro da própria função. Sem ele,
-> qualquer pessoa que descubra o endereço faz a Letícia responder por sua conta,
+> qualquer pessoa que descubra o endereço faz a Gabriela responder por sua conta,
 > gastando a sua chave da OpenAI.
 
 ---
@@ -221,7 +221,7 @@ SUPABASE_PROJECT_REF=       ← 3️⃣ as 20 letras
 ⛔ **Este arquivo nasce para morrer.** Ele existe só durante a instalação, e é
 apagado na parte 6.
 
-### `agente-ia/.env.agente.local` — a Letícia
+### `agente-ia/.env.agente.local` — a Gabriela
 
 São nove linhas, **e você não preenche todas**:
 
@@ -257,7 +257,7 @@ Instale este sistema seguindo o INSTALACAO.md.
 Os três arquivos de chave já estão preenchidos. Faça a parte 3:
 
 1. Leia o CLAUDE.md e o DATABASE.md antes de tocar no banco.
-2. Aplique as 25 migrações de supabase/migrations/, na ordem
+2. Aplique as 26 migrações de supabase/migrations/, na ordem
    numérica, usando o SUPABASE_ACCESS_TOKEN e o SUPABASE_PROJECT_REF
    que estão em .supabase-token.local.
 3. Confira o resultado com as consultas da seção 10 do DATABASE.md
@@ -274,9 +274,9 @@ No fim, me diga o que deu certo e o que ainda falta eu fazer à mão.
 
 | Passo | O que é | Como saber que deu certo |
 |---|---|---|
-| **As 25 migrações** | Criam tabelas, índices, regras de segurança, as funções da agenda e o catálogo de 20 procedimentos | 12 tabelas + 5 views, 23 índices, 23 políticas, 27 funções, 11 triggers |
+| **As 26 migrações** | Criam tabelas, índices, regras de segurança, as funções da agenda e o catálogo de 20 procedimentos | 12 tabelas + 5 views, 23 índices, 23 políticas, 27 funções, 11 triggers |
 | **Os secrets** | Sobem as chaves do arquivo para o servidor | `npm run agente:secrets` termina sem erro |
-| **As duas funções** | `whatsapp` (a Letícia) e `agenda` (a API) | Publicadas no painel do Supabase |
+| **As duas funções** | `whatsapp` (a Gabriela) e `agenda` (a API) | Publicadas no painel do Supabase |
 
 > ⚠️ **As duas funções vão com `--no-verify-jwt`, e isso não é descuido.**
 > Quem chama a `whatsapp` é a ponte de WhatsApp, e quem chama a `agenda` é uma
@@ -346,7 +346,7 @@ No painel: **Authentication → Sign In / Providers → Password**
 
 ### 4.3. Apontar o webhook — o passo que ninguém adivinha
 
-**Só faça este se você vai usar a Letícia.**
+**Só faça este se você vai usar a Gabriela.**
 
 A ponte de WhatsApp não descobre a nossa função sozinha: alguém precisa dizer a
 ela para onde mandar as mensagens.
@@ -430,7 +430,7 @@ link, ou seja, na frente de outra pessoa.
 Agora você **entra no sistema** e faz dele o da sua clínica. Tudo aqui é pela
 tela: nenhum comando, nenhum SQL, nenhuma linha de código.
 
-> ### ⚠️ Faça esta parte inteira ANTES de ligar a Letícia
+> ### ⚠️ Faça esta parte inteira ANTES de ligar a Gabriela
 >
 > Ela não inventa nada — ela **lê** o que está aqui. O endereço que ela informa,
 > o horário que ela anuncia, os tratamentos que ela oferece e o preço que ela
@@ -447,12 +447,12 @@ A ordem abaixo importa: cada passo aparece nos seguintes.
 
 | Campo | Vira o quê |
 |---|---|
-| **Nome da clínica** | O nome na barra lateral, e o que a Letícia diz |
+| **Nome da clínica** | O nome na barra lateral, e o que a Gabriela diz |
 | **Endereço**, **bairro**, **cidade/UF**, **CEP** | A resposta de *"onde vocês ficam?"* |
 | **Link do Google Maps** | O que ela manda para quem pede como chegar |
 | **Instagram** e **site** | Ela cita quando fazem sentido |
 
-**O rodapé dessa aba mostra a prévia do que a Letícia vai falar.** Não é
+**O rodapé dessa aba mostra a prévia do que a Gabriela vai falar.** Não é
 ilustração — é uma consulta de verdade ao que ela lê. Se a prévia estiver
 estranha, o paciente vai ouvir estranho.
 
@@ -469,14 +469,14 @@ O fuso vem no card **acima** da grade, e não é detalhe: ele decide em que hora
 uma consulta cai. A conferência é uma só — **o campo tem que bater com o
 relógio do computador da recepção.**
 
-> ⚠️ **Se discordarem, a Letícia e a recepção discordam exatamente naquelas
+> ⚠️ **Se discordarem, a Gabriela e a recepção discordam exatamente naquelas
 > horas.** Com jornada das 8h às 18h, um deslocamento para trás joga a manhã
 > inteira para fora do expediente, e ela responde *"não tenho horário"* para
 > horário livre.
 
 > ⚠️ **Esta grade é o que a clínica ANUNCIA, não o que a agenda oferece.** Quem
 > manda na disponibilidade é a jornada de cada dentista (5.4). Anunciar até as
-> 18:00 sem nenhum dentista depois das 17:00 faz a Letícia prometer horário que
+> 18:00 sem nenhum dentista depois das 17:00 faz a Gabriela prometer horário que
 > a própria agenda recusa em seguida.
 
 ### 5.3. Procedimentos — **o passo que muda tudo**
@@ -486,20 +486,20 @@ relógio do computador da recepção.**
 > ### 🔴 Os 20 procedimentos que você vê ali não são seus
 >
 > Eles vieram nas migrações, e são o catálogo da clínica que originou este
-> sistema. **A Letícia recita essa lista para os seus pacientes** — e desde a
+> sistema. **A Gabriela recita essa lista para os seus pacientes** — e desde a
 > migração `0022` ela é um **vocabulário fechado**: é o único conjunto de nomes
 > que o sistema consegue gravar e agendar.
 >
 > Um tratamento que a sua clínica faz e não está nessa lista **não pode ser
-> marcado por ninguém** — nem pela Letícia, nem pela API — até você cadastrá-lo.
+> marcado por ninguém** — nem pela Gabriela, nem pela API — até você cadastrá-lo.
 
 O que fazer, em ordem:
 
 1. **Desligue o que a sua clínica não faz.** O botão de liga/desliga fica no
-   próprio card. Desligado, o procedimento some da boca da Letícia na mensagem
+   próprio card. Desligado, o procedimento some da boca da Gabriela na mensagem
    seguinte — sem deploy, sem editar prompt.
 2. **Cadastre o que falta.** É o passo que ninguém lembra, e o sintoma de
-   esquecer é a Letícia não conseguir marcar algo que está no cartaz da
+   esquecer é a Gabriela não conseguir marcar algo que está no cartaz da
    recepção.
 3. **Revise as descrições**, no botão Editar de cada card. A curta é o que ela
    fala no catálogo; a longa é o que ela responde a *"como funciona?"*.
@@ -515,7 +515,7 @@ O que fazer, em ordem:
 Fora da grade de cards existe a **porta de entrada** — a Avaliação
 Odontológica, por onde quase todo tratamento passa antes.
 
-**Ela vem com o valor `0`, e zero não é campo em branco: zero faz a Letícia
+**Ela vem com o valor `0`, e zero não é campo em branco: zero faz a Gabriela
 dizer que a avaliação é gratuita.** Foi uma decisão comercial da clínica de
 origem, e ela vai ser afirmada ao seu paciente na primeira conversa.
 
@@ -529,7 +529,7 @@ origem, e ela vai ser afirmada ao seu paciente na primeira conversa.
 
 Enquanto o banco está vazio (agora), **excluir é seguro**.
 
-Depois que a Letícia atender alguém, não é mais: o nome do procedimento fica
+Depois que a Gabriela atender alguém, não é mais: o nome do procedimento fica
 gravado na ficha de quem se interessou por ele, e o banco recusa salvar uma
 ficha que aponte para um procedimento que saiu do catálogo. O sintoma é cruel —
 *"algum procedimento escolhido não está mais no catálogo"* **sem nenhuma caixa
@@ -549,7 +549,7 @@ que o botão existe.
 - **Não existe tela de "criar agenda".** Cadastrar o profissional já cria a
   agenda dele — e a cor escolhida aqui é a cor dos blocos no calendário.
 - **A jornada de cada um é o que manda na disponibilidade.** É ela, e não a
-  grade de 5.2, que decide o horário que a Letícia oferece.
+  grade de 5.2, que decide o horário que a Gabriela oferece.
 
 ### 5.5. Configurações → Perfil
 
@@ -578,7 +578,7 @@ Seu nome e sua foto, que aparecem no rodapé da barra lateral.
 | 8 | Abra a **Avaliação Odontológica** | O valor é o seu (`0` = ela dirá "gratuita") |
 | 9 | **Agenda** | A grade da semana bate com a jornada dos seus dentistas |
 
-**Se você ligou a Letícia**, faça também o teste de fogo:
+**Se você ligou a Gabriela**, faça também o teste de fogo:
 
 1. Na página **Secretária de IA**, ligue o **modo teste** e cadastre o **seu**
    número
@@ -656,7 +656,7 @@ Se o token já foi revogado (parte 6), gere outro.
 </details>
 
 <details>
-<summary><strong>O WhatsApp diz "Conectado", mas a Letícia não responde ninguém</strong></summary>
+<summary><strong>O WhatsApp diz "Conectado", mas a Gabriela não responde ninguém</strong></summary>
 
 **Quase sempre é o webhook (passo 4.3).** Atender depende de três coisas ao
 mesmo tempo, e a tela mostra as três:
@@ -696,7 +696,7 @@ sempre o mesmo resultado.
 | Entender o que cada tela faz | [`README.md`](README.md) |
 | Mexer no código | [`CLAUDE.md`](CLAUDE.md) |
 | Mexer no banco | [`DATABASE.md`](DATABASE.md) |
-| Entender a Letícia por dentro | [`agente-ia/README.md`](agente-ia/README.md) |
+| Entender a Gabriela por dentro | [`agente-ia/README.md`](agente-ia/README.md) |
 | **Adaptar o prompt para a sua clínica** | [`agente-ia/GUIA-DO-PROMPT.md`](agente-ia/GUIA-DO-PROMPT.md) |
 | Integrar outro sistema à agenda | [`API_AGENTE.md`](API_AGENTE.md) |
 

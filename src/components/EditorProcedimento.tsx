@@ -30,7 +30,7 @@ const CURTA_IDEAL = 120
 
 /**
  * Teto sugerido da descrição completa. Não é limite técnico — é o tamanho em
- * que o texto ainda é *lido* pela Letícia em vez de resumido por ela: a
+ * que o texto ainda é *lido* pela Gabriela em vez de resumido por ela: a
  * resposta dela cabe em 50 palavras, então um texto de 1.500 caracteres não
  * vira resposta, vira resumo automático. Os 20 textos da clínica têm ~430.
  */

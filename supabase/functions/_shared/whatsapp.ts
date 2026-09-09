@@ -199,7 +199,7 @@ export function foraDoAr(estado: Estado = 'indisponivel'): Conexao {
 //
 // A terceira era o mesmo buraco. Com a sessão de pé e o webhook desligado, o
 // card diz **"Conectado"**, em verde, e o paciente recebe silêncio: nada chega
-// no banco, nada aparece em Conversas, a Letícia nunca fica sabendo. Painel que
+// no banco, nada aparece em Conversas, a Gabriela nunca fica sabendo. Painel que
 // afirma o que não sabe é pior que painel vazio.
 // ---------------------------------------------------------------------------
 

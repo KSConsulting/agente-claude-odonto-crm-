@@ -26,7 +26,7 @@ import type { LeadClinica } from '../types'
  *
  * É a ação mais destrutiva que a ficha oferece. Ação destrutiva não fica no
  * caminho do olho de quem só veio conferir um telefone — a mesma razão do
- * interruptor da Letícia ter descido para o fim da página dela.
+ * interruptor da Gabriela ter descido para o fim da página dela.
  */
 
 const FONTE = "'Plus Jakarta Sans', sans-serif"

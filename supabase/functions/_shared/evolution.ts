@@ -295,7 +295,7 @@ function lerWebhook(corpo: Record<string, unknown>): Recebimento {
   if (!dados || !chave.remoteJid) return { tipo: 'ignorar', motivo: 'formato_desconhecido' }
 
   // Mensagem que nós mesmos mandamos volta pelo webhook. Sem este corte, a
-  // Letícia responderia a si mesma, para sempre.
+  // Gabriela responderia a si mesma, para sempre.
   if (chave.fromMe) return { tipo: 'ignorar', motivo: 'propria' }
 
   // Grupo não é atendimento. Newsletter e status, muito menos. A Evolution não

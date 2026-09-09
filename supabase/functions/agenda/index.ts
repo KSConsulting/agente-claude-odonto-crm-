@@ -75,7 +75,7 @@ const FRASES: Record<string, string> = {
   // procedimento fora do catálogo. Manda procurar defeito na máquina, e o
   // defeito está no pedido.
   //
-  // A Letícia nunca caiu nisso: ela tem frase própria em `ferramentas.ts`.
+  // A Gabriela nunca caiu nisso: ela tem frase própria em `ferramentas.ts`.
   // Foi a porta de fora que ficou para trás quando as regras entraram.
   procedimento_desconhecido:
     'Esse procedimento não está no catálogo da clínica. '
@@ -90,7 +90,7 @@ const FRASES: Record<string, string> = {
 
    ⚠️ CÓPIA. As duas funções abaixo existem também em
    `supabase/functions/_shared/tempo.ts`, palavra por palavra, porque a
-   Letícia precisa exatamente da mesma conversão antes de chamar as mesmas
+   Gabriela precisa exatamente da mesma conversão antes de chamar as mesmas
    funções SQL. Esta função aqui está publicada SEM NENHUM IMPORT, de
    propósito (o runtime sobe com `--no-remote`), e trocar isso arriscaria os
    sete endpoints por uma dedução não testada.

@@ -3,7 +3,7 @@
  *
  * O prompt não é um texto fixo: cinco trechos são preenchidos a cada mensagem,
  * lendo o banco na hora. É o que faz desligar um procedimento em Configurações
- * tirá-lo da boca da Letícia na mensagem seguinte, sem deploy e sem ninguém
+ * tirá-lo da boca da Gabriela na mensagem seguinte, sem deploy e sem ninguém
  * reescrever prompt.
  *
  * Os marcadores vivem em agente-ia/prompt.md. Mexeu num nome lá, mexa aqui —
@@ -26,7 +26,7 @@ const FUSO_PADRAO = 'America/Sao_Paulo'
 /**
  * "Hoje é terça-feira, 31/08/2026, e agora são 09:14."
  *
- * Tudo no fuso da clínica, não no do servidor. Sem isso a Letícia erraria
+ * Tudo no fuso da clínica, não no do servidor. Sem isso a Gabriela erraria
  * "amanhã" toda madrugada — e o servidor do Supabase roda em UTC.
  */
 function frescoDaData(fuso: string): string {
@@ -81,7 +81,7 @@ function quando(iso: string, fuso: string): string {
 }
 
 /**
- * A ficha de quem está falando — o que a Letícia precisa saber ANTES da
+ * A ficha de quem está falando — o que a Gabriela precisa saber ANTES da
  * primeira palavra.
  *
  * O QUE ENTRA AQUI E O QUE NÃO ENTRA. Só cabe o que muda a conversa desde o
@@ -199,7 +199,7 @@ export async function montarFicha(
  * "vazio" é impossível. Isto cobre só o banco sem nenhuma linha, e existe para
  * a agente nunca se apresentar como "undefined" a um paciente.
  */
-const NOME_PADRAO = 'Letícia'
+const NOME_PADRAO = 'Gabriela'
 
 export async function montarPrompt(
   promptBase?: string | null,

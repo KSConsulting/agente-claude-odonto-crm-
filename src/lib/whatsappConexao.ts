@@ -94,7 +94,7 @@ export function nomeDoProvedor(chave: string): string {
   return NOME_PROVEDOR[chave] ?? chave
 }
 
-/** `true` quando a Letícia consegue receber e responder. */
+/** `true` quando a Gabriela consegue receber e responder. */
 export function conexaoDePe(c: Conexao | null): boolean {
   return c?.estado === 'conectado'
 }

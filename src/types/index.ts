@@ -130,7 +130,7 @@ export interface LeadClinica {
   /**
    * ⚠️ **CALCULADA na view `crm_clinica`** — os itens acima juntados por
    * vírgula. Existe para as telas que mostram uma linha só (CRM, Dashboard,
-   * exportação) e para a ficha que a Letícia lê.
+   * exportação) e para a ficha que a Gabriela lê.
    *
    * **Nunca grave aqui.** Escrever nesta coluna é escrever numa expressão da
    * view; quem recebe o valor é `procedimentos_interesse`.
@@ -366,7 +366,7 @@ export interface ConfiguracoesAgente {
    * eram dois sistemas que não se falavam, e renomear exigia editar os dois.
    *
    * ⚠️ Isto é o NOME, não o cargo. "Secretária IA" e "Secretária de IA"
-   * continuam constantes no código — trocar "Letícia" por "Sofia" não renomeia
+   * continuam constantes no código — trocar "Gabriela" por "Sofia" não renomeia
    * a página. O banco garante não-vazio (`not null` + `CHECK` de 1 a 40).
    */
   nome_agente: string

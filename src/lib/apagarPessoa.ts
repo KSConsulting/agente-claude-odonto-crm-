@@ -12,7 +12,7 @@ import { buscarPorWhatsapp, type PessoaResumo } from './contatos'
  * É o direito ao esquecimento da LGPD, e também a saída prática para número
  * errado e para lixo de teste.
  *
- * Depois disso a Letícia não sabe mais nada dela: a ficha volta a ser "você
+ * Depois disso a Gabriela não sabe mais nada dela: a ficha volta a ser "você
  * ainda não sabe nada sobre esta pessoa", e na próxima mensagem ela se
  * apresenta e pergunta o nome, como na primeira vez.
  *

@@ -7,7 +7,7 @@ import { supabase } from './supabase'
  *
  * Marcar consulta é o começo; **dar baixa é o que fecha o funil**. É a baixa
  * que promove a pessoa de Contato a Paciente (`src/lib/pessoas.ts`), que
- * alimenta a conversão do Dashboard e que enche o histórico que a Letícia lê
+ * alimenta a conversão do Dashboard e que enche o histórico que a Gabriela lê
  * antes de responder.
  *
  * Sem ela, o paciente é atendido e continua em "Consulta Agendada" para

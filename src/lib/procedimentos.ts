@@ -68,7 +68,7 @@ export function precoParaCampo(valor: number | null): string {
  * diferentes num relatório — e a pergunta que a clínica faz ("qual o
  * procedimento mais procurado?") passa a não ter resposta, sem que nada avise.
  *
- * O banco trava por baixo (migrações `0022` e `0023`), e a Letícia escolhe de
+ * O banco trava por baixo (migrações `0022` e `0023`), e a Gabriela escolhe de
  * uma lista fechada. Isto aqui é a mesma trava do lado de quem digita: ela
  * existe para o erro **não ser possível**, e não para ser corrigido depois.
  *

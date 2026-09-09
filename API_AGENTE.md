@@ -7,7 +7,7 @@ disponibilidade, marcar, consultar, cancelar e remarcar consultas.
 > documento foram exercitados por HTTP contra o projeto real — conflito,
 > expediente, idempotência, conferência de dono, fuso e token revogado.
 
-> ### ⚠️ A Letícia não usa esta API
+> ### ⚠️ A Gabriela não usa esta API
 >
 > O Agente de IA da clínica mora **dentro deste projeto** (a Edge Function
 > `whatsapp`) e chama as funções SQL da `0004` **direto, por RPC** — sem passar
@@ -363,7 +363,7 @@ o dentista abrir a agenda e já saber do que se trata.
 > ⚠️ **`GET /procedimentos` ainda devolve só os nomes**, então não dá para saber
 > de antemão quais passam pela avaliação: quem consome descobre pela recusa.
 > Para um agente conversando, isso significa oferecer horário e voltar atrás na
-> frente do paciente. A Letícia não sofre disso porque lê o catálogo pela view
+> frente do paciente. A Gabriela não sofre disso porque lê o catálogo pela view
 > `procedimentos_clinica_agente`, que traz o fluxo escrito na linha.
 
 > ⚠️ **Procedimento fora do catálogo é RECUSADO.** Isto mudou na migração

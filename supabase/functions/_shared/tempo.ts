@@ -10,7 +10,7 @@
  * em São Paulo**.
  *
  * Foi exatamente isso que aconteceu em produção: o paciente pediu 14h, a
- * Letícia mandou 14h, e a consulta foi gravada às 11h. Pior que as três horas:
+ * Gabriela mandou 14h, e a consulta foi gravada às 11h. Pior que as três horas:
  * com jornada das 8h às 18h, **toda a manhã ficava impossível de agendar** —
  * um pedido das 9h virava 6h, caía fora do expediente, e ela respondia "não
  * tenho horário" para um horário livre.

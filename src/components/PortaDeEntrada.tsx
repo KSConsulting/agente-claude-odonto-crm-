@@ -10,7 +10,7 @@ import type { ServicoClinica } from '../types'
  *
  * Ela não é um tratamento: é por onde os tratamentos começam. No meio da grade
  * ela vira o vigésimo card igual aos outros, quando é a consulta que mais vai
- * acontecer na clínica — e a única que a Letícia marca sozinha.
+ * acontecer na clínica — e a única que a Gabriela marca sozinha.
  *
  * Fica em cima, com contorno próprio, e os tratamentos ficam embaixo.
  *
@@ -94,7 +94,7 @@ export default function PortaDeEntrada({ porta, onEditar }: Props) {
         </button>
       </div>
 
-      {/* Os dois dados que a Letícia usa. Mudam em Editar. */}
+      {/* Os dois dados que a Gabriela usa. Mudam em Editar. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginTop: 13, paddingTop: 12, borderTop: '1px solid #EDF2F4' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#6B818C' }}>
           <Clock size={13} /> {porta.duracao_minutos} minutos

@@ -166,7 +166,7 @@ e nenhuma delas fica entre a tela e o banco.
 
 > ### 📘 O passo a passo completo é o [`INSTALACAO.md`](INSTALACAO.md)
 >
-> Do zero até a Letícia atendendo no WhatsApp, com o que **você** faz e o que a
+> Do zero até a Gabriela atendendo no WhatsApp, com o que **você** faz e o que a
 > **IA da sua IDE** faz, separados. Esta seção é só o resumo — se as duas
 > discordarem, vale o `INSTALACAO.md`.
 
@@ -176,11 +176,11 @@ e nenhuma delas fica entre a tela e o banco.
 |:-:|---|---|
 | 👤 | **Contas** | Supabase, OpenAI e **uma** ponte de WhatsApp (Evolution ou uazapi) |
 | 👤 | **Três arquivos** | Colar as chaves em `.env`, `.supabase-token.local` e `agente-ia/.env.agente.local` |
-| 🤖 | **A IDE** | Ela aplica as 25 migrações e publica as duas funções. Você cola uma frase |
+| 🤖 | **A IDE** | Ela aplica as 26 migrações e publica as duas funções. Você cola uma frase |
 | 👤 | **Quatro cliques** | 1º usuário · política de senha · **apontar o webhook** · Vercel |
 | 👤 | **Encerrar** | Testar, e **revogar os dois tokens** da instalação |
 
-**Dá para parar antes da Letícia.** O sistema de gestão — agenda, CRM,
+**Dá para parar antes da Gabriela.** O sistema de gestão — agenda, CRM,
 pacientes, faturamento — funciona inteiro sem ela, e a equipe atende à mão pela
 tela Conversas.
 
@@ -401,7 +401,7 @@ proteção de interface, não substitui as políticas do Supabase.
 
 ## Integração com o Agente de IA
 
-O agente é a **Letícia**, e ela mora dentro deste repositório: a Edge Function
+O agente é a **Gabriela**, e ela mora dentro deste repositório: a Edge Function
 `supabase/functions/whatsapp/`.
 
 Quem entrega as mensagens é a ponte de WhatsApp escolhida pela clínica —
@@ -487,7 +487,7 @@ Sete endpoints para consultar disponibilidade, marcar, consultar, cancelar e
 remarcar, além de listar profissionais e procedimentos. Rodam numa Edge Function
 do Supabase, autenticados por token.
 
-**A Letícia não usa esses endpoints** — ela roda no mesmo projeto e chama as
+**A Gabriela não usa esses endpoints** — ela roda no mesmo projeto e chama as
 funções SQL direto. A API existe para integração externa: outro sistema da
 clínica, uma automação, um parceiro. As duas portas descem para as mesmas
 funções, e é isso que impede uma de oferecer horário que a outra recusa.
@@ -509,7 +509,7 @@ As políticas de RLS liberam apenas o papel `authenticated`, que corresponde a u
 sessão de usuário logado. **Servidor não tem sessão.**
 
 As Edge Functions recebem a `service_role key` do próprio Supabase, então isso já
-está resolvido para a Letícia. Vale para qualquer outra automação que alguém
+está resolvido para a Gabriela. Vale para qualquer outra automação que alguém
 aponte para o banco: com a chave `anon`, as gravações **falham em silêncio** —
 `200 OK`, zero linhas afetadas, nenhum lead no sistema.
 
@@ -702,7 +702,7 @@ resposta ao paciente, não como erro.
 
 | Arquivo | Conteúdo |
 |---|---|
-| [`INSTALACAO.md`](INSTALACAO.md) | **O passo a passo da instalação**, do zero até a Letícia atendendo — separando o que você faz do que a IA da IDE faz |
+| [`INSTALACAO.md`](INSTALACAO.md) | **O passo a passo da instalação**, do zero até a Gabriela atendendo — separando o que você faz do que a IA da IDE faz |
 | [`DATABASE.md`](DATABASE.md) | Referência completa do banco: todas as colunas, RLS, Storage, Realtime, armadilhas e consultas de verificação |
 | [`API_AGENTE.md`](API_AGENTE.md) | Contrato da API da agenda para integração externa: os sete endpoints, com cURL pronto, e o desenho dos tokens de acesso |
 | [`CLAUDE.md`](CLAUDE.md) | Convenções de código, design system, rotas e débito técnico conhecido |

@@ -21,7 +21,7 @@ Nesse caso:
    de cada vez.
 3. **Respeite a divisão de quem age.** As partes 1, 2, 4, 5 e 6 são dela: criar
    contas, colar chaves, clicar em painéis de terceiros, configurar pela tela.
-   A parte 3 é sua: aplicar as 25 migrações e publicar as duas Edge Functions.
+   A parte 3 é sua: aplicar as 26 migrações e publicar as duas Edge Functions.
    Não tente fazer a parte dela, e não deixe a parte 3 para ela.
 4. **Não pule a parte 5**, mesmo que o sistema já esteja funcionando. O banco
    nasce com o catálogo de procedimentos da clínica de origem, e desde a
@@ -62,7 +62,7 @@ clínica, não redistribuir. O clone exige credencial: sem um token do GitHub ou
 
 > **A instalação tem um dono: [`INSTALACAO.md`](INSTALACAO.md).** Ela já esteve
 > espalhada em três documentos, que discordavam — um dizia 24 migrações, o
-> outro "os dois arquivos", e nenhum mencionava as chaves da Letícia. O
+> outro "os dois arquivos", e nenhum mencionava as chaves da Gabriela. O
 > `README.md`, o `DATABASE.md` e o `agente-ia/README.md` agora **apontam** para
 > ele. Mexeu em algo que muda a instalação? **É lá que se atualiza**, e só
 > lá.
@@ -144,7 +144,7 @@ As migrações executáveis ficam em [`supabase/migrations/`](supabase/migration
 e a API do Agente de IA em
 [`supabase/functions/agenda/`](supabase/functions/agenda/).
 
-A migração é aplicada em **vinte e cinco arquivos, nesta ordem**:
+A migração é aplicada em **vinte e seis arquivos, nesta ordem**:
 `0001_schema_inicial.sql`, `0002_agenda_profissionais.sql` (agenda e
 profissionais), `0003_whatsapp_unico.sql` (WhatsApp normalizado e único),
 `0004_api_agente.sql` (tokens e funções da API),
@@ -175,7 +175,8 @@ e o interesse do lead vira lista) e `0023_marcar_so_do_catalogo.sql` (o
 banco em vez de trazer todo mundo) e `0025_jornada_no_banco.sql` (a jornada vira
 regra do banco: a função `dentro_da_jornada()`, o conserto do defeito da
 meia-noite nas três funções que a copiavam, e o trigger que recusa agendar fora
-dela).
+dela) e `0026_nome_gabriela.sql` (a secretária passa a se chamar **Gabriela** —
+um `update` na coluna que a `0019` criou, e nenhuma linha de código junto).
 
 > ⚠️ **A `0021` recria a `agenda_marcar` inteira**, porque `create or replace`
 > exige o corpo todo. O arquivo foi **gerado a partir do
@@ -690,7 +691,7 @@ select (timestamptz '2026-09-01 23:30-03')::date;                               
 
 | | |
 |---|---|
-| **Saiu** | "Horário dos Contatos" (dentro/fora do expediente). Era o argumento da própria Letícia existir — *"X pessoas escreveram fora do horário, e só ela respondeu"* —, mas a clínica não usava. Saiu junto uma consulta a `horario_comercial` e uma regra de horário que dependia do relógio do computador |
+| **Saiu** | "Horário dos Contatos" (dentro/fora do expediente). Era o argumento da própria Gabriela existir — *"X pessoas escreveram fora do horário, e só ela respondeu"* —, mas a clínica não usava. Saiu junto uma consulta a `horario_comercial` e uma regra de horário que dependia do relógio do computador |
 | **Entrou** | **Consultas por profissional**, cada barra na **cor do próprio dentista** — a mesma da Agenda, para o gráfico e o calendário falarem a mesma língua |
 | **Entrou** | **Procedimentos: procurado x realizado**, duas barras por procedimento |
 
@@ -815,8 +816,8 @@ IA, `UserCheck` para a pessoa) e aparece sempre que o autor muda.
 
 | Onde | Como aparece |
 |---|---|
-| Nas telas da equipe | **Secretária IA · Letícia** — o crachá antes do nome |
-| Na conversa com o paciente | **Letícia**, e só |
+| Nas telas da equipe | **Secretária IA · Gabriela** — o crachá antes do nome |
+| Na conversa com o paciente | **Gabriela**, e só |
 
 A equipe precisa saber de relance que quem respondeu foi a IA, e não uma colega.
 O paciente, não: o prompt proíbe — em regra inegociável — que ela diga ser
@@ -834,9 +835,9 @@ Agora:
 
 | O quê | Onde mora | Por quê |
 |---|---|---|
-| **O nome** (`Letícia`) | `configuracoes_agente.nome_agente` | Cada clínica escolhe o seu. Em código, seria um deploy por clínica |
+| **O nome** (`Gabriela`) | `configuracoes_agente.nome_agente` | Cada clínica escolhe o seu. Em código, seria um deploy por clínica |
 | **O cargo** (`Secretária IA`) | [`src/lib/agente.ts`](src/lib/agente.ts) | É o que ela faz, não como se chama |
-| **O nome da página** (`Secretária de IA`) | idem | Trocar "Letícia" por "Sofia" não deve renomear a tela |
+| **O nome da página** (`Secretária de IA`) | idem | Trocar "Gabriela" por "Sofia" não deve renomear a tela |
 
 As telas leem pelo `useAgente()` — um `useSyncExternalStore` alimentado uma vez
 por sessão pelo [`Layout.tsx`](src/components/Layout.tsx), que é o único
@@ -847,6 +848,11 @@ componente por onde toda tela autenticada passa. O prompt lê pelo marcador
 > frases da interface tinham "Letícia" digitado à mão, e elas continuariam
 > falando de uma pessoa que não existe mais no dia em que a clínica renomeasse.
 > Meia renomeação é pior que nenhuma.
+>
+> **A conta foi cobrada na `0026`**, quando o nome virou `Gabriela`: a troca foi
+> um `update` de uma linha, e nenhuma tela precisou ser tocada. Só os dois
+> `NOME_PADRAO` — os fallbacks de meio segundo — acompanharam, e eles não são
+> a fonte de nada.
 
 **O campo na tela é só leitura, e isso é decisão de produto, não limitação.** A
 coluna é gravável e a tela poderia editá-la em três linhas. O campo é inerte
@@ -878,7 +884,7 @@ Mas **só o que é ciclo de vida**: ativar, editar, excluir. O que é conteúdo 
 regra — as descrições, o fluxo de agendamento, o valor — mora no modal de
 Editar. A diferença é o custo do erro: religar um procedimento desligado por
 engano é um clique; mudar o fluxo de agendamento sem perceber muda o que a
-Letícia marca para o paciente.
+Gabriela marca para o paciente.
 
 > **O rodapé do card não esmaece junto.** Desligar um procedimento apaga o corpo
 > (`opacity: 0.5`), mas não o rodapé: apagar o botão que religa é apagar a saída.
@@ -1016,8 +1022,8 @@ Eram quatro portas de texto livre, e todas foram fechadas:
 |---|---|
 | Modal **Novo Paciente** | Caixas de seleção com os procedimentos ativos |
 | Modal **Novo Agendamento** | Lista suspensa, **sem campo livre** |
-| `atualizar_ficha` (a Letícia) | `enum` no JSON Schema, montado a cada mensagem |
-| `agenda_marcar` (Letícia e API) | Recusa com `procedimento_desconhecido` |
+| `atualizar_ficha` (a Gabriela) | `enum` no JSON Schema, montado a cada mensagem |
+| `agenda_marcar` (Gabriela e API) | Recusa com `procedimento_desconhecido` |
 
 E o banco confere por baixo, nas duas tabelas (migração `0022`).
 
@@ -1082,7 +1088,7 @@ não gravar.**
 
 > ⚠️ **A lista entra no schema a cada mensagem**, lida de `servicos_clinica`.
 > Fixa no código, ela envelheceria no dia em que a clínica cadastrasse mais um
-> procedimento — e o sintoma seria a Letícia não conseguir marcar algo que está
+> procedimento — e o sintoma seria a Gabriela não conseguir marcar algo que está
 > na tela dela. Se a leitura falhar, o campo volta a ser texto livre: `enum`
 > vazio é recusado pelos fornecedores, e o resultado seria ela parar de
 > responder. Grafia solta é ruim; secretária muda é pior.
@@ -1115,7 +1121,7 @@ Clareamento.
 | **Uma caixa, não três categorias** | "Passa pela avaliação", ligado ou desligado. A versão de três níveis foi descartada: duas delas mandavam o agente fazer exatamente a mesma coisa, e categoria que não muda comportamento só serve para ser preenchida errado |
 | **A caixa mora no modal de Editar** | É decisão que se toma pensando, uma vez — não coisa para clicar de passagem numa grade de vinte cards, onde é fácil errar o vizinho. O card **mostra** o resultado ("Passa pela avaliação" / "Agenda direto · a partir de R$ 250"), porque senão descobrir quais passam exigiria abrir vinte modais |
 | **Uma porta só, garantida por índice** | `servicos_clinica_avaliacao_unica` é parcial (`where e_avaliacao`). Duas portas seriam duas respostas para a mesma pergunta |
-| **A trava mora na função SQL** | `agenda_marcar` recusa, e devolve o nome da porta. Prompt é pedido, não trava — a Letícia já ignorou regra escrita com o dado na frente dela. E como as duas portas dos agentes descem para a mesma função, a API externa herda a regra de graça |
+| **A trava mora na função SQL** | `agenda_marcar` recusa, e devolve o nome da porta. Prompt é pedido, não trava — a Gabriela já ignorou regra escrita com o dado na frente dela. E como as duas portas dos agentes descem para a mesma função, a API externa herda a regra de graça |
 | **A recepção passa por fora** | `NovoAgendamentoModal` grava direto em `consultas`. A regra existe para impedir um **agente** de decidir clínica, não para impedir a clínica de marcar o que quiser. Vale para **esta** regra: a da jornada a recepção não fura mais (ver "Agendar fora da jornada não existe") |
 
 **O preço tem três estados, e o do meio é o que vale.** Vazio, ela não fala
@@ -1234,7 +1240,7 @@ Duas decisões menores que sobreviveram:
 
 #### A ficha do lead virou editável
 
-Nome, WhatsApp e procedimentos eram **só leitura** ali. Um nome que a Letícia
+Nome, WhatsApp e procedimentos eram **só leitura** ali. Um nome que a Gabriela
 entendeu errado, ou um número digitado torto, só tinham conserto pela IDE.
 
 | Decisão | Por quê |
@@ -1243,12 +1249,12 @@ entendeu errado, ou um número digitado torto, só tinham conserto pela IDE.
 | **O botão só acende quando há o que salvar**, e diz "Nada mudou por aqui" quando não há | Botão apagado sem motivo escrito parece botão quebrado |
 | **A pendência é comparada com o que está GRAVADO** | Não com um sinalizador de "mexeu". Mexer e voltar ao valor original deixa de contar, e o salvar zera tudo sozinho — não há um `setSujo(false)` para alguém esquecer num `onChange` novo |
 | **O WhatsApp usa o mesmo `CampoTelefone` do cadastro** | A regra de país e de contagem de dígitos mora num lugar só |
-| **O resumo continua só leitura** | Quem escreve é a Letícia, por `atualizar_ficha`. Editá-lo aqui seria apagar à mão o que ela reescreve na mensagem seguinte |
+| **O resumo continua só leitura** | Quem escreve é a Gabriela, por `atualizar_ficha`. Editá-lo aqui seria apagar à mão o que ela reescreve na mensagem seguinte |
 
 > ⚠️ **Campo não tocado não entra no `update`.** O `CampoTelefone` manda `''`
 > tanto para "apagou" quanto para "está no meio de digitar" — os dois são
 > inválidos para ele. Sem um `whatsappTocado`, sair da ficha com o número pela
-> metade **zeraria o WhatsApp da pessoa**, que é a chave por onde a Letícia a
+> metade **zeraria o WhatsApp da pessoa**, que é a chave por onde a Gabriela a
 > encontra.
 
 > **O que a tela mostra depois de salvar é a linha que o banco devolveu**
@@ -1288,7 +1294,7 @@ cards, com a conexão e o modo teste no meio — e respondem à mesma pergunta:
 **E ele é só leitura, como o nome — pelo mesmo motivo, com um agravante.** A
 tela editava o prompt e gravava em `configuracoes_agente.prompt`, criando uma
 versão **que não ia para o Git**. No dia em que alguém precisasse entender por
-que a Letícia mudou de comportamento, não haveria histórico nenhum — e o
+que a Gabriela mudou de comportamento, não haveria histórico nenhum — e o
 `prompt.md` continuaria descrevendo uma agente que não existe mais. Hoje o card
 mostra qual dos dois está no ar, e manda editar pelo
 [`prompt.md`](agente-ia/prompt.md).
@@ -1386,7 +1392,7 @@ por dois motivos:
    pessoa, que fica logo abaixo. Ação destrutiva não fica no topo.
 
 O card de estado passou a apontar para ele em uma linha ("Para desligar a
-Letícia, vá até o fim desta página"), porque esconder sem dizer onde está é
+Gabriela, vá até o fim desta página"), porque esconder sem dizer onde está é
 esconder de verdade.
 
 > ⚠️ **O card explica o que NÃO acontece, e é a parte que mais importa.** Três
@@ -1855,7 +1861,7 @@ e está todo listado no mapa daquele README.
 > estiver em etapa não concluída não existe — não procure o arquivo.
 
 **Ela não usa n8n nem Chatwoot.** Esse era o desenho antigo, abandonado antes de
-rodar. Hoje a Letícia é a Edge Function
+rodar. Hoje a Gabriela é a Edge Function
 [`supabase/functions/whatsapp/`](supabase/functions/whatsapp/), chamada por
 webhook pela ponte de WhatsApp ativa — **Evolution API v2** ou **uazapi v2**,
 à escolha da clínica no seletor de Secretária de IA. Duas heranças ficaram no
@@ -1884,7 +1890,7 @@ Nada mais. Detalhes na **seção 8 do [`DATABASE.md`](DATABASE.md)**.
 > nome do perfil do WhatsApp em todo webhook; ele é **ignorado de propósito**. O
 > perfil é o apelido que a pessoa escolheu, não quem vai sentar na cadeira — o
 > telefone do marido, "Casa da Sogra", o número dividido entre duas pessoas. E o
-> estrago não era só o nome errado no CRM: com a ficha já preenchida, a Letícia
+> estrago não era só o nome errado no CRM: com a ficha já preenchida, a Gabriela
 > lia "já sei o nome" e **nunca perguntava**, então ninguém corrigia. O nome vem
 > da conversa, por `atualizar_ficha`, e de mais lugar nenhum. Até ela perguntar,
 > as telas mostram o número formatado.
@@ -1894,7 +1900,7 @@ dia da semana, consultas por profissional, o ranking de procedimentos
 (procurado x realizado) e a taxa de conversão do funil.
 
 > **A rosca "dentro e fora do horário comercial" existiu e foi removida** a
-> pedido da clínica, em 02/09/2026. Ela era o argumento mais direto da Letícia
+> pedido da clínica, em 02/09/2026. Ela era o argumento mais direto da Gabriela
 > existir — *"X pessoas escreveram fora do expediente, e só ela respondeu"*.
 > Quem quiser de volta: o dado é `inicio_atendimento` cruzado com
 > `horario_comercial`, e agora seria uma sexta função na `0024`, no fuso da
@@ -1938,7 +1944,7 @@ por número de WhatsApp, para sempre.
 **A ficha é o único lugar do prompt que carrega ordem, e não só dado.** Quando
 existe consulta marcada, `montarFicha()` acrescenta uma segunda linha mandando
 não oferecer agendamento. Parece repetir as `REGRAS INEGOCIÁVEIS`, e não é: num
-teste real a Letícia ofereceu agendar a quem tinha hora no dia seguinte — com
+teste real a Gabriela ofereceu agendar a quem tinha hora no dia seguinte — com
 o dado na frente dela, e recitando esse mesmo dado trinta segundos depois.
 Regra colada no dado, na **última** coisa que o modelo lê, pesa mais que a mesma
 regra dez seções acima. E não custa cache: esta seção já é volátil. O caso
@@ -1971,18 +1977,18 @@ e quem grava é `agenda_marcar`, chamada pela ferramenta.
 a idempotência da `chave_externa`; ao bater na restrição de sobreposição, devolve
 um `23P01` cru, sem frase para dizer a quem está esperando no WhatsApp.
 
-> **Duas portas, uma regra.** A Letícia chama as funções SQL **direto**, por RPC,
+> **Duas portas, uma regra.** A Gabriela chama as funções SQL **direto**, por RPC,
 > porque roda dentro do mesmo projeto. Quem está de fora usa os sete endpoints da
 > função `agenda/`, com token. As duas descem para as mesmas funções da migração
 > `0004` — é isso que impede as duas de divergirem.
 >
 > ⚠️ **Mas a mesma função SQL não garante o mesmo resultado.** As duas portas já
 > divergiram: `agenda_marcar` recebe `timestamptz`, e o que chega antes disso é
-> texto. A API pública convertia o texto no fuso da clínica; a Letícia mandava
+> texto. A API pública convertia o texto no fuso da clínica; a Gabriela mandava
 > cru. Sem fuso, quem resolve é o Postgres, e a sessão do PostgREST roda em UTC
 > — 14:00 da clínica virava 14:00 de Londres, gravado às **11:00**. A conversão
 > agora é `paraInstante()`, e existe **duas vezes**: em
-> `supabase/functions/_shared/tempo.ts` (Letícia) e dentro de
+> `supabase/functions/_shared/tempo.ts` (Gabriela) e dentro de
 > `supabase/functions/agenda/index.ts` (API), que não pode ter import. **Mudou
 > uma, mude a outra.** O caso está contado na seção 7 do
 > [`agente-ia/README.md`](agente-ia/README.md).
@@ -1997,7 +2003,7 @@ trigger `consultas_sincroniza_lead`.
 remarcar), para **integração externa**, autenticados por token próprio e não
 pela `service_role key`.
 
-> **A Letícia não usa esses endpoints.** Ela mora no mesmo projeto e chama as
+> **A Gabriela não usa esses endpoints.** Ela mora no mesmo projeto e chama as
 > funções SQL direto. A API existe para quem está de fora.
 
 Quatro coisas para não descobrir do jeito difícil:
@@ -2021,7 +2027,7 @@ Quatro coisas para não descobrir do jeito difícil:
    > a frase de **servidor fora do ar** — para uma recusa de **negócio**. Quem
    > integrava ia reiniciar máquina por causa do nome de um procedimento.
    >
-   > **A Letícia nunca caiu nisso**, porque tem frase própria em
+   > **A Gabriela nunca caiu nisso**, porque tem frase própria em
    > `ferramentas.ts`. É sempre a porta de fora que fica para trás: mexeu numa
    > função `agenda_*`, confira o mapa.
 

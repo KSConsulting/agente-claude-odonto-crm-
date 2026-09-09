@@ -20,7 +20,7 @@ import { useSyncExternalStore } from 'react'
  *
  * O **cargo** ("Secretária IA") e o **nome da página** ("Secretária de IA")
  * continuam constantes de propósito: são o que ela faz e como a tela se chama.
- * Trocar "Letícia" por "Sofia" não deve renomear a página.
+ * Trocar "Gabriela" por "Sofia" não deve renomear a página.
  */
 
 /** O que ela é. Só aparece nas telas da equipe. */
@@ -30,7 +30,7 @@ export const AGENTE_TITULO = 'Secretária IA'
  * O nome da PÁGINA dela, no menu do usuário.
  *
  * Repare que aqui tem "de": foi como o produto pediu. `AGENTE_TITULO` é o
- * crachá que vem antes do nome ("Secretária IA · Letícia"); este é o nome da
+ * crachá que vem antes do nome ("Secretária IA · Gabriela"); este é o nome da
  * tela. Se um dia os dois tiverem que virar um só, é aqui que se decide.
  */
 export const AGENTE_PAGINA = 'Secretária de IA'
@@ -42,7 +42,7 @@ export const AGENTE_PAGINA = 'Secretária de IA'
  * abrir e a resposta chegar. Deixar vazio faria a interface piscar frases sem
  * sujeito ("nada chega na ").
  */
-export const NOME_PADRAO = 'Letícia'
+export const NOME_PADRAO = 'Gabriela'
 
 // ---------------------------------------------------------------------------
 // A loja: um valor e quem quer saber quando ele muda
@@ -74,7 +74,7 @@ export function nomeDoAgente(): string {
   return nome
 }
 
-/** `Secretária IA · Letícia`. Para rótulos, não para frases. */
+/** `Secretária IA · Gabriela`. Para rótulos, não para frases. */
 export function rotuloDoAgente(): string {
   return `${AGENTE_TITULO} · ${nome}`
 }
@@ -83,17 +83,17 @@ export function rotuloDoAgente(): string {
  * O nome dela numa tela, que re-renderiza sozinho quando alguém troca.
  *
  * Devolve as três formas porque as três aparecem, e montá-las na mão em cada
- * componente é como surgem "Secretária IA - Letícia" e "Secretaria IA Letícia"
+ * componente é como surgem "Secretária IA - Gabriela" e "Secretaria IA Gabriela"
  * na mesma tela.
  */
 export function useAgente(): {
-  /** Só o nome: `Letícia`. Para frases. */
+  /** Só o nome: `Gabriela`. Para frases. */
   nome: string
   /** O cargo: `Secretária IA`. */
   titulo: string
-  /** `Secretária IA · Letícia`. Para rótulos e etiquetas. */
+  /** `Secretária IA · Gabriela`. Para rótulos e etiquetas. */
   rotulo: string
-  /** `Secretária IA Letícia`. Para frases que precisam do cargo junto. */
+  /** `Secretária IA Gabriela`. Para frases que precisam do cargo junto. */
   porExtenso: string
 } {
   const atual = useSyncExternalStore(inscrever, nomeDoAgente, () => NOME_PADRAO)

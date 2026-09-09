@@ -73,7 +73,7 @@ export async function enviarMensagem(leadId: string, texto: string): Promise<voi
 }
 
 /**
- * Assume a conversa: a Letícia para de responder ESTA conversa, e só ela.
+ * Assume a conversa: a Gabriela para de responder ESTA conversa, e só ela.
  * O agente continua atendendo todo mundo.
  */
 export async function assumirConversa(leadId: string, usuarioId: string): Promise<void> {
@@ -89,7 +89,7 @@ export async function assumirConversa(leadId: string, usuarioId: string): Promis
   if (error) throw error
 }
 
-/** Devolve para a Letícia. */
+/** Devolve para a Gabriela. */
 export async function devolverConversa(leadId: string): Promise<void> {
   const { error } = await supabase
     .from('crm_clinica')

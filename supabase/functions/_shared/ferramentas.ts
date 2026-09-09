@@ -1,5 +1,5 @@
 /**
- * As ferramentas da Letícia.
+ * As ferramentas da Gabriela.
  *
  * Cada uma chama uma função SQL que JÁ EXISTIA (migração 0004) — a mesma que a
  * API `agenda/` usa. A regra de jornada, a escolha de dentista livre e a trava
@@ -43,7 +43,7 @@ const TEXTO = { type: 'string' }
  *
  * ⚠️ **A lista é montada a cada mensagem**, com os procedimentos ATIVOS. Uma
  * lista fixa no código envelheceria no dia em que a clínica cadastrasse o
- * vigésimo primeiro — e o sintoma seria a Letícia não conseguir marcar algo que
+ * vigésimo primeiro — e o sintoma seria a Gabriela não conseguir marcar algo que
  * está na tela dela.
  *
  * O banco continua conferindo por baixo (`0022` e `0023`): `enum` é o que
@@ -304,7 +304,7 @@ function ehNomeGenerico(nome: string): boolean {
   // escrita manual pelo terminal do Windows, não pelo agente: as 44 mensagens
   // da conversa estavam intactas.
   //
-  // O perigo não é a escrita original, é a CÓPIA. A Letícia lê o nome na ficha
+  // O perigo não é a escrita original, é a CÓPIA. A Gabriela lê o nome na ficha
   // e o repete de boa-fé na próxima `atualizar_ficha` — e aí o erro deixa de
   // ter culpado e passa a se manter sozinho. Recusar aqui faz a ficha voltar a
   // ficar vazia, e vazia ela pergunta de novo.
@@ -661,7 +661,7 @@ export async function executar(
           ok: true,
           procedimento: p.nome,
           // Sem texto longo, devolve o curto. Nunca "não tenho informação" —
-          // isso faria a Letícia dizer que não sabe do que a clínica faz.
+          // isso faria a Gabriela dizer que não sabe do que a clínica faz.
           detalhes: p.descricao_longa?.trim() || p.descricao || '',
         }
       }
@@ -702,7 +702,7 @@ export async function executar(
 
         // ⚠️ NOME DE MENTIRA É PIOR QUE NOME VAZIO.
         //
-        // Gravado "cliente", a ficha passa a parecer preenchida: a Letícia lê
+        // Gravado "cliente", a ficha passa a parecer preenchida: a Gabriela lê
         // "já sei o nome" e nunca mais pergunta, e as telas mostram um lead
         // chamado "cliente" para sempre. Vazio, o número formatado aparece na
         // tela e ela continua perguntando — que é o certo. Mesma razão pela

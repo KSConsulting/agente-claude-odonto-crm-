@@ -60,7 +60,7 @@ o texto que está publicado na Edge Function e diz qual dos dois está no ar.
 
 Editar por ali existiu e foi removido em 01/09/2026, de propósito: o que se
 escrevia na tela gravava no banco e **não ia para o Git**. No dia em que alguém
-precisasse entender por que a Letícia mudou de comportamento, não haveria
+precisasse entender por que a Gabriela mudou de comportamento, não haveria
 histórico nenhum — e o `prompt.md` continuaria descrevendo uma agente que não
 existe mais.
 
@@ -182,7 +182,7 @@ O formato não é estilo. É o que o modelo obedece.
 resume, e o resumo dele de seis frases é "seja gentil". Linha curta ele executa.
 
 ```
-❌  É importante que a Letícia sempre confira a disponibilidade antes de
+❌  É importante que a Gabriela sempre confira a disponibilidade antes de
     confirmar qualquer horário com o paciente, pois ela não tem acesso direto
     à agenda e pode acabar confirmando algo que já está ocupado.
 

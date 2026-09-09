@@ -26,7 +26,7 @@ Documentação completa do schema. Serve para quem baixar este sistema e precisa
 
 ### 1.1. Rodar as migrações
 
-Abra o **SQL Editor** no painel do Supabase e execute os **vinte e cinco
+Abra o **SQL Editor** no painel do Supabase e execute os **vinte e seis
 arquivos, nesta ordem** — cada um depende do anterior:
 
 1. `supabase/migrations/0001_schema_inicial.sql` — 6 tabelas, 1 view, 9 índices,
@@ -150,6 +150,12 @@ arquivos, nesta ordem** — cada um depende do anterior:
     reescrita de `agenda_profissionais_livres`, `agenda_marcar` e
     `agenda_remarcar` para chamarem a função em vez de repetirem a regra.
     Detalhes em 4.20.
+
+26. `supabase/migrations/0026_nome_gabriela.sql` — a secretária passa a se
+    chamar **Gabriela**. É um `update` de uma linha na coluna que a `0019`
+    criou, e existe como migração — e não como comando avulso — porque o
+    padrão da `0019` continua sendo `'Letícia'`: um banco recriado do zero
+    voltaria ao nome da clínica de origem. Detalhes em 4.16.
 
     > **Ela conserta um defeito silencioso.** As três cópias comparavam o fim
     > da consulta como *hora do dia*: numa jornada das 08:00 às 18:00, uma
@@ -669,7 +675,7 @@ Grade de atendimento — **uma linha por dia da semana**.
 
 **Usada em:** `Configuracoes.tsx` (edição) e `jornada_texto(null)` (4.15), que
 monta a linha `Atendimento:` da view `informacoes_clinica_agente` (4.12) — a
-frase que a Letícia fala.
+frase que a Gabriela fala.
 
 > **O Dashboard lia esta tabela e não lê mais.** Era a rosca "dentro x fora do
 > horário comercial", removida em 02/09/2026 a pedido da clínica.
@@ -797,7 +803,7 @@ Daí as duas réguas, ambas avisadas na tela de edição:
 - **`descricao` até ~120 caracteres.** É o catálogo: serve para o agente saber
   que o procedimento existe, não para explicá-lo.
 - **`descricao_longa` em torno de 430, teto sugerido de 600.** Não é limite
-  técnico. A Letícia responde em até 50 palavras; acima disso ela para de
+  técnico. A Gabriela responde em até 50 palavras; acima disso ela para de
   escolher o que dizer e passa a **resumir por conta própria** — e resumo
   automático é onde nasce a frase que nenhum dentista escreveu.
 
@@ -1166,7 +1172,7 @@ existe, não vai existir, procure em `mensagens_whatsapp`.
 
 ### 4.17. `mensagens_whatsapp` · `configuracoes_agente` (migração `0010`)
 
-Criadas para o Agente de IA próprio — a Letícia — que substitui o fluxo do n8n.
+Criadas para o Agente de IA próprio — a Gabriela — que substitui o fluxo do n8n.
 
 **📘 A documentação completa está em
 [`agente-ia/README.md`](agente-ia/README.md), seção 6.** Aqui fica só o
@@ -1242,13 +1248,20 @@ Agora é uma coluna, e os dois leem dela: as telas pelo `useAgente()`, o prompt
 pelo marcador `{{NOME_AGENTE}}`.
 
 > ⚠️ **É o NOME, não o cargo.** "Secretária IA" (o crachá) e "Secretária de IA"
-> (o nome da página) continuam constantes no código: trocar "Letícia" por
+> (o nome da página) continuam constantes no código: trocar "Gabriela" por
 > "Sofia" não deve renomear a tela.
 
 `not null` com padrão `'Letícia'` e `CHECK` de 1 a 40 caracteres depois do
 `trim`. Vazio não é um estado que valha a pena existir — a agente se apresenta
 em toda primeira mensagem, e nulo obrigaria todo leitor a ter um fallback
 próprio, até um deles esquecer e ela se apresentar como "undefined".
+
+> ⚠️ **O padrão é `'Letícia'`, mas o valor desta instalação é `Gabriela`.** O
+> padrão é o nome da clínica de origem e continua escrito na `0019`, que é
+> registro do que rodou. Quem troca é a
+> [`0026`](supabase/migrations/0026_nome_gabriela.sql), com um `update` — e é
+> por isso que ela existe em vez de um `update` avulso no SQL Editor: sem ela,
+> um banco recriado do zero voltaria a se chamar Letícia.
 
 Regra do projeto: mudou o `CHECK`, mude `src/types/index.ts` no mesmo commit.
 
@@ -1265,7 +1278,7 @@ Regra do projeto: mudou o `CHECK`, mude `src/types/index.ts` no mesmo commit.
 > ⚠️ **`horario_comercial` é o horário da clínica; `profissional_horarios` é o
 > que a agenda realmente oferece.** Os dois podem divergir: anunciar até as
 > 18:00 sem nenhum dentista depois das 17:00 faz o agente prometer horário que a
-> consulta de disponibilidade recusa em seguida. A Letícia lê o primeiro para
+> consulta de disponibilidade recusa em seguida. A Gabriela lê o primeiro para
 > conversar e o segundo para marcar — e não tem como perceber sozinha que os
 > dois discordam.
 
@@ -1742,7 +1755,7 @@ ficha antes destruiria a única forma de saber quais arquivos eram dela.
 
 ## 8. Integração com o Agente de IA
 
-O agente é a **Letícia**, e ela **mora dentro deste projeto**: a Edge Function
+O agente é a **Gabriela**, e ela **mora dentro deste projeto**: a Edge Function
 [`supabase/functions/whatsapp/`](supabase/functions/whatsapp/). Quem entrega as
 mensagens é a **Evolution API** (WhatsApp não oficial, v2), que chama a função
 por webhook. Quem pensa é a OpenAI.
@@ -1847,7 +1860,7 @@ Duas consequências:
    seção "A foto vira texto" do [`agente-ia/README.md`](agente-ia/README.md)
 5. **Espera 12 segundos, em duas etapas.** Aos 8, acende o "digitando…"; aos 12,
    responde. Se chegou mensagem nova em qualquer uma delas, esta execução
-   desiste — quem responde é a última. É o que faz a Letícia responder as três
+   desiste — quem responde é a última. É o que faz a Gabriela responder as três
    mensagens picadas de uma vez, como gente
 6. `agente_deve_responder()` decide: agente ligado? conversa não assumida por
    um atendente? número liberado no modo teste?
@@ -1895,13 +1908,13 @@ A diferença é o caminho, não a regra:
 
 | Quem | Como chega na agenda | Autenticação |
 |---|---|---|
-| A Letícia (função `whatsapp`) | Chama as funções SQL **direto**, por RPC no PostgREST | A `service_role key` que o Supabase injeta |
+| A Gabriela (função `whatsapp`) | Chama as funções SQL **direto**, por RPC no PostgREST | A `service_role key` que o Supabase injeta |
 | Qualquer integração externa | `POST /marcar`, `GET /disponibilidade`… na função `agenda` | Token próprio, criado em Configurações → Token e API |
 
 **As duas descem para as mesmas funções da 4.11.** A regra de jornada, a escolha
 de dentista livre e a trava de sobreposição vivem num lugar só — e é isso que
 mantém as duas portas honestas entre si. A `agenda/` acrescenta, para quem está
-de fora, o que a Letícia não precisa: conferência de token, tradução de recusa
+de fora, o que a Gabriela não precisa: conferência de token, tradução de recusa
 em frase pronta e HTTP.
 
 O que existe no banco por causa dessa história:
@@ -1909,7 +1922,7 @@ O que existe no banco por causa dessa história:
 | Peça | Por quê |
 |---|---|
 | `consultas_sem_sobreposicao` (4.2) | Recepção e agente escrevem ao mesmo tempo; só o banco fecha a janela |
-| `chave_externa` UNIQUE (4.2) | Retry não pode virar consulta duplicada. A Letícia usa `wa_{lead}_{data_hora}` |
+| `chave_externa` UNIQUE (4.2) | Retry não pode virar consulta duplicada. A Gabriela usa `wa_{lead}_{data_hora}` |
 | `profissional_bloqueios` (4.9) | Sem isso não existe "disponibilidade" confiável |
 | `configuracoes_clinica.fuso_horario` (4.4) | Servidor em UTC; sem fixar o fuso, a disponibilidade erra em 3 horas |
 | `origem` (4.2) | Sem isso é impossível medir ou auditar o que o agente marcou sozinho |
@@ -2055,7 +2068,7 @@ Lista do que quebra este banco de formas não óbvias:
 22. **Reescrever a regra de jornada em SQL sem mexer no TypeScript** (ou o
     contrário) → `dentro_da_jornada()` (4.20) e `motivoForaDaJornada()`
     (`src/lib/agenda.ts`) são as duas únicas implementações que sobraram, e
-    elas têm de concordar. Divergindo, a recepção recusa o que a Letícia já
+    elas têm de concordar. Divergindo, a recepção recusa o que a Gabriela já
     prometeu ao paciente — ou marca o que ela recusa.
 
 ---
