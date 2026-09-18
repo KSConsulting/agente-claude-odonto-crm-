@@ -21,7 +21,10 @@ const aqui = dirname(fileURLToPath(import.meta.url))
 const origem = join(aqui, 'prompt.md')
 const destino = join(aqui, '..', 'supabase', 'functions', '_shared', 'prompt-oficial.ts')
 
-const prompt = readFileSync(origem, 'utf8')
+// \r\n -> \n: no Windows, o core.autocrlf do Git grava o .md com CRLF no
+// checkout. Sem isto, o prompt embutido carrega \r a mais e diverge do que
+// foi gerado (e commitado) num checkout Unix, mesmo com o .md idêntico.
+const prompt = readFileSync(origem, 'utf8').replace(/\r\n/g, '\n')
 
 // JSON.stringify em vez de template literal: o prompt tem crase, cifrão e
 // chaves duplas. Escapar isso à mão é como se cria um bug que só aparece
